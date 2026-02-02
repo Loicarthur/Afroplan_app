@@ -5,12 +5,16 @@
 
 import { supabase } from '@/lib/supabase';
 
+// Acompte fixe à la réservation (en centimes)
+export const BOOKING_DEPOSIT = 1000; // 10€ d'acompte
+
 // Configuration des taux de commission selon le plan d'abonnement
+// La commission est prise sur l'acompte de 10€
 export const COMMISSION_RATES = {
-  free: 0.15,      // 15% pour le plan gratuit
-  starter: 0.10,   // 10% pour le plan Starter (19€/mois)
-  pro: 0.08,       // 8% pour le plan Pro (39€/mois)
-  premium: 0.05,   // 5% pour le plan Premium (79€/mois)
+  free: 0.15,      // 15% = 1.50€ sur l'acompte de 10€
+  starter: 0.10,   // 10% = 1€ sur l'acompte de 10€
+  pro: 0.08,       // 8% = 0.80€ sur l'acompte de 10€
+  premium: 0.05,   // 5% = 0.50€ sur l'acompte de 10€
 } as const;
 
 // Plans d'abonnement pour les salons
@@ -76,9 +80,11 @@ export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 
 export interface PaymentIntent {
   id: string;
   bookingId: string;
-  amount: number;
-  commission: number;
-  salonAmount: number;
+  depositAmount: number;      // Acompte payé par le client (10€)
+  totalServicePrice: number;  // Prix total du service
+  remainingAmount: number;    // Reste à payer au salon
+  commission: number;         // Commission Afro'Planet sur l'acompte
+  salonDepositAmount: number; // Part de l'acompte reversée au salon
   currency: string;
   status: PaymentStatus;
   stripePaymentIntentId?: string;
@@ -98,29 +104,37 @@ export interface StripeAccount {
 
 export const paymentService = {
   /**
-   * Calculer la commission et le montant pour le salon
+   * Calculer la commission sur l'acompte
+   * L'acompte est toujours de 10€, la commission est prise dessus
    */
-  calculateCommission(
-    amount: number,
+  calculateDepositCommission(
     plan: SubscriptionPlan = 'free'
-  ): { commission: number; salonAmount: number; commissionRate: number } {
+  ): {
+    depositAmount: number;
+    commission: number;
+    salonDepositAmount: number;
+    commissionRate: number;
+  } {
+    const depositAmount = BOOKING_DEPOSIT; // 10€ = 1000 centimes
     const commissionRate = COMMISSION_RATES[plan];
-    const commission = Math.round(amount * commissionRate);
-    const salonAmount = amount - commission;
+    const commission = Math.round(depositAmount * commissionRate);
+    const salonDepositAmount = depositAmount - commission;
 
     return {
+      depositAmount,
       commission,
-      salonAmount,
+      salonDepositAmount,
       commissionRate,
     };
   },
 
   /**
-   * Créer une intention de paiement pour une réservation
+   * Créer une intention de paiement pour l'acompte d'une réservation
+   * Le client paie 10€ d'acompte, le reste sera payé au salon directement
    */
   async createPaymentIntent(
     bookingId: string,
-    amount: number,
+    totalServicePrice: number,
     salonId: string
   ): Promise<PaymentIntent> {
     // Récupérer le compte Stripe du salon
@@ -131,7 +145,11 @@ export const paymentService = {
       .single();
 
     const plan = stripeAccount?.subscription_plan || 'free';
-    const { commission, salonAmount, commissionRate } = this.calculateCommission(amount, plan);
+    const { depositAmount, commission, salonDepositAmount, commissionRate } =
+      this.calculateDepositCommission(plan);
+
+    // Calculer le reste à payer au salon
+    const remainingAmount = totalServicePrice - depositAmount;
 
     // Enregistrer le paiement en base
     const { data: payment, error } = await supabase
@@ -139,12 +157,15 @@ export const paymentService = {
       .insert({
         booking_id: bookingId,
         salon_id: salonId,
-        amount,
+        amount: depositAmount,           // Acompte de 10€
+        total_service_price: totalServicePrice,
+        remaining_amount: remainingAmount,
         commission,
-        salon_amount: salonAmount,
+        salon_amount: salonDepositAmount,
         commission_rate: commissionRate,
         currency: 'eur',
         status: 'pending',
+        payment_type: 'deposit',
       })
       .select()
       .single();
@@ -158,9 +179,11 @@ export const paymentService = {
     return {
       id: payment.id,
       bookingId,
-      amount,
+      depositAmount,
+      totalServicePrice,
+      remainingAmount,
       commission,
-      salonAmount,
+      salonDepositAmount,
       currency: 'eur',
       status: 'pending',
     };

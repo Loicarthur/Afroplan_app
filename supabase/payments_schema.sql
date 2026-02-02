@@ -63,11 +63,14 @@ CREATE TABLE payments (
     salon_id UUID NOT NULL REFERENCES salons(id) ON DELETE CASCADE,
 
     -- Montants
-    amount INTEGER NOT NULL, -- Montant total en centimes
-    commission INTEGER NOT NULL, -- Commission Afro'Planet en centimes
-    salon_amount INTEGER NOT NULL, -- Montant reversé au salon en centimes
+    amount INTEGER NOT NULL, -- Acompte payé en centimes (10€ = 1000)
+    total_service_price INTEGER NOT NULL, -- Prix total du service en centimes
+    remaining_amount INTEGER NOT NULL, -- Reste à payer au salon en centimes
+    commission INTEGER NOT NULL, -- Commission Afro'Planet sur l'acompte en centimes
+    salon_amount INTEGER NOT NULL, -- Part de l'acompte reversée au salon en centimes
     commission_rate DECIMAL(4, 4) NOT NULL, -- Taux de commission appliqué
     currency TEXT DEFAULT 'eur',
+    payment_type TEXT DEFAULT 'deposit', -- 'deposit' = acompte
 
     -- Statut
     status payment_status DEFAULT 'pending',

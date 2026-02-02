@@ -21,7 +21,7 @@ import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { paymentService } from '@/services/payment.service';
+import { paymentService, BOOKING_DEPOSIT } from '@/services/payment.service';
 
 interface BookingDetails {
   salonName: string;
@@ -53,9 +53,9 @@ export default function CheckoutScreen() {
     duration: parseInt(params.duration as string) || 180,
   };
 
-  // Frais de service (exemple: 2€)
-  const serviceFee = 200;
-  const totalAmount = bookingDetails.servicePrice + serviceFee;
+  // Acompte fixe de 10€
+  const depositAmount = BOOKING_DEPOSIT; // 1000 centimes = 10€
+  const remainingAmount = bookingDetails.servicePrice - depositAmount;
 
   const formatAmount = (cents: number) => {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
@@ -280,42 +280,56 @@ export default function CheckoutScreen() {
 
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-              {bookingDetails.serviceName}
+              Prix du service ({bookingDetails.serviceName})
             </Text>
             <Text style={[styles.priceValue, { color: colors.text }]}>
               {formatAmount(bookingDetails.servicePrice)}
             </Text>
           </View>
 
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
           <View style={styles.priceRow}>
             <View style={styles.priceLabelWithInfo}>
-              <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-                Frais de service
+              <Text style={[styles.depositLabel, { color: colors.primary }]}>
+                Acompte à payer maintenant
               </Text>
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
-                    'Frais de service',
-                    'Ces frais nous permettent de maintenir la plateforme, garantir un paiement sécurisé et offrir un support client 24/7.'
+                    'Acompte de réservation',
+                    'Cet acompte de 10€ confirme votre réservation et sera déduit du prix total. Le reste sera payé directement au salon le jour du rendez-vous.'
                   )
                 }
               >
-                <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+                <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            <Text style={[styles.priceValue, { color: colors.text }]}>
-              {formatAmount(serviceFee)}
+            <Text style={[styles.depositValue, { color: colors.primary }]}>
+              {formatAmount(depositAmount)}
             </Text>
           </View>
 
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
           <View style={styles.priceRow}>
-            <Text style={[styles.totalLabel, { color: colors.text }]}>
-              Total
+            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
+              Reste à payer au salon
             </Text>
-            <Text style={[styles.totalValue, { color: colors.primary }]}>
-              {formatAmount(totalAmount)}
+            <Text style={[styles.priceValue, { color: colors.textSecondary }]}>
+              {formatAmount(remainingAmount)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Info acompte */}
+        <View style={[styles.depositInfoCard, { backgroundColor: '#F0FDF4' }]}>
+          <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
+          <View style={styles.depositInfoContent}>
+            <Text style={[styles.depositInfoTitle, { color: '#166534' }]}>
+              Paiement sécurisé en 2 étapes
+            </Text>
+            <Text style={[styles.depositInfoText, { color: '#15803D' }]}>
+              1. Payez 10€ d'acompte maintenant{'\n'}
+              2. Réglez le reste ({formatAmount(remainingAmount)}) au salon
             </Text>
           </View>
         </View>
@@ -348,7 +362,7 @@ export default function CheckoutScreen() {
               <>
                 <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
                 <Text style={styles.payButtonText}>
-                  Payer {formatAmount(totalAmount)}
+                  Payer l'acompte de {formatAmount(depositAmount)}
                 </Text>
               </>
             )}
@@ -512,13 +526,34 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: 12,
   },
-  totalLabel: {
-    fontSize: 16,
+  depositLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  depositValue: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: '700',
+  depositInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  depositInfoContent: {
+    flex: 1,
+  },
+  depositInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  depositInfoText: {
+    fontSize: 13,
+    lineHeight: 20,
   },
   termsContainer: {
     flexDirection: 'row',
