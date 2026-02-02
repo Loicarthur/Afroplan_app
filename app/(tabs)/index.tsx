@@ -81,12 +81,31 @@ export default function HomeScreen() {
                 : 'Bienvenue sur AfroPlan'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
-            onPress={() => router.push('/modal')}
-          >
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {isAuthenticated ? (
+              <TouchableOpacity
+                style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => router.push('/modal')}
+              >
+                <Ionicons name="notifications-outline" size={24} color={colors.text} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.authButtons}>
+                <TouchableOpacity
+                  style={[styles.loginButton, { borderColor: colors.primary }]}
+                  onPress={() => router.push('/(auth)/login')}
+                >
+                  <Text style={[styles.loginButtonText, { color: colors.primary }]}>Connexion</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.registerButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/(auth)/register')}
+                >
+                  <Text style={styles.registerButtonText}>Inscription</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -276,6 +295,35 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  loginButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  loginButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  registerButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  registerButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   greeting: {
     fontSize: FontSizes.md,

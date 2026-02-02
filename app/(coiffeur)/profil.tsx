@@ -1,5 +1,5 @@
 /**
- * Page de profil utilisateur AfroPlan
+ * Page profil - Espace Coiffeur AfroPlan
  */
 
 import React from 'react';
@@ -63,10 +63,10 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
   );
 }
 
-export default function ProfileScreen() {
+export default function CoiffeurProfilScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, isAuthenticated, signOut, isLoading } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
   const handleSignOut = () => {
     Alert.alert(
@@ -80,6 +80,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await signOut();
+              router.replace('/(tabs)');
             } catch (error) {
               console.error('Erreur lors de la deconnexion:', error);
             }
@@ -89,39 +90,12 @@ export default function ProfileScreen() {
     );
   };
 
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.authPrompt}>
-          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.backgroundSecondary }]}>
-            <Ionicons name="person-outline" size={60} color={colors.textMuted} />
-          </View>
-          <Text style={[styles.authTitle, { color: colors.text }]}>
-            Bienvenue sur AfroPlan
-          </Text>
-          <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-            Connectez-vous pour acceder a votre profil et gerer vos reservations
-          </Text>
-          <Button
-            title="Se connecter"
-            onPress={() => router.push('/(auth)/login')}
-            fullWidth
-            style={{ marginTop: Spacing.lg }}
-          />
-          <Button
-            title="Creer un compte"
-            variant="outline"
-            onPress={() => router.push('/(auth)/register')}
-            fullWidth
-            style={{ marginTop: Spacing.sm }}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handleSwitchToClient = () => {
+    router.replace('/(tabs)');
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -135,7 +109,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarInitials}>
-                  {profile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                  {profile?.full_name?.charAt(0)?.toUpperCase() || 'C'}
                 </Text>
               </View>
             )}
@@ -146,37 +120,69 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>
-            {profile?.full_name || 'Utilisateur'}
+            {profile?.full_name || 'Coiffeur'}
           </Text>
           <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
             {profile?.email || user?.email}
           </Text>
-          {profile?.role === 'coiffeur' && (
-            <View style={[styles.roleBadge, { backgroundColor: colors.accent }]}>
-              <Ionicons name="cut" size={14} color="#1A1A1A" />
-              <Text style={styles.roleBadgeText}>Coiffeur</Text>
-            </View>
-          )}
+          <View style={[styles.roleBadge, { backgroundColor: colors.accent }]}>
+            <Ionicons name="cut" size={14} color="#1A1A1A" />
+            <Text style={styles.roleBadgeText}>Coiffeur Professionnel</Text>
+          </View>
         </View>
 
-        {/* Switch to Pro Mode for Coiffeurs */}
-        {profile?.role === 'coiffeur' && (
-          <View style={styles.switchSection}>
-            <TouchableOpacity
-              style={[styles.switchButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/(coiffeur)')}
-            >
-              <Ionicons name="storefront" size={24} color="#FFFFFF" />
-              <View style={styles.switchContent}>
-                <Text style={styles.switchTitle}>Espace Coiffeur</Text>
-                <Text style={styles.switchSubtitle}>Gerer votre salon et vos reservations</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Switch to Client Mode */}
+        <View style={styles.switchSection}>
+          <TouchableOpacity
+            style={[styles.switchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleSwitchToClient}
+          >
+            <Ionicons name="swap-horizontal" size={24} color={colors.primary} />
+            <View style={styles.switchContent}>
+              <Text style={[styles.switchTitle, { color: colors.text }]}>
+                Mode Client
+              </Text>
+              <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
+                Basculer vers l'espace client
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
 
         {/* Menu Sections */}
+        <View style={styles.menuSection}>
+          <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
+            Mon activite
+          </Text>
+          <View style={[styles.menuGroup, Shadows.sm]}>
+            <MenuItem
+              icon="storefront-outline"
+              title="Mon salon"
+              subtitle="Gerer les informations du salon"
+              onPress={() => router.push('/(coiffeur)/salon')}
+            />
+            <MenuItem
+              icon="cut-outline"
+              title="Mes services"
+              subtitle="Gerer les prestations"
+              onPress={() => router.push('/(coiffeur)/services')}
+            />
+            <MenuItem
+              icon="calendar-outline"
+              title="Reservations"
+              subtitle="Voir toutes les reservations"
+              onPress={() => router.push('/(coiffeur)/reservations')}
+            />
+            <MenuItem
+              icon="stats-chart-outline"
+              title="Statistiques"
+              subtitle="Revenus et performances"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+          </View>
+        </View>
+
         <View style={styles.menuSection}>
           <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
             Compte
@@ -193,34 +199,15 @@ export default function ProfileScreen() {
               onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
             />
             <MenuItem
+              icon="card-outline"
+              title="Paiements"
+              subtitle="Configurer les paiements"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
               icon="lock-closed-outline"
               title="Securite"
               subtitle="Mot de passe, authentification"
-              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
-            />
-          </View>
-        </View>
-
-        <View style={styles.menuSection}>
-          <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-            Preferences
-          </Text>
-          <View style={[styles.menuGroup, Shadows.sm]}>
-            <MenuItem
-              icon="globe-outline"
-              title="Langue"
-              subtitle="Francais"
-              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
-            />
-            <MenuItem
-              icon="moon-outline"
-              title="Theme"
-              subtitle={colorScheme === 'dark' ? 'Sombre' : 'Clair'}
-              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
-            />
-            <MenuItem
-              icon="location-outline"
-              title="Localisation"
               onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
             />
           </View>
@@ -233,17 +220,17 @@ export default function ProfileScreen() {
           <View style={[styles.menuGroup, Shadows.sm]}>
             <MenuItem
               icon="help-circle-outline"
-              title="Aide"
+              title="Aide & FAQ"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
+              icon="chatbubble-outline"
+              title="Contacter le support"
               onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
             />
             <MenuItem
               icon="document-text-outline"
               title="Conditions d'utilisation"
-              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
-            />
-            <MenuItem
-              icon="shield-checkmark-outline"
-              title="Politique de confidentialite"
               onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
             />
           </View>
@@ -264,7 +251,7 @@ export default function ProfileScreen() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={[styles.appName, { color: colors.textMuted }]}>
-            AfroPlan
+            AfroPlan Pro
           </Text>
           <Text style={[styles.appVersion, { color: colors.textMuted }]}>
             Version 1.0.0
@@ -280,23 +267,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  authPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  authTitle: {
-    fontSize: FontSizes.xxl,
-    fontWeight: '700',
-    marginTop: Spacing.lg,
-    textAlign: 'center',
-  },
-  authSubtitle: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
   },
   profileHeader: {
     alignItems: 'center',
@@ -370,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
+    borderWidth: 1,
   },
   switchContent: {
     flex: 1,
@@ -378,12 +349,10 @@ const styles = StyleSheet.create({
   switchTitle: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   switchSubtitle: {
     fontSize: FontSizes.sm,
     marginTop: 2,
-    color: 'rgba(255,255,255,0.8)',
   },
   menuSection: {
     paddingHorizontal: Spacing.md,
