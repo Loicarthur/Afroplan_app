@@ -5,10 +5,10 @@
 
 import { Platform } from 'react-native';
 
-// Couleurs principales AfroPlan
-const primaryColor = '#8B4513'; // Brun Afro
-const accentColor = '#DAA520'; // Or / Dore
-const secondaryColor = '#2D1810'; // Brun fonce
+// Couleurs principales AfroPlan - Design violet/magenta
+const primaryColor = '#8B5CF6'; // Violet principal
+const accentColor = '#F97316'; // Orange accent
+const secondaryColor = '#7C3AED'; // Violet foncé
 
 export const Colors = {
   light: {
@@ -17,17 +17,21 @@ export const Colors = {
     textSecondary: '#666666',
     textMuted: '#999999',
     background: '#FFFFFF',
-    backgroundSecondary: '#F8F5F2',
+    backgroundSecondary: '#F8F8F8',
     card: '#FFFFFF',
-    border: '#E5E0DB',
+    border: '#E5E5E5',
 
     // Couleurs de marque
     primary: primaryColor,
-    primaryLight: '#A65D2A',
-    primaryDark: '#6B3410',
+    primaryLight: '#A78BFA',
+    primaryDark: '#7C3AED',
     accent: accentColor,
-    accentLight: '#F0D88A',
+    accentLight: '#FB923C',
     secondary: secondaryColor,
+
+    // Gradient colors
+    gradientStart: '#8B5CF6',
+    gradientEnd: '#EC4899',
 
     // Couleurs fonctionnelles
     success: '#22C55E',
@@ -45,13 +49,20 @@ export const Colors = {
     inputBackground: '#F5F5F5',
     inputBorder: '#E0E0E0',
     placeholder: '#9CA3AF',
-    divider: '#E5E0DB',
+    divider: '#E5E5E5',
     shadow: 'rgba(0, 0, 0, 0.1)',
     overlay: 'rgba(0, 0, 0, 0.5)',
 
     // Rating stars
-    starFilled: accentColor,
+    starFilled: '#FBBF24',
     starEmpty: '#D1D5DB',
+
+    // Category badges
+    badgeBraids: '#8B5CF6',
+    badgeNatural: '#F97316',
+    badgeTwists: '#EC4899',
+    badgeLocs: '#22C55E',
+    badgeWeave: '#3B82F6',
   },
   dark: {
     // Couleurs de base
@@ -64,12 +75,16 @@ export const Colors = {
     border: '#333333',
 
     // Couleurs de marque
-    primary: '#C87137',
-    primaryLight: '#D4894F',
+    primary: '#A78BFA',
+    primaryLight: '#C4B5FD',
     primaryDark: primaryColor,
     accent: accentColor,
-    accentLight: '#F0D88A',
-    secondary: '#4A3028',
+    accentLight: '#FB923C',
+    secondary: '#8B5CF6',
+
+    // Gradient colors
+    gradientStart: '#8B5CF6',
+    gradientEnd: '#EC4899',
 
     // Couleurs fonctionnelles
     success: '#22C55E',
@@ -78,10 +93,10 @@ export const Colors = {
     info: '#3B82F6',
 
     // Navigation
-    tint: '#C87137',
+    tint: '#A78BFA',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: '#C87137',
+    tabIconSelected: '#A78BFA',
 
     // Composants specifiques
     inputBackground: '#2A2A2A',
@@ -92,8 +107,15 @@ export const Colors = {
     overlay: 'rgba(0, 0, 0, 0.7)',
 
     // Rating stars
-    starFilled: accentColor,
+    starFilled: '#FBBF24',
     starEmpty: '#4B5563',
+
+    // Category badges
+    badgeBraids: '#A78BFA',
+    badgeNatural: '#FB923C',
+    badgeTwists: '#F472B6',
+    badgeLocs: '#34D399',
+    badgeWeave: '#60A5FA',
   },
 };
 

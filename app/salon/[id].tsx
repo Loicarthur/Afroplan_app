@@ -87,8 +87,17 @@ export default function SalonDetailScreen() {
       return;
     }
 
-    // Navigate to booking flow
-    Alert.alert('Reservation', `Service: ${selectedService.name}\nPrix: ${selectedService.price} EUR`);
+    // Navigate to booking flow with service details
+    router.push({
+      pathname: '/booking/[id]',
+      params: {
+        id: id,
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        servicePrice: selectedService.price.toString(),
+        serviceDuration: selectedService.duration_minutes.toString(),
+      },
+    });
   };
 
   const handleFavorite = async () => {

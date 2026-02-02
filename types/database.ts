@@ -174,6 +174,12 @@ export interface Database {
           status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
           notes: string | null;
           total_price: number;
+          payment_method: 'full' | 'deposit' | 'on_site';
+          payment_status: 'pending' | 'partial' | 'completed' | 'refunded';
+          deposit_amount: number;
+          amount_paid: number;
+          remaining_amount: number | null;
+          payment_date: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -189,6 +195,12 @@ export interface Database {
           status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
           notes?: string | null;
           total_price: number;
+          payment_method?: 'full' | 'deposit' | 'on_site';
+          payment_status?: 'pending' | 'partial' | 'completed' | 'refunded';
+          deposit_amount?: number;
+          amount_paid?: number;
+          remaining_amount?: number | null;
+          payment_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -204,6 +216,12 @@ export interface Database {
           status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
           notes?: string | null;
           total_price?: number;
+          payment_method?: 'full' | 'deposit' | 'on_site';
+          payment_status?: 'pending' | 'partial' | 'completed' | 'refunded';
+          deposit_amount?: number;
+          amount_paid?: number;
+          remaining_amount?: number | null;
+          payment_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -345,6 +363,8 @@ export interface Database {
     Enums: {
       user_role: 'client' | 'coiffeur' | 'admin';
       booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+      payment_method: 'full' | 'deposit' | 'on_site';
+      payment_status: 'pending' | 'partial' | 'completed' | 'refunded';
     };
   };
 }
@@ -421,4 +441,19 @@ export type OpeningHours = {
   friday: DaySchedule;
   saturday: DaySchedule;
   sunday: DaySchedule;
+};
+
+// Types pour les paiements
+export type PaymentMethod = 'full' | 'deposit' | 'on_site';
+export type PaymentStatus = 'pending' | 'partial' | 'completed' | 'refunded';
+
+export const DEPOSIT_AMOUNT = 10; // Acompte fixe de 10 EUR
+
+export type PaymentInfo = {
+  method: PaymentMethod;
+  status: PaymentStatus;
+  depositAmount: number;
+  amountPaid: number;
+  remainingAmount: number;
+  totalPrice: number;
 };

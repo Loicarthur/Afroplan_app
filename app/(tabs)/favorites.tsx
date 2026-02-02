@@ -1,5 +1,5 @@
 /**
- * Page des favoris AfroPlan
+ * Page Favoris AfroPlan - Design z5
  */
 
 import React from 'react';
@@ -7,112 +7,201 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  ActivityIndicator,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/contexts/AuthContext';
-import { useFavorites } from '@/hooks/use-favorites';
-import { Colors, Spacing, FontSizes } from '@/constants/theme';
-import { Button, SalonCard } from '@/components/ui';
-import { Salon } from '@/types';
+import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 60) / 2;
+
+// Donnees de test pour les salons favoris
+const FAVORITE_SALONS = [
+  {
+    id: '1',
+    name: 'Bella Coiffure',
+    rating: 4.9,
+    reviews_count: 234,
+    address: 'Paris 18e',
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+  },
+  {
+    id: '2',
+    name: 'Afro Style Studio',
+    rating: 4.8,
+    reviews_count: 189,
+    address: 'Lyon 2e',
+    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+  },
+];
+
+// Donnees de test pour les styles sauvegardes
+const SAVED_STYLES = [
+  {
+    id: '1',
+    name: 'Box Braids Longues',
+    price: '150-200€',
+    category: 'braids',
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    badgeColor: '#8B5CF6',
+  },
+  {
+    id: '2',
+    name: 'Cornrows Design',
+    price: '90-150€',
+    category: 'braids',
+    image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+    badgeColor: '#8B5CF6',
+  },
+  {
+    id: '3',
+    name: 'Faux Locs',
+    price: '180-250€',
+    category: 'locs',
+    image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
+    badgeColor: '#22C55E',
+  },
+  {
+    id: '4',
+    name: 'Passion Twists',
+    price: '120-180€',
+    category: 'twists',
+    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    badgeColor: '#EC4899',
+  },
+];
 
 export default function FavoritesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, isAuthenticated } = useAuth();
 
-  const { favorites, isLoading, refresh, removeFavorite } = useFavorites(user?.id || '');
-
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.authPrompt}>
-          <Ionicons name="heart-outline" size={80} color={colors.textMuted} />
-          <Text style={[styles.authTitle, { color: colors.text }]}>
-            Connectez-vous
-          </Text>
-          <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-            Pour sauvegarder vos salons favoris, vous devez vous connecter
-          </Text>
-          <Button
-            title="Se connecter"
-            onPress={() => router.push('/(auth)/login')}
-            style={{ marginTop: Spacing.lg }}
-          />
-          <Button
-            title="Creer un compte"
-            variant="outline"
-            onPress={() => router.push('/(auth)/register')}
-            style={{ marginTop: Spacing.sm }}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const handleRemoveFavorite = async (salonId: string) => {
-    try {
-      await removeFavorite(salonId);
-    } catch (error) {
-      console.error('Erreur lors de la suppression du favori:', error);
-    }
+  const handleRemoveSalon = (salonId: string) => {
+    // TODO: Remove from favorites
+    console.log('Remove salon:', salonId);
   };
 
-  const renderSalonItem = ({ item }: { item: Salon }) => (
-    <View style={styles.salonItem}>
-      <SalonCard
-        salon={item}
-        variant="horizontal"
-        isFavorite
-        onFavoritePress={() => handleRemoveFavorite(item.id)}
-      />
-    </View>
-  );
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="heart-outline" size={64} color={colors.textMuted} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Aucun favori
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-        Explorez les salons et ajoutez vos preferes a vos favoris
-      </Text>
-      <Button
-        title="Explorer les salons"
-        onPress={() => router.push('/(tabs)/explore')}
-        style={{ marginTop: Spacing.lg }}
-      />
-    </View>
-  );
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      braids: 'Braids',
+      natural: 'Natural',
+      twists: 'Twists',
+      locs: 'Locs',
+      weave: 'Weave',
+    };
+    return labels[category] || category;
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header with Gradient */}
+        <LinearGradient
+          colors={['#8B5CF6', '#EC4899']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.headerIcon}>
+              <Ionicons name="heart" size={28} color="#FFFFFF" />
+            </View>
+            <Text style={styles.headerTitle}>Mes Favoris</Text>
+            <Text style={styles.headerSubtitle}>Vos salons et styles preferes</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Salons Favoris Section */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Salons Favoris ({FAVORITE_SALONS.length})
+          </Text>
+
+          {FAVORITE_SALONS.map((salon) => (
+            <View
+              key={salon.id}
+              style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
+            >
+              <Image
+                source={{ uri: salon.image }}
+                style={styles.salonImage}
+                contentFit="cover"
+              />
+              <View style={styles.salonContent}>
+                <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={14} color="#FBBF24" />
+                  <Text style={[styles.ratingText, { color: colors.text }]}>
+                    {salon.rating}
+                  </Text>
+                  <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
+                    • {salon.reviews_count} avis
+                  </Text>
+                </View>
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.addressText, { color: colors.textSecondary }]}>
+                    {salon.address}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => handleRemoveSalon(salon.id)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
-      ) : (
-        <FlatList
-          data={favorites}
-          keyExtractor={(item) => item.id}
-          renderItem={renderSalonItem}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={[
-            styles.listContent,
-            favorites.length === 0 && styles.emptyListContent,
-          ]}
-          showsVerticalScrollIndicator={false}
-          onRefresh={refresh}
-          refreshing={isLoading}
-        />
-      )}
-    </SafeAreaView>
+
+        {/* Styles Sauvegardes Section */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Styles Sauvegardes ({SAVED_STYLES.length})
+          </Text>
+
+          <View style={styles.stylesGrid}>
+            {SAVED_STYLES.map((style) => (
+              <TouchableOpacity
+                key={style.id}
+                style={[styles.styleCard, { backgroundColor: colors.card }, Shadows.md]}
+              >
+                <View style={styles.styleImageContainer}>
+                  <Image
+                    source={{ uri: style.image }}
+                    style={styles.styleImage}
+                    contentFit="cover"
+                  />
+                  {/* Category badge */}
+                  <View style={[styles.categoryBadge, { backgroundColor: style.badgeColor }]}>
+                    <Text style={styles.badgeText}>{getCategoryLabel(style.category)}</Text>
+                  </View>
+                </View>
+                <View style={styles.styleInfo}>
+                  <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={1}>
+                    {style.name}
+                  </Text>
+                  <Text style={[styles.stylePrice, { color: colors.primary }]}>
+                    {style.price}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -120,51 +209,131 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  authPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+  header: {
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  authTitle: {
-    fontSize: FontSizes.xxl,
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 24,
     fontWeight: '700',
-    marginTop: Spacing.lg,
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
-  authSubtitle: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
   },
-  listContent: {
-    padding: Spacing.md,
-    paddingBottom: Spacing.xxl,
+  section: {
+    paddingTop: 24,
+    paddingHorizontal: 20,
   },
-  emptyListContent: {
-    flex: 1,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
   },
-  salonItem: {
-    marginBottom: Spacing.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  salonCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
   },
-  emptyContainer: {
+  salonImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+  },
+  salonContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+    marginLeft: 12,
   },
-  emptyTitle: {
-    fontSize: FontSizes.xl,
+  salonName: {
+    fontSize: 16,
     fontWeight: '600',
-    marginTop: Spacing.md,
+    marginBottom: 4,
   },
-  emptySubtitle: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  ratingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  reviewsText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addressText: {
+    fontSize: 13,
+    marginLeft: 4,
+  },
+  removeButton: {
+    padding: 8,
+  },
+  stylesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  styleCard: {
+    width: CARD_WIDTH,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  styleImageContainer: {
+    position: 'relative',
+  },
+  styleImage: {
+    width: '100%',
+    height: 140,
+  },
+  categoryBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  styleInfo: {
+    padding: 12,
+  },
+  styleName: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  stylePrice: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

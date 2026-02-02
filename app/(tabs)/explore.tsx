@@ -1,233 +1,234 @@
 /**
- * Page Explorer / Recherche de salons AfroPlan
+ * Page Recherche AfroPlan - Design z4
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
+  TextInput,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useSalons, useSearchSalons, useCategories } from '@/hooks/use-salons';
-import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { SearchBar, SalonCard, CategoryCard } from '@/components/ui';
-import { Salon, Category, SalonFilters } from '@/types';
+import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 
-export default function ExploreScreen() {
+// Filtres de recherche
+const SEARCH_FILTERS = [
+  { id: 'nearby', name: 'Proche de moi', icon: 'location' },
+  { id: 'rated', name: 'Mieux notes', icon: 'star-outline' },
+  { id: 'available', name: 'Disponible', icon: 'time-outline' },
+];
+
+// Donnees de test pour les salons
+const SALONS_DATA = [
+  {
+    id: '1',
+    name: 'Bella Coiffure',
+    rating: 4.9,
+    reviews_count: 234,
+    price_level: '€€€',
+    address: 'Paris 18e',
+    distance: '1.2 km',
+    availability: "Aujourd'hui 15h",
+    availabilityColor: '#22C55E',
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+  },
+  {
+    id: '2',
+    name: 'Afro Style Studio',
+    rating: 4.8,
+    reviews_count: 189,
+    price_level: '€€',
+    address: 'Paris 11e',
+    distance: '2.5 km',
+    availability: 'Demain 10h',
+    availabilityColor: '#F97316',
+    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+  },
+  {
+    id: '3',
+    name: 'Natural Beauty Salon',
+    rating: 4.7,
+    reviews_count: 156,
+    price_level: '€€€',
+    address: 'Paris 13e',
+    distance: '3.8 km',
+    availability: 'Mercredi 14h',
+    availabilityColor: '#8B5CF6',
+    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+  },
+  {
+    id: '4',
+    name: 'Tresses & Co',
+    rating: 4.6,
+    reviews_count: 98,
+    price_level: '€€',
+    address: 'Paris 20e',
+    distance: '4.2 km',
+    availability: "Aujourd'hui 18h",
+    availabilityColor: '#22C55E',
+    image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+  },
+];
+
+export default function SearchScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const params = useLocalSearchParams<{ category?: string }>();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
-    params.category
-  );
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('nearby');
 
-  const filters: SalonFilters = {
-    category: selectedCategory,
-    searchQuery: searchQuery || undefined,
-  };
-
-  const { salons, isLoading, error, hasMore, loadMore, refresh } = useSalons(filters);
-  const { results: searchResults, isLoading: searching, search, clear } = useSearchSalons();
-  const { categories } = useCategories();
-
-  const displayedSalons = searchQuery.length > 2 ? searchResults : salons;
-
-  const handleSearch = useCallback((text: string) => {
-    setSearchQuery(text);
-    if (text.length > 2) {
-      search(text);
-    } else {
-      clear();
-    }
-  }, [search, clear]);
-
-  const handleCategoryPress = (category: Category) => {
-    if (selectedCategory === category.slug) {
-      setSelectedCategory(undefined);
-    } else {
-      setSelectedCategory(category.slug);
-    }
-  };
-
-  const handleClearFilters = () => {
-    setSelectedCategory(undefined);
-    setSearchQuery('');
-    clear();
-  };
-
-  const renderSalonItem = ({ item }: { item: Salon }) => (
-    <View style={styles.salonItem}>
-      <SalonCard salon={item} variant="horizontal" />
-    </View>
+  const filteredSalons = SALONS_DATA.filter((salon) =>
+    salon.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderHeader = () => (
-    <View>
-      {/* Categories */}
-      {categories.length > 0 && (
-        <View style={styles.categoriesSection}>
-          <FlatList
-            data={categories}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.categoriesList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.categoryChip,
-                  {
-                    backgroundColor:
-                      selectedCategory === item.slug
-                        ? colors.primary
-                        : colors.backgroundSecondary,
-                  },
-                ]}
-                onPress={() => handleCategoryPress(item)}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    {
-                      color:
-                        selectedCategory === item.slug
-                          ? '#FFFFFF'
-                          : colors.text,
-                    },
-                  ]}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
-
-      {/* Active Filters */}
-      {(selectedCategory || searchQuery) && (
-        <View style={styles.activeFilters}>
-          <Text style={[styles.activeFiltersText, { color: colors.textSecondary }]}>
-            Filtres actifs:
-          </Text>
-          {selectedCategory && (
-            <View style={[styles.filterTag, { backgroundColor: colors.primary }]}>
-              <Text style={styles.filterTagText}>{selectedCategory}</Text>
-              <TouchableOpacity onPress={() => setSelectedCategory(undefined)}>
-                <Ionicons name="close" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          )}
-          <TouchableOpacity onPress={handleClearFilters}>
-            <Text style={[styles.clearFilters, { color: colors.error }]}>
-              Tout effacer
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Results count */}
-      <View style={styles.resultsHeader}>
-        <Text style={[styles.resultsCount, { color: colors.textSecondary }]}>
-          {displayedSalons.length} salon{displayedSalons.length !== 1 ? 's' : ''} trouve
-          {displayedSalons.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
-    </View>
-  );
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="search-outline" size={64} color={colors.textMuted} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Aucun salon trouve
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-        {error
-          ? 'Configurez votre backend Supabase pour voir les salons'
-          : 'Essayez de modifier vos criteres de recherche'}
-      </Text>
-      {(selectedCategory || searchQuery) && (
-        <TouchableOpacity
-          style={[styles.clearButton, { backgroundColor: colors.primary }]}
-          onPress={handleClearFilters}
-        >
-          <Text style={styles.clearButtonText}>Effacer les filtres</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  const renderFooter = () => {
-    if (!hasMore || isLoading) return null;
-    return (
-      <TouchableOpacity
-        style={[styles.loadMoreButton, { borderColor: colors.border }]}
-        onPress={loadMore}
-      >
-        <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-          Charger plus
-        </Text>
-      </TouchableOpacity>
-    );
+  const handleSalonPress = (salonId: string) => {
+    router.push(`/salon/${salonId}`);
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Search Header */}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Explorer</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Trouvez le salon parfait pour vous
-        </Text>
+        <Text style={[styles.title, { color: colors.text }]}>Recherche</Text>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <SearchBar
-          placeholder="Rechercher un salon, une ville..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-          showFilterButton
-          onFilterPress={() => setShowFilters(!showFilters)}
-        />
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+          <Ionicons name="search" size={20} color={colors.textMuted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Salon, style, quartier..."
+            placeholderTextColor={colors.placeholder}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary }]}>
+          <Ionicons name="options" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Filter Chips */}
+      <View style={styles.filtersWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersContainer}
+        >
+          {SEARCH_FILTERS.map((filter) => (
+            <TouchableOpacity
+              key={filter.id}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: selectedFilter === filter.id ? colors.primary : colors.background,
+                  borderColor: selectedFilter === filter.id ? colors.primary : colors.border,
+                },
+              ]}
+              onPress={() => setSelectedFilter(filter.id)}
+            >
+              <Ionicons
+                name={filter.icon as any}
+                size={16}
+                color={selectedFilter === filter.id ? '#FFFFFF' : colors.text}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color: selectedFilter === filter.id ? '#FFFFFF' : colors.text,
+                  },
+                ]}
+              >
+                {filter.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {/* Progress indicator */}
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+            <View style={[styles.progressBar, { backgroundColor: colors.primary }]} />
+          </View>
+        </View>
+      </View>
+
+      {/* Results Header */}
+      <View style={styles.resultsHeader}>
+        <Text style={[styles.resultsCount, { color: colors.text }]}>
+          {filteredSalons.length} salons trouves
+        </Text>
+        <TouchableOpacity style={styles.sortButton}>
+          <Text style={[styles.sortText, { color: colors.primary }]}>Trier par</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Salons List */}
-      {isLoading && displayedSalons.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Recherche des salons...
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={displayedSalons}
-          keyExtractor={(item) => item.id}
-          renderItem={renderSalonItem}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmpty}
-          ListFooterComponent={renderFooter}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onRefresh={refresh}
-          refreshing={isLoading && displayedSalons.length > 0}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-        />
-      )}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+      >
+        {filteredSalons.map((salon) => (
+          <TouchableOpacity
+            key={salon.id}
+            style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
+            onPress={() => handleSalonPress(salon.id)}
+          >
+            <Image
+              source={{ uri: salon.image }}
+              style={styles.salonImage}
+              contentFit="cover"
+            />
+            <View style={styles.salonContent}>
+              <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color="#FBBF24" />
+                <Text style={[styles.ratingText, { color: colors.text }]}>
+                  {salon.rating}
+                </Text>
+                <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
+                  ({salon.reviews_count})
+                </Text>
+                <Text style={[styles.separator, { color: colors.textMuted }]}>•</Text>
+                <Text style={[styles.priceLevel, { color: colors.textMuted }]}>
+                  {salon.price_level}
+                </Text>
+              </View>
+
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                <Text style={[styles.addressText, { color: colors.textSecondary }]}>
+                  {salon.address}
+                </Text>
+                <Text style={[styles.distanceText, { color: colors.textMuted }]}>
+                  {salon.distance}
+                </Text>
+              </View>
+
+              <View style={styles.availabilityRow}>
+                <Ionicons name="time-outline" size={14} color={salon.availabilityColor} />
+                <Text style={[styles.availabilityText, { color: salon.availabilityColor }]}>
+                  {salon.availability}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+        <View style={{ height: 100 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -237,123 +238,158 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: FontSizes.xxxl,
+    fontSize: 28,
     fontWeight: '700',
   },
-  subtitle: {
-    fontSize: FontSizes.md,
-    marginTop: Spacing.xs,
-  },
   searchContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 12,
   },
-  categoriesSection: {
-    marginBottom: Spacing.md,
-  },
-  categoriesList: {
-    paddingHorizontal: Spacing.md,
-  },
-  categoryChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    marginRight: Spacing.sm,
-  },
-  categoryChipText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
-  },
-  activeFilters: {
+  searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  activeFiltersText: {
-    fontSize: FontSizes.sm,
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
   },
-  filterTag: {
+  filterButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filtersWrapper: {
+    marginBottom: 16,
+  },
+  filtersContainer: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.xs,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
   },
-  filterTagText: {
-    color: '#FFFFFF',
-    fontSize: FontSizes.sm,
-  },
-  clearFilters: {
-    fontSize: FontSizes.sm,
+  filterChipText: {
+    fontSize: 13,
     fontWeight: '500',
+  },
+  progressContainer: {
+    paddingHorizontal: 20,
+    marginTop: 12,
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+  },
+  progressBar: {
+    width: '30%',
+    height: '100%',
+    borderRadius: 2,
   },
   resultsHeader: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   resultsCount: {
-    fontSize: FontSizes.sm,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  listContent: {
-    paddingBottom: Spacing.xxl,
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  salonItem: {
-    paddingHorizontal: Spacing.md,
+  sortText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  loadingContainer: {
+  listContainer: {
+    paddingHorizontal: 20,
+  },
+  salonCard: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    padding: 12,
+  },
+  salonImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+  },
+  salonContent: {
     flex: 1,
+    marginLeft: 12,
     justifyContent: 'center',
+  },
+  salonName: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  ratingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  reviewsText: {
+    fontSize: 12,
+    marginLeft: 2,
+  },
+  separator: {
+    marginHorizontal: 6,
+  },
+  priceLevel: {
+    fontSize: 12,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 13,
+    marginLeft: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: Spacing.md,
-    fontSize: FontSizes.md,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xxl,
-  },
-  emptyTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '600',
-    marginTop: Spacing.md,
-  },
-  emptySubtitle: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-  },
-  clearButton: {
-    marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-  },
-  clearButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  loadMoreButton: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  loadMoreText: {
-    fontWeight: '600',
+  availabilityText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 4,
   },
 });
