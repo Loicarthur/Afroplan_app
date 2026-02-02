@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -97,11 +98,16 @@ export default function RegisterScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
+            <Image
+              source={require('@/assets/images/logo_afro.jpeg')}
+              style={styles.logoImage}
+              contentFit="contain"
+            />
             <Text style={[styles.title, { color: colors.text }]}>
               Creer un compte
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Rejoignez la communaute AfroPlan
+              Rejoignez la communaute Afro'Planet
             </Text>
           </View>
 
@@ -263,8 +269,15 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
   },
   header: {
+    alignItems: 'center',
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: Spacing.md,
   },
   title: {
     fontSize: FontSizes.xxl,

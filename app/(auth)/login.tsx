@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,11 +78,13 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-              <Ionicons name="cut" size={40} color="#FFFFFF" />
-            </View>
+            <Image
+              source={require('@/assets/images/logo_afro.jpeg')}
+              style={styles.logoImage}
+              contentFit="contain"
+            />
             <Text style={[styles.title, { color: colors.text }]}>
-              Bienvenue sur AfroPlan
+              Bienvenue sur Afro'Planet
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Connectez-vous pour acceder a votre compte
@@ -195,12 +198,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.lg,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     marginBottom: Spacing.lg,
   },
   title: {

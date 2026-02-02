@@ -108,11 +108,13 @@ export default function HomeScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoIcon}>
-                <Text style={styles.logoEmoji}>💇🏾‍♀️</Text>
-              </View>
+              <Image
+                source={require('@/assets/images/logo_afro.jpeg')}
+                style={styles.logoImage}
+                contentFit="contain"
+              />
               <View>
-                <Text style={styles.logoText}>AfroPlan</Text>
+                <Text style={styles.logoText}>Afro'Planet</Text>
                 <Text style={styles.logoSubtext}>Trouvez votre style parfait</Text>
               </View>
             </View>
@@ -248,17 +250,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 45,
+    height: 45,
+    borderRadius: 22,
     marginRight: 12,
-  },
-  logoEmoji: {
-    fontSize: 20,
+    backgroundColor: '#FFFFFF',
   },
   logoText: {
     fontSize: 22,
