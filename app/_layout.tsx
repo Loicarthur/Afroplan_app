@@ -60,10 +60,16 @@ export default function RootLayout() {
       <ThemeProvider value={theme}>
         <Stack>
           <Stack.Screen
+            name="index"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="splash"
             options={{
               headerShown: false,
-              animation: 'fade',
+              animation: 'none',
             }}
           />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
