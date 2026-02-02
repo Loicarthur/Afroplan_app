@@ -122,22 +122,41 @@ export default function HomeScreen() {
               <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
+          <View style={styles.headerRight}>
+            {isAuthenticated ? (
+              <TouchableOpacity
+                style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => router.push('/modal')}
+              >
+                <Ionicons name="notifications-outline" size={24} color={colors.text} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.authButtons}>
+                <TouchableOpacity
+                  style={[styles.loginButton, { borderColor: colors.primary }]}
+                  onPress={() => router.push('/(auth)/login')}
+                >
+                  <Text style={[styles.loginButtonText, { color: colors.primary }]}>Connexion</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.registerButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/(auth)/register')}
+                >
+                  <Text style={styles.registerButtonText}>Inscription</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
 
-          {/* Search Bar */}
-          <TouchableOpacity
-            style={styles.searchBar}
-            onPress={handleSearchPress}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-            <Text style={styles.searchPlaceholder}>Rechercher un salon ou un style...</Text>
-          </TouchableOpacity>
-
-          {/* Location */}
-          <View style={styles.locationContainer}>
-            <View style={styles.locationLeft}>
-              <Ionicons name="location" size={16} color="#FFFFFF" />
-              <Text style={styles.locationText}>{location}</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <TouchableOpacity onPress={handleSearchPress} activeOpacity={0.9}>
+            <View pointerEvents="none">
+              <SearchBar
+                placeholder="Rechercher un salon, un style..."
+                showFilterButton={false}
+              />
             </View>
             <TouchableOpacity>
               <Text style={styles.changeText}>Changer</Text>
@@ -250,12 +269,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logoImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 22,
-    marginRight: 12,
-    backgroundColor: '#FFFFFF',
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  loginButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  loginButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  registerButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  registerButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  greeting: {
+    fontSize: FontSizes.md,
   },
   logoText: {
     fontSize: 22,

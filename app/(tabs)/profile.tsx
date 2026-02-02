@@ -161,33 +161,85 @@ export default function ProfileScreen() {
               <Text style={[styles.seeAll, { color: colors.primary }]}>Voir tout →</Text>
             </TouchableOpacity>
           </View>
-
-          {RECENT_BOOKINGS.map((booking) => (
-            <View
-              key={booking.id}
-              style={[styles.bookingCard, { backgroundColor: colors.card }, Shadows.sm]}
-            >
-              <View style={styles.bookingContent}>
-                <Text style={[styles.bookingSalon, { color: colors.text }]}>
-                  {booking.salon}
-                </Text>
-                <Text style={[styles.bookingService, { color: colors.textSecondary }]}>
-                  {booking.service}
-                </Text>
-                <View style={styles.bookingDateRow}>
-                  <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
-                  <Text style={[styles.bookingDate, { color: colors.textMuted }]}>
-                    {booking.date}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: booking.statusColor + '20' }]}>
-                <Text style={[styles.statusText, { color: booking.statusColor }]}>
-                  {booking.status}
-                </Text>
-              </View>
+          <Text style={[styles.profileName, { color: colors.text }]}>
+            {profile?.full_name || 'Utilisateur'}
+          </Text>
+          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+            {profile?.email || user?.email}
+          </Text>
+          {profile?.role === 'coiffeur' && (
+            <View style={[styles.roleBadge, { backgroundColor: colors.accent }]}>
+              <Ionicons name="cut" size={14} color="#1A1A1A" />
+              <Text style={styles.roleBadgeText}>Coiffeur</Text>
             </View>
-          ))}
+          )}
+        </View>
+
+        {/* Switch to Pro Mode for Coiffeurs */}
+        {profile?.role === 'coiffeur' && (
+          <View style={styles.switchSection}>
+            <TouchableOpacity
+              style={[styles.switchButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/(coiffeur)')}
+            >
+              <Ionicons name="storefront" size={24} color="#FFFFFF" />
+              <View style={styles.switchContent}>
+                <Text style={styles.switchTitle}>Espace Coiffeur</Text>
+                <Text style={styles.switchSubtitle}>Gerer votre salon et vos reservations</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Menu Sections */}
+        <View style={styles.menuSection}>
+          <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
+            Compte
+          </Text>
+          <View style={[styles.menuGroup, Shadows.sm]}>
+            <MenuItem
+              icon="person-outline"
+              title="Modifier le profil"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
+              icon="notifications-outline"
+              title="Notifications"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
+              icon="lock-closed-outline"
+              title="Securite"
+              subtitle="Mot de passe, authentification"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+          </View>
+        </View>
+
+        <View style={styles.menuSection}>
+          <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
+            Preferences
+          </Text>
+          <View style={[styles.menuGroup, Shadows.sm]}>
+            <MenuItem
+              icon="globe-outline"
+              title="Langue"
+              subtitle="Francais"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
+              icon="moon-outline"
+              title="Theme"
+              subtitle={colorScheme === 'dark' ? 'Sombre' : 'Clair'}
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+            <MenuItem
+              icon="location-outline"
+              title="Localisation"
+              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+            />
+          </View>
         </View>
 
         {/* Menu Items */}
@@ -342,25 +394,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 2,
   },
-  bookingService: {
-    fontSize: 13,
-    marginBottom: 4,
+  switchSection: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  bookingDateRow: {
+  switchButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
   },
-  bookingDate: {
-    fontSize: 12,
-    marginLeft: 4,
+  switchContent: {
+    flex: 1,
+    marginLeft: Spacing.md,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  switchTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
-  statusText: {
-    fontSize: 12,
+  switchSubtitle: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  menuSection: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  menuSectionTitle: {
+    fontSize: FontSizes.sm,
     fontWeight: '600',
   },
   menuItem: {

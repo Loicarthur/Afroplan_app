@@ -14,6 +14,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================
 CREATE TYPE user_role AS ENUM ('client', 'coiffeur', 'admin');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed');
+CREATE TYPE payment_method AS ENUM ('full', 'deposit', 'on_site');
+CREATE TYPE payment_status AS ENUM ('pending', 'partial', 'completed', 'refunded');
 
 -- ============================================
 -- TABLE: PROFILES (Utilisateurs)
@@ -195,6 +197,13 @@ CREATE TABLE bookings (
     status booking_status DEFAULT 'pending',
     notes TEXT,
     total_price DECIMAL(10, 2) NOT NULL,
+    -- Champs de paiement
+    payment_method payment_method DEFAULT 'on_site',
+    payment_status payment_status DEFAULT 'pending',
+    deposit_amount DECIMAL(10, 2) DEFAULT 10.00,
+    amount_paid DECIMAL(10, 2) DEFAULT 0,
+    remaining_amount DECIMAL(10, 2),
+    payment_date TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
