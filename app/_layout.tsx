@@ -72,7 +72,15 @@ export default function RootLayout() {
               animation: 'none',
             }}
           />
+          <Stack.Screen
+            name="role-selection"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(coiffeur)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(salon)" options={{ headerShown: false }} />
           <Stack.Screen

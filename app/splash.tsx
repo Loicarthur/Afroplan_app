@@ -42,7 +42,7 @@ export default function SplashScreen() {
     // Annuler les animations
     cancelAnimation(scale);
 
-    router.replace('/(tabs)');
+    router.replace('/role-selection');
   };
 
   useEffect(() => {

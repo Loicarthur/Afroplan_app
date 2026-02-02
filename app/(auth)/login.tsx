@@ -1,8 +1,9 @@
 /**
  * Page de connexion AfroPlan
+ * Design responsive amélioré
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,25 +13,47 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input } from '@/components/ui';
 
+const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+
+const SELECTED_ROLE_KEY = '@afroplan_selected_role';
+
+type UserRole = 'client' | 'coiffeur';
+
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signIn, isLoading } = useAuth();
+  const { signIn, isLoading, profile } = useAuth();
+  const params = useLocalSearchParams<{ role?: string }>();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = params.role || await AsyncStorage.getItem(SELECTED_ROLE_KEY);
+      if (role === 'client' || role === 'coiffeur') {
+        setSelectedRole(role);
+      }
+    };
+    loadRole();
+  }, [params.role]);
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -44,7 +67,7 @@ export default function LoginScreen() {
     if (!password) {
       newErrors.password = 'Le mot de passe est requis';
     } else if (password.length < 6) {
-      newErrors.password = 'Le mot de passe doit contenir au moins 6 caracteres';
+      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
     }
 
     setErrors(newErrors);
@@ -56,7 +79,7 @@ export default function LoginScreen() {
 
     try {
       await signIn(email, password);
-      router.replace('/(tabs)');
+      // La redirection sera gérée après le chargement du profil
     } catch (error) {
       Alert.alert(
         'Erreur de connexion',
@@ -65,8 +88,30 @@ export default function LoginScreen() {
     }
   };
 
+  // Rediriger après connexion en fonction du rôle du profil
+  useEffect(() => {
+    const handleRedirectAfterLogin = async () => {
+      if (profile?.role) {
+        // Utiliser le rôle du profil utilisateur
+        if (profile.role === 'coiffeur') {
+          router.replace('/(coiffeur)');
+        } else {
+          router.replace('/(tabs)');
+        }
+      }
+    };
+
+    handleRedirectAfterLogin();
+  }, [profile]);
+
+  const isClient = selectedRole === 'client';
+  const roleColor = isClient ? '#8B5CF6' : '#F97316';
+  const roleGradient = isClient
+    ? ['#8B5CF6', '#7C3AED']
+    : ['#F97316', '#EA580C'];
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -76,18 +121,47 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.replace('/role-selection')}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+
+          {/* Header with Role Badge */}
           <View style={styles.header}>
-            <Image
-              source={require('@/assets/images/logo_afro.jpeg')}
-              style={styles.logoImage}
-              contentFit="contain"
-            />
+            <View style={styles.logoWrapper}>
+              <Image
+                source={require('@/assets/images/logo_afro.jpeg')}
+                style={styles.logoImage}
+                contentFit="cover"
+              />
+            </View>
+
             <Text style={[styles.title, { color: colors.text }]}>
-              Bienvenue sur AfroPlan
+              Connexion
             </Text>
+
+            {/* Role Badge */}
+            <LinearGradient
+              colors={roleGradient}
+              style={styles.roleBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Ionicons
+                name={isClient ? "person" : "cut"}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.roleBadgeText}>
+                {isClient ? 'Espace Client' : 'Espace Coiffeur'}
+              </Text>
+            </LinearGradient>
+
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Connectez-vous pour acceder a votre compte
+              Connectez-vous pour accéder à votre compte
             </Text>
           </View>
 
@@ -118,10 +192,10 @@ export default function LoginScreen() {
 
             <TouchableOpacity
               style={styles.forgotPassword}
-              onPress={() => Alert.alert('Info', 'Fonctionnalite a venir')}
+              onPress={() => Alert.alert('Info', 'Fonctionnalité à venir')}
             >
-              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                Mot de passe oublie?
+              <Text style={[styles.forgotPasswordText, { color: roleColor }]}>
+                Mot de passe oublié?
               </Text>
             </TouchableOpacity>
 
@@ -130,7 +204,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={isLoading}
               fullWidth
-              style={{ marginTop: Spacing.md }}
+              style={[styles.loginButton, { backgroundColor: roleColor }]}
             />
           </View>
 
@@ -144,22 +218,22 @@ export default function LoginScreen() {
           {/* Social Login */}
           <View style={styles.socialButtons}>
             <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => Alert.alert('Info', 'Connexion Google a venir')}
+              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+              onPress={() => Alert.alert('Info', 'Connexion Google à venir')}
             >
               <Ionicons name="logo-google" size={20} color={colors.text} />
               <Text style={[styles.socialButtonText, { color: colors.text }]}>
-                Continuer avec Google
+                Google
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => Alert.alert('Info', 'Connexion Apple a venir')}
+              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+              onPress={() => Alert.alert('Info', 'Connexion Apple à venir')}
             >
               <Ionicons name="logo-apple" size={20} color={colors.text} />
               <Text style={[styles.socialButtonText, { color: colors.text }]}>
-                Continuer avec Apple
+                Apple
               </Text>
             </TouchableOpacity>
           </View>
@@ -169,12 +243,26 @@ export default function LoginScreen() {
             <Text style={[styles.registerText, { color: colors.textSecondary }]}>
               Vous n'avez pas de compte?
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text style={[styles.registerLink, { color: colors.primary }]}>
+            <TouchableOpacity onPress={() => router.push({
+              pathname: '/(auth)/register',
+              params: { role: selectedRole }
+            })}>
+              <Text style={[styles.registerLink, { color: roleColor }]}>
                 {' '}S'inscrire
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Switch Role */}
+          <TouchableOpacity
+            style={styles.switchRole}
+            onPress={() => router.replace('/role-selection')}
+          >
+            <Ionicons name="swap-horizontal" size={16} color={colors.textMuted} />
+            <Text style={[styles.switchRoleText, { color: colors.textMuted }]}>
+              Changer de profil
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -193,41 +281,78 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
   },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+  },
   header: {
     alignItems: 'center',
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    paddingTop: isSmallScreen ? Spacing.md : Spacing.lg,
+    paddingBottom: isSmallScreen ? Spacing.md : Spacing.lg,
+  },
+  logoWrapper: {
+    width: isSmallScreen ? 80 : 100,
+    height: isSmallScreen ? 80 : 100,
+    borderRadius: isSmallScreen ? 40 : 50,
+    overflow: 'hidden',
+    marginBottom: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   logoImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: Spacing.lg,
+    width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: FontSizes.xxl,
+    fontSize: isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: '700',
     marginBottom: Spacing.sm,
   },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: BorderRadius.full,
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
+  roleBadgeText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
   subtitle: {
-    fontSize: FontSizes.md,
+    fontSize: isSmallScreen ? FontSizes.sm : FontSizes.md,
     textAlign: 'center',
+    paddingHorizontal: Spacing.md,
   },
   form: {
-    marginTop: Spacing.lg,
+    marginTop: isSmallScreen ? Spacing.md : Spacing.lg,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginTop: Spacing.sm,
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
   forgotPasswordText: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
   },
+  loginButton: {
+    marginTop: Spacing.lg,
+  },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: Spacing.xl,
+    marginVertical: isSmallScreen ? Spacing.lg : Spacing.xl,
   },
   dividerLine: {
     flex: 1,
@@ -238,15 +363,18 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
   },
   socialButtons: {
-    gap: Spacing.sm,
+    flexDirection: 'row',
+    gap: Spacing.md,
   },
   socialButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: isSmallScreen ? Spacing.sm + 2 : Spacing.md,
     borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
+    borderWidth: 1,
   },
   socialButtonText: {
     fontSize: FontSizes.md,
@@ -255,7 +383,7 @@ const styles = StyleSheet.create({
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: Spacing.xl,
+    marginTop: isSmallScreen ? Spacing.lg : Spacing.xl,
   },
   registerText: {
     fontSize: FontSizes.md,
@@ -263,5 +391,16 @@ const styles = StyleSheet.create({
   registerLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  switchRole: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.lg,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+  },
+  switchRoleText: {
+    fontSize: FontSizes.sm,
   },
 });

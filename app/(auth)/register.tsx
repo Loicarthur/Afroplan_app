@@ -1,8 +1,9 @@
 /**
  * Page d'inscription AfroPlan
+ * Design responsive amélioré
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,16 +13,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input } from '@/components/ui';
+
+const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+
+const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 
 type UserRole = 'client' | 'coiffeur';
 
@@ -29,14 +38,25 @@ export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { signUp, isLoading } = useAuth();
+  const params = useLocalSearchParams<{ role?: string }>();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('client');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('client');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = params.role || await AsyncStorage.getItem(SELECTED_ROLE_KEY);
+      if (role === 'client' || role === 'coiffeur') {
+        setSelectedRole(role);
+      }
+    };
+    loadRole();
+  }, [params.role]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -54,7 +74,7 @@ export default function RegisterScreen() {
     if (!password) {
       newErrors.password = 'Le mot de passe est requis';
     } else if (password.length < 6) {
-      newErrors.password = 'Le mot de passe doit contenir au moins 6 caracteres';
+      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
     }
 
     if (!confirmPassword) {
@@ -71,11 +91,17 @@ export default function RegisterScreen() {
     if (!validate()) return;
 
     try {
-      await signUp(email, password, fullName, phone || undefined, role);
+      await signUp(email, password, fullName, phone || undefined, selectedRole);
       Alert.alert(
-        'Inscription reussie',
-        'Un email de confirmation vous a ete envoye. Veuillez verifier votre boite de reception.',
-        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
+        'Inscription réussie',
+        'Un email de confirmation vous a été envoyé. Veuillez vérifier votre boîte de réception.',
+        [{
+          text: 'OK',
+          onPress: () => router.replace({
+            pathname: '/(auth)/login',
+            params: { role: selectedRole }
+          })
+        }]
       );
     } catch (error) {
       Alert.alert(
@@ -85,8 +111,14 @@ export default function RegisterScreen() {
     }
   };
 
+  const isClient = selectedRole === 'client';
+  const roleColor = isClient ? '#8B5CF6' : '#F97316';
+  const roleGradient = isClient
+    ? ['#8B5CF6', '#7C3AED']
+    : ['#F97316', '#EA580C'];
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -96,76 +128,50 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+
           {/* Header */}
           <View style={styles.header}>
-            <Image
-              source={require('@/assets/images/logo_afro.jpeg')}
-              style={styles.logoImage}
-              contentFit="contain"
-            />
-            <Text style={[styles.title, { color: colors.text }]}>
-              Creer un compte
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Rejoignez la communaute AfroPlan
-            </Text>
-          </View>
-
-          {/* Role Selection */}
-          <View style={styles.roleSelection}>
-            <Text style={[styles.roleLabel, { color: colors.text }]}>
-              Je suis un(e):
-            </Text>
-            <View style={styles.roleButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.roleButton,
-                  {
-                    backgroundColor:
-                      role === 'client' ? colors.primary : colors.backgroundSecondary,
-                  },
-                ]}
-                onPress={() => setRole('client')}
-              >
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={role === 'client' ? '#FFFFFF' : colors.text}
-                />
-                <Text
-                  style={[
-                    styles.roleButtonText,
-                    { color: role === 'client' ? '#FFFFFF' : colors.text },
-                  ]}
-                >
-                  Client
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.roleButton,
-                  {
-                    backgroundColor:
-                      role === 'coiffeur' ? colors.primary : colors.backgroundSecondary,
-                  },
-                ]}
-                onPress={() => setRole('coiffeur')}
-              >
-                <Ionicons
-                  name="cut-outline"
-                  size={20}
-                  color={role === 'coiffeur' ? '#FFFFFF' : colors.text}
-                />
-                <Text
-                  style={[
-                    styles.roleButtonText,
-                    { color: role === 'coiffeur' ? '#FFFFFF' : colors.text },
-                  ]}
-                >
-                  Coiffeur
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.logoWrapper}>
+              <Image
+                source={require('@/assets/images/logo_afro.jpeg')}
+                style={styles.logoImage}
+                contentFit="cover"
+              />
             </View>
+
+            <Text style={[styles.title, { color: colors.text }]}>
+              Créer un compte
+            </Text>
+
+            {/* Role Badge */}
+            <LinearGradient
+              colors={roleGradient}
+              style={styles.roleBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Ionicons
+                name={isClient ? "person" : "cut"}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.roleBadgeText}>
+                {isClient ? 'Compte Client' : 'Compte Coiffeur'}
+              </Text>
+            </LinearGradient>
+
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {isClient
+                ? 'Rejoignez la communauté AfroPlan'
+                : 'Développez votre activité avec AfroPlan Pro'}
+            </Text>
           </View>
 
           {/* Form */}
@@ -193,7 +199,7 @@ export default function RegisterScreen() {
             />
 
             <Input
-              label="Telephone (optionnel)"
+              label="Téléphone (optionnel)"
               placeholder="+33 6 12 34 56 78"
               value={phone}
               onChangeText={setPhone}
@@ -204,7 +210,7 @@ export default function RegisterScreen() {
 
             <Input
               label="Mot de passe"
-              placeholder="Minimum 6 caracteres"
+              placeholder="Minimum 6 caractères"
               value={password}
               onChangeText={setPassword}
               isPassword
@@ -227,29 +233,43 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               loading={isLoading}
               fullWidth
-              style={{ marginTop: Spacing.md }}
+              style={[styles.registerButton, { backgroundColor: roleColor }]}
             />
           </View>
 
           {/* Terms */}
           <Text style={[styles.terms, { color: colors.textSecondary }]}>
             En vous inscrivant, vous acceptez nos{' '}
-            <Text style={{ color: colors.primary }}>Conditions d'utilisation</Text>
+            <Text style={{ color: roleColor }}>Conditions d'utilisation</Text>
             {' '}et notre{' '}
-            <Text style={{ color: colors.primary }}>Politique de confidentialite</Text>
+            <Text style={{ color: roleColor }}>Politique de confidentialité</Text>
           </Text>
 
           {/* Login Link */}
           <View style={styles.loginContainer}>
             <Text style={[styles.loginText, { color: colors.textSecondary }]}>
-              Vous avez deja un compte?
+              Vous avez déjà un compte?
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-              <Text style={[styles.loginLink, { color: colors.primary }]}>
+            <TouchableOpacity onPress={() => router.push({
+              pathname: '/(auth)/login',
+              params: { role: selectedRole }
+            })}>
+              <Text style={[styles.loginLink, { color: roleColor }]}>
                 {' '}Se connecter
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Switch Role */}
+          <TouchableOpacity
+            style={styles.switchRole}
+            onPress={() => router.replace('/role-selection')}
+          >
+            <Ionicons name="swap-horizontal" size={16} color={colors.textMuted} />
+            <Text style={[styles.switchRoleText, { color: colors.textMuted }]}>
+              Changer de profil
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -268,58 +288,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
   },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+  },
   header: {
     alignItems: 'center',
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingTop: isSmallScreen ? Spacing.sm : Spacing.md,
+    paddingBottom: isSmallScreen ? Spacing.sm : Spacing.md,
+  },
+  logoWrapper: {
+    width: isSmallScreen ? 70 : 80,
+    height: isSmallScreen ? 70 : 80,
+    borderRadius: isSmallScreen ? 35 : 40,
+    overflow: 'hidden',
+    marginBottom: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   logoImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: Spacing.md,
+    width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: FontSizes.xxl,
+    fontSize: isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: '700',
     marginBottom: Spacing.sm,
   },
-  subtitle: {
-    fontSize: FontSizes.md,
-  },
-  roleSelection: {
-    marginBottom: Spacing.lg,
-  },
-  roleLabel: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
-    marginBottom: Spacing.sm,
-  },
-  roleButtons: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  roleButton: {
-    flex: 1,
+  roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: BorderRadius.full,
+    gap: 6,
+    marginBottom: Spacing.xs,
   },
-  roleButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
+  roleBadgeText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  subtitle: {
+    fontSize: isSmallScreen ? FontSizes.xs : FontSizes.sm,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.md,
   },
   form: {
-    marginBottom: Spacing.lg,
+    marginTop: isSmallScreen ? Spacing.sm : Spacing.md,
+  },
+  registerButton: {
+    marginTop: Spacing.md,
   },
   terms: {
-    fontSize: FontSizes.sm,
+    fontSize: isSmallScreen ? FontSizes.xs : FontSizes.sm,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: Spacing.lg,
+    lineHeight: isSmallScreen ? 16 : 20,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.sm,
   },
   loginContainer: {
     flexDirection: 'row',
@@ -331,5 +365,16 @@ const styles = StyleSheet.create({
   loginLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  switchRole: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.md,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+  },
+  switchRoleText: {
+    fontSize: FontSizes.sm,
   },
 });
