@@ -1,10 +1,11 @@
 /**
  * Splash Screen - Afro'Planet
  * Écran de bienvenue avec logo animé (effet heartbeat)
+ * Durée: 10 secondes ou toucher pour passer
  */
 
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -16,7 +17,7 @@ import Animated, {
   withTiming,
   withDelay,
   Easing,
-  runOnJS,
+  cancelAnimation,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -25,8 +26,22 @@ export default function SplashScreen() {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0);
   const textOpacity = useSharedValue(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasNavigated = useRef(false);
 
   const navigateToApp = () => {
+    // Éviter la double navigation
+    if (hasNavigated.current) return;
+    hasNavigated.current = true;
+
+    // Annuler le timer si encore actif
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Annuler les animations
+    cancelAnimation(scale);
+
     router.replace('/(tabs)');
   };
 
@@ -59,12 +74,16 @@ export default function SplashScreen() {
       withTiming(1, { duration: 800 })
     );
 
-    // Navigation après 5 secondes
-    const timer = setTimeout(() => {
+    // Navigation après 10 secondes
+    timerRef.current = setTimeout(() => {
       navigateToApp();
-    }, 5000);
+    }, 10000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
@@ -77,41 +96,44 @@ export default function SplashScreen() {
   }));
 
   return (
-    <LinearGradient
-      colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <View style={styles.content}>
-        {/* Logo animé */}
-        <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-          <View style={styles.logoBackground}>
-            <Image
-              source={require('@/assets/images/logo_afro.jpeg')}
-              style={styles.logo}
-              contentFit="contain"
-            />
-          </View>
-        </Animated.View>
+    <Pressable style={styles.pressable} onPress={navigateToApp}>
+      <LinearGradient
+        colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
+        style={styles.container}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.content}>
+          {/* Logo animé */}
+          <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
+            <View style={styles.logoBackground}>
+              <Image
+                source={require('@/assets/images/logo_afro.jpeg')}
+                style={styles.logo}
+                contentFit="contain"
+              />
+            </View>
+          </Animated.View>
 
-        {/* Texte de bienvenue */}
-        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-          <Text style={styles.welcomeText}>Bienvenue sur</Text>
-          <Text style={styles.brandName}>Afro'Planet</Text>
-          <Text style={styles.tagline}>Trouvez votre style parfait</Text>
-        </Animated.View>
-      </View>
-
-      {/* Indicateur de chargement */}
-      <Animated.View style={[styles.footer, textAnimatedStyle]}>
-        <View style={styles.loadingDots}>
-          <LoadingDot delay={0} />
-          <LoadingDot delay={200} />
-          <LoadingDot delay={400} />
+          {/* Texte de bienvenue */}
+          <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
+            <Text style={styles.welcomeText}>Bienvenue sur</Text>
+            <Text style={styles.brandName}>Afro'Planet</Text>
+            <Text style={styles.tagline}>Trouvez votre style parfait</Text>
+          </Animated.View>
         </View>
-      </Animated.View>
-    </LinearGradient>
+
+        {/* Indicateur - toucher pour continuer */}
+        <Animated.View style={[styles.footer, textAnimatedStyle]}>
+          <View style={styles.loadingDots}>
+            <LoadingDot delay={0} />
+            <LoadingDot delay={200} />
+            <LoadingDot delay={400} />
+          </View>
+          <Text style={styles.skipText}>Touchez l'écran pour continuer</Text>
+        </Animated.View>
+      </LinearGradient>
+    </Pressable>
   );
 }
 
@@ -141,6 +163,9 @@ function LoadingDot({ delay }: { delay: number }) {
 }
 
 const styles = StyleSheet.create({
+  pressable: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
@@ -206,5 +231,11 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: '#FFFFFF',
+  },
+  skipText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    marginTop: 20,
+    fontWeight: '400',
   },
 });
