@@ -114,7 +114,7 @@ export default function HomeScreen() {
                 contentFit="contain"
               />
               <View>
-                <Text style={styles.logoText}>Afro'Planet</Text>
+                <Text style={styles.logoText}>AfroPlan</Text>
                 <Text style={styles.logoSubtext}>Trouvez votre style parfait</Text>
               </View>
             </View>

@@ -1,5 +1,5 @@
 /**
- * Dashboard Coiffeur/Salon - Afro'Planet
+ * Dashboard Coiffeur/Salon - AfroPlan
  * Gestion des revenus, réservations et statistiques
  */
 

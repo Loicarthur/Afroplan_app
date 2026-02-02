@@ -1,5 +1,5 @@
 /**
- * Page d'abonnement Salon - Afro'Planet
+ * Page d'abonnement Salon - AfroPlan
  * Choix du plan pour réduire les commissions
  */
 

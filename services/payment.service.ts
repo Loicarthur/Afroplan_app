@@ -1,5 +1,5 @@
 /**
- * Service de paiement Stripe pour Afro'Planet
+ * Service de paiement Stripe pour AfroPlan
  * Gestion des paiements avec Stripe Connect et système de commission
  */
 
@@ -83,7 +83,7 @@ export interface PaymentIntent {
   depositAmount: number;      // Acompte payé par le client (10€)
   totalServicePrice: number;  // Prix total du service
   remainingAmount: number;    // Reste à payer au salon
-  commission: number;         // Commission Afro'Planet sur l'acompte
+  commission: number;         // Commission AfroPlan sur l'acompte
   salonDepositAmount: number; // Part de l'acompte reversée au salon
   currency: string;
   status: PaymentStatus;

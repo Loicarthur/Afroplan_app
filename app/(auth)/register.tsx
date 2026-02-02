@@ -107,7 +107,7 @@ export default function RegisterScreen() {
               Creer un compte
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Rejoignez la communaute Afro'Planet
+              Rejoignez la communaute AfroPlan
             </Text>
           </View>
 

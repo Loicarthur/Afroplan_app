@@ -84,7 +84,7 @@ export default function LoginScreen() {
               contentFit="contain"
             />
             <Text style={[styles.title, { color: colors.text }]}>
-              Bienvenue sur Afro'Planet
+              Bienvenue sur AfroPlan
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Connectez-vous pour acceder a votre compte

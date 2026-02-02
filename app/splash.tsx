@@ -1,5 +1,5 @@
 /**
- * Splash Screen - Afro'Planet
+ * Splash Screen - AfroPlan
  * Écran de bienvenue avec logo animé (effet heartbeat)
  * Durée: 10 secondes ou toucher pour passer
  */
@@ -118,7 +118,7 @@ export default function SplashScreen() {
           {/* Texte de bienvenue */}
           <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
             <Text style={styles.welcomeText}>Bienvenue sur</Text>
-            <Text style={styles.brandName}>Afro'Planet</Text>
+            <Text style={styles.brandName}>AfroPlan</Text>
             <Text style={styles.tagline}>Trouvez votre style parfait</Text>
           </Animated.View>
         </View>

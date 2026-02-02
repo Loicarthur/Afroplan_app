@@ -1,5 +1,5 @@
 /**
- * Page de Checkout - Afro'Planet
+ * Page de Checkout - AfroPlan
  * Paiement sécurisé pour les réservations
  */
 

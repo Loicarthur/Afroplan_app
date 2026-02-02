@@ -1,5 +1,5 @@
 -- ============================================
--- SCHEMA SQL PAIEMENTS - AFRO'PLANET
+-- SCHEMA SQL PAIEMENTS - AfroPlan
 -- ============================================
 -- Tables pour la gestion des paiements Stripe Connect
 -- et le système de commission
@@ -66,7 +66,7 @@ CREATE TABLE payments (
     amount INTEGER NOT NULL, -- Acompte payé en centimes (10€ = 1000)
     total_service_price INTEGER NOT NULL, -- Prix total du service en centimes
     remaining_amount INTEGER NOT NULL, -- Reste à payer au salon en centimes
-    commission INTEGER NOT NULL, -- Commission Afro'Planet sur l'acompte en centimes
+    commission INTEGER NOT NULL, -- Commission AfroPlan sur l'acompte en centimes
     salon_amount INTEGER NOT NULL, -- Part de l'acompte reversée au salon en centimes
     commission_rate DECIMAL(4, 4) NOT NULL, -- Taux de commission appliqué
     currency TEXT DEFAULT 'eur',
