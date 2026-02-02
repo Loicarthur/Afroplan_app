@@ -117,10 +117,16 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ) : (
               <View style={styles.authButtons}>
-                <TouchableOpacity style={styles.loginButton}>
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}
+                >
                   <Text style={styles.loginButtonText}>Connexion</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.registerButton}>
+                <TouchableOpacity
+                  style={styles.registerButton}
+                  onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'client' } })}
+                >
                   <Text style={styles.registerButtonText}>Inscription</Text>
                 </TouchableOpacity>
               </View>

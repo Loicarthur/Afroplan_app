@@ -98,11 +98,12 @@ export default function RoleSelectionScreen() {
     // Stocker le rôle sélectionné
     await AsyncStorage.setItem(SELECTED_ROLE_KEY, role);
 
-    // Rediriger vers l'écran de connexion avec le rôle en paramètre
-    router.replace({
-      pathname: '/(auth)/login',
-      params: { role }
-    });
+    // Rediriger vers la page d'accueil correspondante
+    if (role === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
   };
 
   return (
