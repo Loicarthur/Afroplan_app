@@ -43,7 +43,7 @@ const AfroPlanDarkTheme = {
 };
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  initialRouteName: 'splash',
 };
 
 export default function RootLayout() {
@@ -59,8 +59,23 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={theme}>
         <Stack>
+          <Stack.Screen
+            name="splash"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(salon)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="checkout"
+            options={{
+              headerShown: false,
+              presentation: 'modal',
+            }}
+          />
           <Stack.Screen
             name="salon/[id]"
             options={{
