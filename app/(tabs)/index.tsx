@@ -1,5 +1,5 @@
 /**
- * Page d'accueil AfroPlan
+ * Page d'accueil AfroPlan - Design z1
  */
 
 import React from 'react';
@@ -8,37 +8,72 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
   Dimensions,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePopularSalons, useCategories } from '@/hooks/use-salons';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { SearchBar, SalonCard, CategoryCard } from '@/components/ui';
-import { Category } from '@/types';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 40;
+
+// Donnees de test pour les styles populaires
+const POPULAR_STYLES = [
+  { id: '1', name: 'Tresses', icon: '💇🏾‍♀️', color: '#FFE4E6' },
+  { id: '2', name: 'Twists', icon: '✨', color: '#FEF3C7' },
+  { id: '3', name: 'Natural', icon: '🌸', color: '#FCE7F3' },
+  { id: '4', name: 'Locs', icon: '🌺', color: '#DBEAFE' },
+];
+
+// Donnees de test pour les salons recommandes
+const RECOMMENDED_SALONS = [
+  {
+    id: '1',
+    name: 'Bella Coiffure',
+    address: 'Paris 18e',
+    rating: 4.9,
+    reviews_count: 234,
+    specialty: 'Box Braids',
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+  },
+  {
+    id: '2',
+    name: 'Afro Style Studio',
+    address: 'Paris 11e',
+    rating: 4.8,
+    reviews_count: 189,
+    specialty: 'Twists',
+    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+  },
+  {
+    id: '3',
+    name: 'Natural Beauty Salon',
+    address: 'Paris 13e',
+    rating: 4.7,
+    reviews_count: 156,
+    specialty: 'Natural Hair',
+    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+  },
+];
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, isAuthenticated } = useAuth();
-  const { salons: popularSalons, isLoading: loadingSalons, error: salonsError } = usePopularSalons(6);
-  const { categories, isLoading: loadingCategories } = useCategories();
+  const { profile, isAuthenticated } = useAuth();
 
   const [refreshing, setRefreshing] = React.useState(false);
+  const [location, setLocation] = React.useState('Paris, France');
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    // Refresh data
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
@@ -46,220 +81,149 @@ export default function HomeScreen() {
     router.push('/(tabs)/explore');
   };
 
-  const handleCategoryPress = (category: Category) => {
-    router.push(`/(tabs)/explore?category=${category.slug}`);
+  const handleSalonPress = (salonId: string) => {
+    router.push(`/salon/${salonId}`);
   };
 
-  const handleSeeAllSalons = () => {
-    router.push('/(tabs)/explore');
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon apres-midi';
-    return 'Bonsoir';
+  const handleSeeAllStyles = () => {
+    router.push('/(tabs)/bookings');
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        style={{ backgroundColor: colors.background }}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-              {getGreeting()}
-            </Text>
-            <Text style={[styles.userName, { color: colors.text }]}>
-              {isAuthenticated && profile?.full_name
-                ? profile.full_name
-                : 'Bienvenue sur AfroPlan'}
-            </Text>
+        {/* Header with Gradient */}
+        <LinearGradient
+          colors={['#8B5CF6', '#7C3AED']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerTop}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoIcon}>
+                <Text style={styles.logoEmoji}>💇🏾‍♀️</Text>
+              </View>
+              <View>
+                <Text style={styles.logoText}>AfroPlan</Text>
+                <Text style={styles.logoSubtext}>Trouvez votre style parfait</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.settingsButton}>
+              <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
+
+          {/* Search Bar */}
           <TouchableOpacity
-            style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
-            onPress={() => router.push('/modal')}
+            style={styles.searchBar}
+            onPress={handleSearchPress}
+            activeOpacity={0.9}
           >
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+            <Text style={styles.searchPlaceholder}>Rechercher un salon ou un style...</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <TouchableOpacity onPress={handleSearchPress} activeOpacity={0.9}>
-            <View pointerEvents="none">
-              <SearchBar
-                placeholder="Rechercher un salon, un style..."
-                showFilterButton={false}
-              />
+          {/* Location */}
+          <View style={styles.locationContainer}>
+            <View style={styles.locationLeft}>
+              <Ionicons name="location" size={16} color="#FFFFFF" />
+              <Text style={styles.locationText}>{location}</Text>
             </View>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity>
+              <Text style={styles.changeText}>Changer</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-        {/* Banner */}
-        <View style={styles.bannerContainer}>
-          <View style={[styles.banner, { backgroundColor: colors.primary }]}>
-            <View style={styles.bannerContent}>
-              <Text style={styles.bannerTitle}>
-                Trouvez votre coiffeur Afro ideal
-              </Text>
-              <Text style={styles.bannerSubtitle}>
-                Des milliers de salons pres de chez vous
-              </Text>
+        {/* Styles Populaires */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Styles Populaires
+            </Text>
+            <TouchableOpacity onPress={handleSeeAllStyles}>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>Voir tout →</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stylesContainer}
+          >
+            {POPULAR_STYLES.map((style) => (
               <TouchableOpacity
-                style={[styles.bannerButton, { backgroundColor: colors.accent }]}
-                onPress={handleSeeAllSalons}
+                key={style.id}
+                style={styles.styleItem}
+                onPress={() => router.push('/(tabs)/bookings')}
               >
-                <Text style={styles.bannerButtonText}>Explorer</Text>
+                <View style={[styles.styleIcon, { backgroundColor: style.color }]}>
+                  <Text style={styles.styleEmoji}>{style.icon}</Text>
+                </View>
+                <Text style={[styles.styleName, { color: colors.text }]}>{style.name}</Text>
               </TouchableOpacity>
-            </View>
-            <Image
-              source={require('@/assets/images/icon.png')}
-              style={styles.bannerImage}
-              contentFit="contain"
-            />
-          </View>
+            ))}
+          </ScrollView>
         </View>
 
-        {/* Categories */}
+        {/* Salons Recommandes */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Categories
+              Salons Recommandes
             </Text>
+            <TouchableOpacity>
+              <Ionicons name="star" size={20} color="#FBBF24" />
+            </TouchableOpacity>
           </View>
-          {loadingCategories ? (
-            <View style={styles.loadingContainer}>
-              <Text style={{ color: colors.textSecondary }}>Chargement...</Text>
-            </View>
-          ) : categories.length > 0 ? (
-            <FlatList
-              data={categories}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.categoriesList}
-              renderItem={({ item }) => (
-                <CategoryCard
-                  category={item}
-                  onPress={handleCategoryPress}
-                  variant="compact"
-                />
-              )}
-            />
-          ) : (
-            <View style={styles.placeholderCategories}>
-              {['Tresses', 'Locks', 'Coupe', 'Coloration', 'Soins'].map((name, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.placeholderCategory, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => router.push('/(tabs)/explore')}
-                >
-                  <View style={[styles.placeholderIcon, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="sparkles-outline" size={20} color="#FFFFFF" />
-                  </View>
-                  <Text style={[styles.placeholderCategoryName, { color: colors.text }]}>
-                    {name}
+
+          {RECOMMENDED_SALONS.map((salon) => (
+            <TouchableOpacity
+              key={salon.id}
+              style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.md]}
+              onPress={() => handleSalonPress(salon.id)}
+            >
+              <Image
+                source={{ uri: salon.image }}
+                style={styles.salonImage}
+                contentFit="cover"
+              />
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={12} color="#FFFFFF" />
+                <Text style={styles.ratingText}>{salon.rating}</Text>
+              </View>
+              <View style={styles.salonInfo}>
+                <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+                <View style={styles.salonLocation}>
+                  <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.salonAddress, { color: colors.textSecondary }]}>
+                    {salon.address}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                </View>
+                <View style={styles.salonBottom}>
+                  <Text style={[styles.reviewCount, { color: colors.textMuted }]}>
+                    {salon.reviews_count} avis
+                  </Text>
+                  <Text style={[styles.specialty, { color: colors.primary }]}>
+                    {salon.specialty}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Popular Salons */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Salons populaires
-            </Text>
-            <TouchableOpacity onPress={handleSeeAllSalons}>
-              <Text style={[styles.seeAll, { color: colors.primary }]}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
-          {loadingSalons ? (
-            <View style={styles.loadingContainer}>
-              <Text style={{ color: colors.textSecondary }}>Chargement des salons...</Text>
-            </View>
-          ) : salonsError ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-              <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-                Configurez votre backend Supabase pour voir les salons
-              </Text>
-            </View>
-          ) : popularSalons.length > 0 ? (
-            <FlatList
-              data={popularSalons}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.salonsList}
-              renderItem={({ item }) => (
-                <SalonCard salon={item} variant="featured" />
-              )}
-            />
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="storefront-outline" size={48} color={colors.textMuted} />
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Aucun salon disponible pour le moment
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Actions rapides
-          </Text>
-          <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={[styles.quickAction, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => router.push('/(tabs)/explore')}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.primary }]}>
-                <Ionicons name="location-outline" size={24} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Pres de moi
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickAction, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => router.push('/(tabs)/bookings')}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.accent }]}>
-                <Ionicons name="calendar-outline" size={24} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Reservations
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickAction, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => router.push('/(tabs)/favorites')}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.error }]}>
-                <Ionicons name="heart-outline" size={24} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Favoris
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Bottom spacing */}
-        <View style={{ height: Spacing.xxl }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -268,167 +232,177 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    paddingTop: 50,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    marginBottom: 20,
   },
-  headerLeft: {
-    flex: 1,
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  greeting: {
-    fontSize: FontSizes.md,
+  logoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  userName: {
-    fontSize: FontSizes.xxl,
+  logoEmoji: {
+    fontSize: 20,
+  },
+  logoText: {
+    fontSize: 22,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.full,
+  logoSubtext: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchContainer: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  bannerContainer: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  banner: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+  searchBar: {
     flexDirection: 'row',
-    overflow: 'hidden',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
   },
-  bannerContent: {
-    flex: 1,
+  searchPlaceholder: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#9CA3AF',
   },
-  bannerTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '700',
+  locationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  locationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    marginLeft: 6,
+    fontSize: 14,
     color: '#FFFFFF',
-    marginBottom: Spacing.xs,
   },
-  bannerSubtitle: {
-    fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: Spacing.md,
-  },
-  bannerButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignSelf: 'flex-start',
-  },
-  bannerButtonText: {
-    color: '#1A1A1A',
-    fontWeight: '600',
-    fontSize: FontSizes.sm,
-  },
-  bannerImage: {
-    width: 80,
-    height: 80,
-    opacity: 0.8,
+  changeText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    textDecorationLine: 'underline',
   },
   section: {
-    marginBottom: Spacing.lg,
+    paddingTop: 24,
+    paddingHorizontal: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: FontSizes.xl,
+    fontSize: 20,
     fontWeight: '700',
   },
   seeAll: {
-    fontSize: FontSizes.md,
+    fontSize: 14,
     fontWeight: '500',
   },
-  categoriesList: {
-    paddingHorizontal: Spacing.md,
+  stylesContainer: {
+    paddingRight: 20,
   },
-  salonsList: {
-    paddingHorizontal: Spacing.md,
-  },
-  loadingContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xl,
+  styleItem: {
     alignItems: 'center',
+    marginRight: 24,
   },
-  emptyContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xl,
-    alignItems: 'center',
-  },
-  emptyText: {
-    marginTop: Spacing.md,
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xl,
-    alignItems: 'center',
-  },
-  errorText: {
-    marginTop: Spacing.md,
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-  },
-  placeholderCategories: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-  },
-  placeholderCategory: {
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    marginRight: Spacing.sm,
-    minWidth: 80,
-  },
-  placeholderIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.full,
+  styleIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 8,
   },
-  placeholderCategoryName: {
-    fontSize: FontSizes.sm,
+  styleEmoji: {
+    fontSize: 28,
+  },
+  styleName: {
+    fontSize: 12,
     fontWeight: '500',
   },
-  quickActions: {
+  salonCard: {
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  salonImage: {
+    width: '100%',
+    height: 180,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 150,
+    right: 12,
     flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.sm,
-  },
-  quickAction: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.full,
+  ratingText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  salonInfo: {
+    padding: 16,
+  },
+  salonName: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  salonLocation: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 8,
   },
-  quickActionText: {
-    fontSize: FontSizes.sm,
+  salonAddress: {
+    marginLeft: 4,
+    fontSize: 14,
+  },
+  salonBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewCount: {
+    fontSize: 12,
+  },
+  specialty: {
+    fontSize: 14,
     fontWeight: '500',
   },
 });
