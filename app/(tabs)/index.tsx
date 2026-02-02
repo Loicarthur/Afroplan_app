@@ -21,11 +21,12 @@ import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+// import SearchBar from '@/components/SearchBar'; // à adapter si nécessaire
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 40;
 
-// Donnees de test pour les styles populaires
+/* -------------------- Données mock -------------------- */
+
 const POPULAR_STYLES = [
   { id: '1', name: 'Tresses', icon: '💇🏾‍♀️', color: '#FFE4E6' },
   { id: '2', name: 'Twists', icon: '✨', color: '#FEF3C7' },
@@ -33,7 +34,6 @@ const POPULAR_STYLES = [
   { id: '4', name: 'Locs', icon: '🌺', color: '#DBEAFE' },
 ];
 
-// Donnees de test pour les salons recommandes
 const RECOMMENDED_SALONS = [
   {
     id: '1',
@@ -64,34 +64,24 @@ const RECOMMENDED_SALONS = [
   },
 ];
 
+/* -------------------- Screen -------------------- */
+
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [refreshing, setRefreshing] = React.useState(false);
-  const [location, setLocation] = React.useState('Paris, France');
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
-  const handleSearchPress = () => {
-    router.push('/(tabs)/explore');
-  };
-
-  const handleSalonPress = (salonId: string) => {
-    router.push(`/salon/${salonId}`);
-  };
-
-  const handleSeeAllStyles = () => {
-    router.push('/(tabs)/bookings');
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -99,7 +89,7 @@ export default function HomeScreen() {
         }
         style={{ backgroundColor: colors.background }}
       >
-        {/* Header with Gradient */}
+        {/* ---------------- Header ---------------- */}
         <LinearGradient
           colors={['#8B5CF6', '#7C3AED']}
           start={{ x: 0, y: 0 }}
@@ -115,63 +105,39 @@ export default function HomeScreen() {
               />
               <View>
                 <Text style={styles.logoText}>AfroPlan</Text>
-                <Text style={styles.logoSubtext}>Trouvez votre style parfait</Text>
+                <Text style={styles.logoSubtext}>
+                  Trouvez votre style parfait
+                </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.settingsButton}>
-              <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.headerRight}>
+
             {isAuthenticated ? (
-              <TouchableOpacity
-                style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => router.push('/modal')}
-              >
-                <Ionicons name="notifications-outline" size={24} color={colors.text} />
+              <TouchableOpacity style={styles.iconButton}>
+                <Ionicons name="notifications-outline" size={22} color="#FFF" />
               </TouchableOpacity>
             ) : (
               <View style={styles.authButtons}>
-                <TouchableOpacity
-                  style={[styles.loginButton, { borderColor: colors.primary }]}
-                  onPress={() => router.push('/(auth)/login')}
-                >
-                  <Text style={[styles.loginButtonText, { color: colors.primary }]}>Connexion</Text>
+                <TouchableOpacity style={styles.loginButton}>
+                  <Text style={styles.loginButtonText}>Connexion</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.registerButton, { backgroundColor: colors.primary }]}
-                  onPress={() => router.push('/(auth)/register')}
-                >
+                <TouchableOpacity style={styles.registerButton}>
                   <Text style={styles.registerButtonText}>Inscription</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <TouchableOpacity onPress={handleSearchPress} activeOpacity={0.9}>
-            <View pointerEvents="none">
-              <SearchBar
-                placeholder="Rechercher un salon, un style..."
-                showFilterButton={false}
-              />
-            </View>
-            <TouchableOpacity>
-              <Text style={styles.changeText}>Changer</Text>
-            </TouchableOpacity>
-          </View>
         </LinearGradient>
 
-        {/* Styles Populaires */}
+        {/* ---------------- Styles populaires ---------------- */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Styles Populaires
+              Styles populaires
             </Text>
-            <TouchableOpacity onPress={handleSeeAllStyles}>
-              <Text style={[styles.seeAll, { color: colors.primary }]}>Voir tout →</Text>
+            <TouchableOpacity>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>
+                Voir tout →
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -180,57 +146,52 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.stylesContainer}
           >
-            {POPULAR_STYLES.map((style) => (
-              <TouchableOpacity
-                key={style.id}
-                style={styles.styleItem}
-                onPress={() => router.push('/(tabs)/bookings')}
-              >
-                <View style={[styles.styleIcon, { backgroundColor: style.color }]}>
+            {POPULAR_STYLES.map(style => (
+              <TouchableOpacity key={style.id} style={styles.styleItem}>
+                <View
+                  style={[
+                    styles.styleIcon,
+                    { backgroundColor: style.color },
+                  ]}
+                >
                   <Text style={styles.styleEmoji}>{style.icon}</Text>
                 </View>
-                <Text style={[styles.styleName, { color: colors.text }]}>{style.name}</Text>
+                <Text style={[styles.styleName, { color: colors.text }]}>
+                  {style.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        {/* Salons Recommandes */}
+        {/* ---------------- Salons recommandés ---------------- */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Salons Recommandes
-            </Text>
-            <TouchableOpacity>
-              <Ionicons name="star" size={20} color="#FBBF24" />
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Salons recommandés
+          </Text>
 
-          {RECOMMENDED_SALONS.map((salon) => (
+          {RECOMMENDED_SALONS.map(salon => (
             <TouchableOpacity
               key={salon.id}
               style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.md]}
-              onPress={() => handleSalonPress(salon.id)}
+              onPress={() => router.push(`/salon/${salon.id}`)}
             >
-              <Image
-                source={{ uri: salon.image }}
-                style={styles.salonImage}
-                contentFit="cover"
-              />
+              <Image source={{ uri: salon.image }} style={styles.salonImage} />
+
               <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={12} color="#FFFFFF" />
+                <Ionicons name="star" size={12} color="#FFF" />
                 <Text style={styles.ratingText}>{salon.rating}</Text>
               </View>
+
               <View style={styles.salonInfo}>
-                <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
-                <View style={styles.salonLocation}>
-                  <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.salonAddress, { color: colors.textSecondary }]}>
-                    {salon.address}
-                  </Text>
-                </View>
+                <Text style={[styles.salonName, { color: colors.text }]}>
+                  {salon.name}
+                </Text>
+
+                <Text style={styles.salonAddress}>{salon.address}</Text>
+
                 <View style={styles.salonBottom}>
-                  <Text style={[styles.reviewCount, { color: colors.textMuted }]}>
+                  <Text style={styles.reviewCount}>
                     {salon.reviews_count} avis
                   </Text>
                   <Text style={[styles.specialty, { color: colors.primary }]}>
@@ -248,10 +209,11 @@ export default function HomeScreen() {
   );
 }
 
+/* -------------------- Styles -------------------- */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+
   header: {
     paddingTop: 50,
     paddingBottom: 24,
@@ -259,58 +221,37 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
+
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
+
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  logoImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
   },
-  authButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  loginButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-  },
-  loginButtonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-  },
-  registerButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-  },
-  registerButtonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  greeting: {
-    fontSize: FontSizes.md,
-  },
+
   logoText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#FFF',
   },
+
   logoSubtext: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
   },
-  settingsButton: {
+
+  iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -318,64 +259,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchBar: {
+
+  authButtons: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 16,
+    gap: 8,
   },
-  searchPlaceholder: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#9CA3AF',
+
+  loginButton: {
+    borderWidth: 1,
+    borderColor: '#FFF',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  locationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+
+  loginButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
   },
-  locationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  registerButton: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  locationText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#FFFFFF',
+
+  registerButtonText: {
+    fontWeight: '600',
+    color: '#7C3AED',
   },
-  changeText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    textDecorationLine: 'underline',
-  },
+
   section: {
     paddingTop: 24,
     paddingHorizontal: 20,
   },
+
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
+
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
   },
+
   seeAll: {
     fontSize: 14,
     fontWeight: '500',
   },
+
   stylesContainer: {
     paddingRight: 20,
   },
+
   styleItem: {
     alignItems: 'center',
     marginRight: 24,
   },
+
   styleIcon: {
     width: 60,
     height: 60,
@@ -384,22 +328,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  styleEmoji: {
-    fontSize: 28,
-  },
+
+  styleEmoji: { fontSize: 28 },
+
   styleName: {
     fontSize: 12,
     fontWeight: '500',
   },
+
   salonCard: {
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
   },
+
   salonImage: {
     width: '100%',
     height: 180,
   },
+
   ratingBadge: {
     position: 'absolute',
     top: 150,
@@ -411,37 +358,40 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
+
   ratingText: {
     marginLeft: 4,
-    fontSize: 12,
+    color: '#FFF',
     fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 12,
   },
+
   salonInfo: {
     padding: 16,
   },
+
   salonName: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 4,
   },
-  salonLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+
   salonAddress: {
-    marginLeft: 4,
+    marginTop: 4,
     fontSize: 14,
+    color: '#6B7280',
   },
+
   salonBottom: {
+    marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
+
   reviewCount: {
     fontSize: 12,
+    color: '#9CA3AF',
   },
+
   specialty: {
     fontSize: 14,
     fontWeight: '500',
