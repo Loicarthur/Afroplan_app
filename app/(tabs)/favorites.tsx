@@ -1,5 +1,6 @@
 /**
- * Page Favoris AfroPlan - Design z5
+ * Page Favoris AfroPlan
+ * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
 import React from 'react';
@@ -11,11 +12,12 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
@@ -51,7 +53,7 @@ const SAVED_STYLES = [
     price: '150-200€',
     category: 'braids',
     image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
-    badgeColor: '#8B5CF6',
+    badgeColor: '#191919',
   },
   {
     id: '2',
@@ -59,7 +61,7 @@ const SAVED_STYLES = [
     price: '90-150€',
     category: 'braids',
     image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
-    badgeColor: '#8B5CF6',
+    badgeColor: '#191919',
   },
   {
     id: '3',
@@ -67,7 +69,7 @@ const SAVED_STYLES = [
     price: '180-250€',
     category: 'locs',
     image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
-    badgeColor: '#22C55E',
+    badgeColor: '#4A4A4A',
   },
   {
     id: '4',
@@ -75,7 +77,7 @@ const SAVED_STYLES = [
     price: '120-180€',
     category: 'twists',
     image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
-    badgeColor: '#EC4899',
+    badgeColor: '#4A4A4A',
   },
 ];
 
@@ -100,24 +102,19 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header with Gradient */}
-        <LinearGradient
-          colors={['#8B5CF6', '#EC4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
+        {/* Header */}
+        <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerIcon}>
               <Ionicons name="heart" size={28} color="#FFFFFF" />
             </View>
             <Text style={styles.headerTitle}>Mes Favoris</Text>
-            <Text style={styles.headerSubtitle}>Vos salons et styles preferes</Text>
+            <Text style={styles.headerSubtitle}>Vos salons et styles préférés</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Salons Favoris Section */}
         <View style={[styles.section, { backgroundColor: colors.background }]}>
@@ -190,7 +187,7 @@ export default function FavoritesScreen() {
                   <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={1}>
                     {style.name}
                   </Text>
-                  <Text style={[styles.stylePrice, { color: colors.primary }]}>
+                  <Text style={[styles.stylePrice, { color: '#191919' }]}>
                     {style.price}
                   </Text>
                 </View>
@@ -210,11 +207,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 30,
+    backgroundColor: '#191919',
+    paddingTop: 16,
+    paddingBottom: 24,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#191919',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   headerContent: {
     alignItems: 'center',
@@ -223,7 +232,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -236,7 +245,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.7)',
   },
   section: {
     paddingTop: 24,

@@ -26,8 +26,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const isSmallScreen = width < 380;
+const isVerySmallScreen = width < 340;
 
 type StatCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -184,25 +185,6 @@ export default function CoiffeurDashboard() {
                 <Text style={styles.ctaButtonText}>Créer mon compte Pro</Text>
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
-            <View style={styles.socialLinks}>
-              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://instagram.com/afroplan')}>
-                <Ionicons name="logo-instagram" size={24} color="#191919" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://tiktok.com/@afroplan')}>
-                <Ionicons name="logo-tiktok" size={24} color="#191919" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://linkedin.com/company/afroplan')}>
-                <Ionicons name="logo-linkedin" size={24} color="#191919" />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
-              <Text style={[styles.supportLink, { color: colors.primary }]}>Support</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={{ height: 100 }} />
@@ -476,31 +458,44 @@ const styles = StyleSheet.create({
   benefitsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: isSmallScreen ? 8 : 12,
+    justifyContent: 'space-between',
   },
   benefitCard: {
-    width: (width - 44) / 2,
-    padding: 16,
+    width: isVerySmallScreen ? '100%' : (width - 44) / 2,
+    padding: isSmallScreen ? 12 : 16,
     borderRadius: 16,
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#191919',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   benefitIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: isSmallScreen ? 48 : 56,
+    height: isSmallScreen ? 48 : 56,
+    borderRadius: isSmallScreen ? 24 : 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: isSmallScreen ? 8 : 12,
   },
   benefitTitle: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : 14,
     fontWeight: '600',
     marginBottom: 4,
     textAlign: 'center',
   },
   benefitDesc: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 11 : 12,
     textAlign: 'center',
+    lineHeight: isSmallScreen ? 14 : 16,
   },
   ctaSection: {
     padding: 16,
@@ -534,35 +529,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#191919',
-  },
-  footer: {
-    marginTop: 32,
-    paddingTop: 24,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    alignItems: 'center',
-  },
-  footerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    gap: 24,
-    marginBottom: 16,
-  },
-  socialButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F0F0F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  supportLink: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   statsContainer: {
     paddingHorizontal: 20,

@@ -4,7 +4,7 @@
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,10 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
   FadeInUp,
   FadeInDown,
+  interpolateColor,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -37,24 +39,64 @@ interface RoleCardProps {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   delay: number;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
-function RoleCard({ role, title, description, icon, onPress, delay }: RoleCardProps) {
+function RoleCard({ role, title, description, icon, onPress, delay, isSelected, onSelect }: RoleCardProps) {
   const scale = useSharedValue(1);
+  const colorProgress = useSharedValue(0);
+
+  // Animation quand sélectionné
+  React.useEffect(() => {
+    colorProgress.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
+  }, [isSelected]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['#FFFFFF', '#191919']
+    ),
+    borderColor: '#191919',
+  }));
+
+  const animatedTextStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['#191919', '#FFFFFF']
+    ),
+  }));
+
+  const animatedDescStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['#4A4A4A', '#E5E5E5']
+    ),
+  }));
+
+  const animatedIconBgStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['#F0F0F0', '#FFFFFF']
+    ),
+  }));
+
   const handlePressIn = () => {
     scale.value = withSpring(0.97, { damping: 15 });
+    onSelect();
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 15 });
   };
-
-  const isClient = role === 'client';
 
   return (
     <Animated.View
@@ -68,18 +110,18 @@ function RoleCard({ role, title, description, icon, onPress, delay }: RoleCardPr
         onPress={onPress}
         style={styles.cardTouchable}
       >
-        <View style={[styles.card, isClient ? styles.cardClient : styles.cardCoiffeur]}>
+        <Animated.View style={[styles.card, animatedCardStyle]}>
           <View style={styles.cardContent}>
-            <View style={[styles.iconContainer, isClient ? styles.iconContainerClient : styles.iconContainerCoiffeur]}>
+            <Animated.View style={[styles.iconContainer, animatedIconBgStyle]}>
               <Ionicons name={icon} size={isSmallScreen ? 36 : 44} color="#191919" />
-            </View>
-            <Text style={styles.cardTitle}>{title}</Text>
-            <Text style={styles.cardDescription}>{description}</Text>
+            </Animated.View>
+            <Animated.Text style={[styles.cardTitle, animatedTextStyle]}>{title}</Animated.Text>
+            <Animated.Text style={[styles.cardDescription, animatedDescStyle]}>{description}</Animated.Text>
             <View style={styles.arrowContainer}>
-              <Ionicons name="arrow-forward-circle" size={28} color="#191919" />
+              <Ionicons name="arrow-forward-circle" size={28} color={isSelected ? "#FFFFFF" : "#191919"} />
             </View>
           </View>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -87,6 +129,7 @@ function RoleCard({ role, title, description, icon, onPress, delay }: RoleCardPr
 
 export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
 
   const handleRoleSelect = async (role: UserRole) => {
     // Naviguer vers l'écran de bienvenue avec le rôle sélectionné
@@ -97,7 +140,7 @@ export default function RoleSelectionScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
       {/* Header avec logo */}
       <Animated.View
         entering={FadeInDown.delay(200).duration(600)}
@@ -124,6 +167,8 @@ export default function RoleSelectionScreen() {
           icon="person"
           onPress={() => handleRoleSelect('client')}
           delay={400}
+          isSelected={selectedRole === 'client'}
+          onSelect={() => setSelectedRole('client')}
         />
 
         <RoleCard
@@ -133,18 +178,10 @@ export default function RoleSelectionScreen() {
           icon="cut"
           onPress={() => handleRoleSelect('coiffeur')}
           delay={600}
+          isSelected={selectedRole === 'coiffeur'}
+          onSelect={() => setSelectedRole('coiffeur')}
         />
       </View>
-
-      {/* Footer */}
-      <Animated.View
-        entering={FadeInUp.delay(800).duration(600)}
-        style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}
-      >
-        <Text style={styles.footerText}>
-          Vous pourrez toujours changer de rôle plus tard
-        </Text>
-      </Animated.View>
     </View>
   );
 }
@@ -214,6 +251,7 @@ const styles = StyleSheet.create({
     minHeight: isSmallScreen ? 140 : 160,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
+    borderColor: '#191919',
     ...Platform.select({
       ios: {
         shadowColor: '#191919',
@@ -226,12 +264,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  cardClient: {
-    borderColor: '#191919',
-  },
-  cardCoiffeur: {
-    borderColor: '#4A4A4A',
-  },
   cardContent: {
     flex: 1,
   },
@@ -242,12 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isSmallScreen ? 12 : 16,
-  },
-  iconContainerClient: {
     backgroundColor: '#F0F0F0',
-  },
-  iconContainerCoiffeur: {
-    backgroundColor: '#E5E5E5',
   },
   cardTitle: {
     fontSize: isSmallScreen ? 20 : 24,
@@ -265,14 +292,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: isSmallScreen ? 16 : 20,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  footerText: {
-    fontSize: 13,
-    color: '#808080',
-    textAlign: 'center',
   },
 });

@@ -338,47 +338,48 @@ export default function HomeScreen() {
         </View>
 
         {/* ---------------- Footer avec réseaux sociaux ---------------- */}
-        <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
-          <View style={styles.socialLinks}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => openLink('https://instagram.com/afroplan')}
-            >
-              <Ionicons name="logo-instagram" size={24} color="#191919" />
-              <Text style={styles.socialText}>Instagram</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => openLink('https://tiktok.com/@afroplan')}
-            >
-              <Ionicons name="logo-tiktok" size={24} color="#191919" />
-              <Text style={styles.socialText}>TikTok</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => openLink('https://linkedin.com/company/afroplan')}
-            >
-              <Ionicons name="logo-linkedin" size={24} color="#191919" />
-              <Text style={styles.socialText}>LinkedIn</Text>
-            </TouchableOpacity>
+        <View style={styles.footer}>
+          <View style={styles.footerTop}>
+            <View style={styles.footerLinks}>
+              <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>Support</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerDot}>•</Text>
+              <TouchableOpacity>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>CGU</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerDot}>•</Text>
+              <TouchableOpacity>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>Confidentialité</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.footerLinks}>
-            <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
-              <Text style={[styles.footerLink, { color: colors.primary }]}>Support</Text>
-            </TouchableOpacity>
-            <Text style={[styles.footerDot, { color: colors.textMuted }]}>•</Text>
-            <TouchableOpacity>
-              <Text style={[styles.footerLink, { color: colors.primary }]}>CGU</Text>
-            </TouchableOpacity>
-            <Text style={[styles.footerDot, { color: colors.textMuted }]}>•</Text>
-            <TouchableOpacity>
-              <Text style={[styles.footerLink, { color: colors.primary }]}>Confidentialité</Text>
-            </TouchableOpacity>
+          <View style={styles.socialSection}>
+            <Text style={styles.socialTitle}>Rejoignez-nous</Text>
+            <View style={styles.socialLinks}>
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={() => openLink('https://instagram.com/afroplan')}
+              >
+                <Ionicons name="logo-instagram" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={() => openLink('https://tiktok.com/@afroplan')}
+              >
+                <Ionicons name="logo-tiktok" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={() => openLink('https://linkedin.com/company/afroplan')}
+              >
+                <Ionicons name="logo-linkedin" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <Text style={[styles.copyright, { color: colors.textMuted }]}>
+          <Text style={styles.copyright}>
             © 2024 AfroPlan. Tous droits réservés.
           </Text>
         </View>
@@ -668,48 +669,59 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-    marginTop: 32,
-    paddingTop: 24,
+    marginTop: 24,
+    paddingTop: 20,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
+    backgroundColor: '#f9f8f8',
   },
-  footerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  footerTop: {
     marginBottom: 16,
-    textAlign: 'center',
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 32,
-    marginBottom: 24,
-  },
-  socialButton: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  socialText: {
-    fontSize: 12,
-    color: '#4A4A4A',
   },
   footerLinks: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: 8,
   },
   footerLink: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   footerDot: {
-    fontSize: 8,
+    fontSize: 6,
+    color: '#808080',
+  },
+  socialSection: {
+    backgroundColor: '#191919',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  socialTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  socialLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  socialButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copyright: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
-    marginBottom: 16,
+    color: '#808080',
+    marginBottom: 8,
   },
 });
