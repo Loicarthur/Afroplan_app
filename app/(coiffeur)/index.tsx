@@ -15,6 +15,8 @@ import {
   Platform,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -212,7 +214,7 @@ export default function CoiffeurDashboard() {
   // Dashboard pour coiffeur connecté
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
