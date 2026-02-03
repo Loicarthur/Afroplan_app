@@ -37,19 +37,19 @@ const { width, height } = Dimensions.get('window');
 const ONBOARDING_SLIDES = [
   {
     id: '1',
-    image: require('@/assets/images/p1.png'),
+    image: require('@/assets/images/afro2.jpg'),
     title: 'Des coiffeurs passionnés',
     subtitle: 'Spécialistes des cheveux afro près de chez toi',
   },
   {
     id: '2',
-    image: require('@/assets/images/p2.png'),
+    image: require('@/assets/images/afro2.jpg'),
     title: 'Trouve ton style parfait',
     subtitle: 'Des centaines de coiffures afro à portée de main',
   },
   {
     id: '3',
-    image: require('@/assets/images/p3.png'),
+    image: require('@/assets/images/afro2.jpg'),
     title: 'Réserve en quelques clics',
     subtitle: 'Simple, rapide et sans stress',
   },
