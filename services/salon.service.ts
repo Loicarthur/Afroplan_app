@@ -1,5 +1,6 @@
 /**
  * Service pour la gestion des salons
+ * Inclut les filtres avances pour service a domicile, promotions, localisation
  */
 
 import { supabase } from '@/lib/supabase';
@@ -9,11 +10,18 @@ import {
   SalonUpdate,
   SalonWithDetails,
   SalonFilters,
+  SalonFiltersExtended,
+  SalonWithPromotions,
   Service,
+  ServiceInsert,
+  ServiceUpdate,
+  ServiceExtended,
+  ServiceLocationType,
   Category,
   GalleryImage,
   Review,
   ReviewWithClient,
+  Promotion,
   PaginatedResponse,
 } from '@/types';
 
@@ -361,5 +369,600 @@ export const salonService = {
     }
 
     return data || [];
+  },
+
+  // ============================================
+  // FILTRES AVANCES
+  // ============================================
+
+  /**
+   * Recherche avancee de salons avec tous les filtres
+   */
+  async searchSalonsAdvanced(
+    filters: SalonFiltersExtended,
+    page: number = 1
+  ): Promise<PaginatedResponse<SalonWithPromotions>> {
+    let query = supabase
+      .from('salons')
+      .select('*', { count: 'exact' })
+      .eq('is_active', true);
+
+    // Filtres de base
+    if (filters.city) {
+      query = query.ilike('city', `%${filters.city}%`);
+    }
+    if (filters.minRating) {
+      query = query.gte('rating', filters.minRating);
+    }
+    if (filters.isVerified) {
+      query = query.eq('is_verified', true);
+    }
+    if (filters.searchQuery) {
+      query = query.or(
+        `name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
+      );
+    }
+
+    // Filtre service a domicile
+    if (filters.offersHomeService) {
+      query = query.eq('offers_home_service', true);
+    }
+
+    // Pagination
+    const from = (page - 1) * SALONS_PER_PAGE;
+    const to = from + SALONS_PER_PAGE - 1;
+    query = query.range(from, to);
+
+    // Tri
+    query = query.order('rating', { ascending: false });
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Enrichir avec les promotions actives si demande
+    let enrichedData: SalonWithPromotions[] = data || [];
+    if (filters.hasPromotion) {
+      const now = new Date().toISOString();
+      const salonIds = data?.map(s => s.id) || [];
+
+      if (salonIds.length > 0) {
+        const { data: promotions } = await supabase
+          .from('promotions')
+          .select('*')
+          .in('salon_id', salonIds)
+          .eq('status', 'active')
+          .lte('start_date', now)
+          .gte('end_date', now);
+
+        // Filtrer les salons avec promotions actives
+        const salonsWithPromotions = new Set(promotions?.map(p => p.salon_id) || []);
+        enrichedData = data?.filter(s => salonsWithPromotions.has(s.id)) || [];
+      }
+    }
+
+    // Filtrer par proximite si coordonnees fournies
+    if (filters.nearbyLatitude && filters.nearbyLongitude && filters.nearbyRadiusKm) {
+      enrichedData = enrichedData.filter(salon => {
+        if (!salon.latitude || !salon.longitude) return false;
+        const distance = this.calculateDistance(
+          filters.nearbyLatitude!,
+          filters.nearbyLongitude!,
+          salon.latitude,
+          salon.longitude
+        );
+        return distance <= filters.nearbyRadiusKm!;
+      });
+    }
+
+    const total = count || 0;
+    const totalPages = Math.ceil(total / SALONS_PER_PAGE);
+
+    return {
+      data: enrichedData,
+      total,
+      page,
+      totalPages,
+      hasMore: page < totalPages,
+    };
+  },
+
+  /**
+   * Recuperer les salons offrant le service a domicile
+   */
+  async getHomeServiceSalons(
+    latitude?: number,
+    longitude?: number,
+    radiusKm: number = 20,
+    page: number = 1
+  ): Promise<PaginatedResponse<Salon>> {
+    let query = supabase
+      .from('salons')
+      .select('*', { count: 'exact' })
+      .eq('is_active', true)
+      .eq('offers_home_service', true)
+      .order('rating', { ascending: false });
+
+    const from = (page - 1) * SALONS_PER_PAGE;
+    const to = from + SALONS_PER_PAGE - 1;
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    let filteredData = data || [];
+
+    // Filtrer par proximite si coordonnees fournies
+    if (latitude && longitude) {
+      filteredData = filteredData.filter(salon => {
+        if (!salon.latitude || !salon.longitude) return true; // Inclure si pas de coordonnees
+        const distance = this.calculateDistance(latitude, longitude, salon.latitude, salon.longitude);
+        return distance <= radiusKm;
+      });
+    }
+
+    const total = count || 0;
+    const totalPages = Math.ceil(total / SALONS_PER_PAGE);
+
+    return {
+      data: filteredData,
+      total,
+      page,
+      totalPages,
+      hasMore: page < totalPages,
+    };
+  },
+
+  /**
+   * Recuperer les salons avec promotions actives
+   */
+  async getSalonsWithActivePromotions(
+    city?: string,
+    limit: number = 10
+  ): Promise<SalonWithPromotions[]> {
+    const now = new Date().toISOString();
+
+    // Recuperer les promotions actives
+    let promoQuery = supabase
+      .from('promotions')
+      .select('salon_id')
+      .eq('status', 'active')
+      .lte('start_date', now)
+      .gte('end_date', now);
+
+    const { data: activePromos } = await promoQuery;
+
+    if (!activePromos || activePromos.length === 0) {
+      return [];
+    }
+
+    const salonIds = [...new Set(activePromos.map(p => p.salon_id))];
+
+    // Recuperer les salons
+    let salonQuery = supabase
+      .from('salons')
+      .select('*')
+      .in('id', salonIds)
+      .eq('is_active', true)
+      .order('rating', { ascending: false })
+      .limit(limit);
+
+    if (city) {
+      salonQuery = salonQuery.ilike('city', `%${city}%`);
+    }
+
+    const { data: salons, error } = await salonQuery;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Enrichir avec les promotions
+    const result: SalonWithPromotions[] = [];
+    for (const salon of salons || []) {
+      const { data: promotions } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('salon_id', salon.id)
+        .eq('status', 'active')
+        .lte('start_date', now)
+        .gte('end_date', now);
+
+      result.push({
+        ...salon,
+        promotions: promotions || [],
+        active_promotion_count: promotions?.length || 0,
+      });
+    }
+
+    return result;
+  },
+
+  /**
+   * Calculer la distance entre deux points (Haversine)
+   */
+  calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = this.toRad(lat2 - lat1);
+    const dLon = this.toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  toRad(deg: number): number {
+    return deg * (Math.PI / 180);
+  },
+
+  // ============================================
+  // GESTION DES SERVICES (ETENDUE)
+  // ============================================
+
+  /**
+   * Creer un service avec options etendues
+   */
+  async createService(service: ServiceInsert & {
+    service_location?: ServiceLocationType;
+    home_service_additional_fee?: number;
+    min_booking_notice_hours?: number;
+  }): Promise<Service> {
+    const { data, error } = await supabase
+      .from('services')
+      .insert(service)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  /**
+   * Mettre a jour un service
+   */
+  async updateService(id: string, updates: ServiceUpdate & {
+    service_location?: ServiceLocationType;
+    home_service_additional_fee?: number;
+    min_booking_notice_hours?: number;
+  }): Promise<Service> {
+    const { data, error } = await supabase
+      .from('services')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  /**
+   * Supprimer un service
+   */
+  async deleteService(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('services')
+      .update({ is_active: false })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Recuperer les services d'un salon filtres par type de localisation
+   */
+  async getSalonServicesByLocation(
+    salonId: string,
+    locationType?: ServiceLocationType
+  ): Promise<ServiceExtended[]> {
+    let query = supabase
+      .from('services')
+      .select('*')
+      .eq('salon_id', salonId)
+      .eq('is_active', true)
+      .order('category', { ascending: true })
+      .order('price', { ascending: true });
+
+    if (locationType) {
+      query = query.or(`service_location.eq.${locationType},service_location.eq.both`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  },
+
+  // ============================================
+  // GESTION DE LA GALERIE
+  // ============================================
+
+  /**
+   * Ajouter une image a la galerie
+   */
+  async addGalleryImage(salonId: string, imageUrl: string, caption?: string): Promise<GalleryImage> {
+    // Recuperer l'ordre max actuel
+    const { data: existing } = await supabase
+      .from('gallery_images')
+      .select('order')
+      .eq('salon_id', salonId)
+      .order('order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = existing && existing.length > 0 ? existing[0].order + 1 : 0;
+
+    const { data, error } = await supabase
+      .from('gallery_images')
+      .insert({
+        salon_id: salonId,
+        image_url: imageUrl,
+        caption,
+        order: nextOrder,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  /**
+   * Supprimer une image de la galerie
+   */
+  async deleteGalleryImage(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('gallery_images')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Recuperer la galerie d'un salon
+   */
+  async getSalonGallery(salonId: string): Promise<GalleryImage[]> {
+    const { data, error } = await supabase
+      .from('gallery_images')
+      .select('*')
+      .eq('salon_id', salonId)
+      .order('order', { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  },
+
+  // ============================================
+  // GESTION DES CATEGORIES DU SALON
+  // ============================================
+
+  /**
+   * Ajouter une categorie a un salon
+   */
+  async addSalonCategory(salonId: string, categoryId: string): Promise<void> {
+    const { error } = await supabase
+      .from('salon_categories')
+      .insert({ salon_id: salonId, category_id: categoryId });
+
+    if (error && error.code !== '23505') { // Ignorer les doublons
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Retirer une categorie d'un salon
+   */
+  async removeSalonCategory(salonId: string, categoryId: string): Promise<void> {
+    const { error } = await supabase
+      .from('salon_categories')
+      .delete()
+      .eq('salon_id', salonId)
+      .eq('category_id', categoryId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Definir les categories d'un salon (remplace toutes)
+   */
+  async setSalonCategories(salonId: string, categoryIds: string[]): Promise<void> {
+    // Supprimer les anciennes categories
+    await supabase
+      .from('salon_categories')
+      .delete()
+      .eq('salon_id', salonId);
+
+    // Ajouter les nouvelles
+    if (categoryIds.length > 0) {
+      const { error } = await supabase
+        .from('salon_categories')
+        .insert(categoryIds.map(categoryId => ({ salon_id: salonId, category_id: categoryId })));
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  },
+
+  /**
+   * Recuperer les categories d'un salon
+   */
+  async getSalonCategories(salonId: string): Promise<Category[]> {
+    const { data, error } = await supabase
+      .from('salon_categories')
+      .select('category_id')
+      .eq('salon_id', salonId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    const categoryIds = data.map(sc => sc.category_id);
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('*')
+      .in('id', categoryIds);
+
+    return categories || [];
+  },
+
+  // ============================================
+  // CONFIGURATION SERVICE A DOMICILE
+  // ============================================
+
+  /**
+   * Activer/configurer le service a domicile pour un salon
+   */
+  async configureHomeService(
+    salonId: string,
+    config: {
+      enabled: boolean;
+      description?: string;
+      minAmount?: number;
+    }
+  ): Promise<Salon> {
+    return this.updateSalon(salonId, {
+      offers_home_service: config.enabled,
+      home_service_description: config.description,
+      min_home_service_amount: config.minAmount,
+    } as SalonUpdate);
+  },
+
+  // ============================================
+  // STATISTIQUES DU SALON
+  // ============================================
+
+  /**
+   * Recuperer les statistiques d'un salon
+   */
+  async getSalonStats(salonId: string): Promise<{
+    totalBookings: number;
+    completedBookings: number;
+    pendingBookings: number;
+    cancelledBookings: number;
+    totalRevenue: number;
+    averageRating: number;
+    totalReviews: number;
+    totalServices: number;
+    activePromotions: number;
+  }> {
+    // Reservations
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('status, total_price')
+      .eq('salon_id', salonId);
+
+    const stats = {
+      totalBookings: bookings?.length || 0,
+      completedBookings: 0,
+      pendingBookings: 0,
+      cancelledBookings: 0,
+      totalRevenue: 0,
+      averageRating: 0,
+      totalReviews: 0,
+      totalServices: 0,
+      activePromotions: 0,
+    };
+
+    bookings?.forEach(booking => {
+      switch (booking.status) {
+        case 'completed':
+          stats.completedBookings++;
+          stats.totalRevenue += booking.total_price;
+          break;
+        case 'pending':
+        case 'confirmed':
+          stats.pendingBookings++;
+          break;
+        case 'cancelled':
+          stats.cancelledBookings++;
+          break;
+      }
+    });
+
+    // Avis et note
+    const { data: salon } = await supabase
+      .from('salons')
+      .select('rating, reviews_count')
+      .eq('id', salonId)
+      .single();
+
+    stats.averageRating = salon?.rating || 0;
+    stats.totalReviews = salon?.reviews_count || 0;
+
+    // Services
+    const { count: servicesCount } = await supabase
+      .from('services')
+      .select('*', { count: 'exact', head: true })
+      .eq('salon_id', salonId)
+      .eq('is_active', true);
+
+    stats.totalServices = servicesCount || 0;
+
+    // Promotions actives
+    const now = new Date().toISOString();
+    const { count: promosCount } = await supabase
+      .from('promotions')
+      .select('*', { count: 'exact', head: true })
+      .eq('salon_id', salonId)
+      .eq('status', 'active')
+      .lte('start_date', now)
+      .gte('end_date', now);
+
+    stats.activePromotions = promosCount || 0;
+
+    return stats;
+  },
+
+  /**
+   * Recuperer le salon d'un coiffeur par son ID utilisateur
+   */
+  async getSalonByOwnerId(ownerId: string): Promise<Salon | null> {
+    const { data, error } = await supabase
+      .from('salons')
+      .select('*')
+      .eq('owner_id', ownerId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(error.message);
+    }
+
+    return data;
   },
 };
