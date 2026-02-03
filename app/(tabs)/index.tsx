@@ -191,17 +191,10 @@ export default function HomeScreen() {
             {/* Boutons Inscription/Connexion à droite */}
             {!isAuthenticated ? (
               <View style={styles.authButtons}>
-<<<<<<< Updated upstream
-                <TouchableOpacity style={styles.loginButton}>
-                  <Text style={styles.loginButtonText}>Connexion</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.registerButton}>
-=======
                 <TouchableOpacity
                   style={styles.registerButton}
                   onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'client' } })}
                 >
->>>>>>> Stashed changes
                   <Text style={styles.registerButtonText}>Inscription</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
