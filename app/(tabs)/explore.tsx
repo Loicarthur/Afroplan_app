@@ -50,7 +50,7 @@ const SALONS_DATA = [
     address: 'Paris 11e',
     distance: '2.5 km',
     availability: 'Demain 10h',
-    availabilityColor: '#F97316',
+    availabilityColor: '#4A4A4A',
     image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
   },
   {
@@ -62,7 +62,7 @@ const SALONS_DATA = [
     address: 'Paris 13e',
     distance: '3.8 km',
     availability: 'Mercredi 14h',
-    availabilityColor: '#8B5CF6',
+    availabilityColor: '#191919',
     image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
   },
   {

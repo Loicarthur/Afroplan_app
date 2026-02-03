@@ -105,10 +105,10 @@ export default function LoginScreen() {
   }, [profile]);
 
   const isClient = selectedRole === 'client';
-  const roleColor = isClient ? '#8B5CF6' : '#F97316';
+  const roleColor = isClient ? '#191919' : '#191919';
   const roleGradient = isClient
-    ? ['#8B5CF6', '#7C3AED']
-    : ['#F97316', '#EA580C'];
+    ? ['#191919', '#4A4A4A']
+    : ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -133,7 +133,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <View style={styles.logoWrapper}>
               <Image
-                source={require('@/assets/images/logo_afro.jpeg')}
+                source={require('@/assets/images/logo_afroplan.jpeg')}
                 style={styles.logoImage}
                 contentFit="cover"
               />
