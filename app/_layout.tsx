@@ -44,7 +44,8 @@ const AfroPlanDarkTheme = {
 };
 
 export const unstable_settings = {
-  initialRouteName: 'splash',
+  // Démarrer directement sur l'onboarding (carousel de photos)
+  initialRouteName: 'onboarding',
 };
 
 export default function RootLayout() {
