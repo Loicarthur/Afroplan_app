@@ -1,5 +1,6 @@
 /**
  * Dashboard Coiffeur AfroPlan
+ * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
 import React, { useState } from 'react';
@@ -10,8 +11,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  StatusBar,
   Dimensions,
+  Platform,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -23,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
+const isSmallScreen = width < 380;
 
 type StatCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -57,7 +60,6 @@ export default function CoiffeurDashboard() {
   const { profile, isAuthenticated } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Stats mock
   const [stats] = useState({
     todayBookings: 3,
     pendingBookings: 5,
@@ -73,103 +75,79 @@ export default function CoiffeurDashboard() {
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon apres-midi';
+    if (hour < 18) return 'Bon après-midi';
     return 'Bonsoir';
   };
 
-  // Header avec boutons auth (pour non-connectes ou non-coiffeurs)
-  const renderHeader = () => (
-    <LinearGradient
-      colors={['#F97316', '#EA580C']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.header}
-    >
-      <View style={styles.headerTop}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/logo_afro.jpeg')}
-            style={styles.logoImage}
-            contentFit="contain"
-          />
-          <View>
-            <Text style={styles.logoText}>AfroPlan Pro</Text>
-            <Text style={styles.logoSubtext}>Espace Coiffeur</Text>
-          </View>
-        </View>
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch(() => {});
+  };
 
-        {isAuthenticated && profile?.role === 'coiffeur' ? (
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="notifications-outline" size={22} color="#FFF" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.authButtons}>
-            <TouchableOpacity
-              style={styles.loginButton}
-              onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
-            >
-              <Text style={styles.loginButtonText}>Connexion</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.registerButton}
-              onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
-            >
-              <Text style={styles.registerButtonText}>Inscription</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {isAuthenticated && profile?.role === 'coiffeur' && (
-        <View style={styles.welcomeSection}>
-          <Text style={styles.greeting}>{getGreeting()}</Text>
-          <Text style={styles.userName}>{profile?.full_name || 'Coiffeur'}</Text>
-        </View>
-      )}
-    </LinearGradient>
-  );
-
-  // Contenu pour utilisateur non connecte ou non-coiffeur
+  // Contenu pour utilisateur non connecté ou non-coiffeur
   if (!isAuthenticated || profile?.role !== 'coiffeur') {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          {renderHeader()}
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <View style={styles.logoWrapper}>
+                <Image
+                  source={require('@/assets/images/logo_afroplan.jpeg')}
+                  style={styles.logoImage}
+                  contentFit="contain"
+                />
+              </View>
+              <View style={styles.authButtons}>
+                <TouchableOpacity
+                  style={styles.registerButton}
+                  onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
+                >
+                  <Text style={styles.registerButtonText}>Inscription</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
+                >
+                  <Text style={styles.loginButtonText}>Connexion</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
 
           {/* Section avantages */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Developpez votre activite
+              Développez votre activité
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-              Rejoignez la communaute AfroPlan Pro et boostez votre salon
+              Rejoignez la communauté AfroPlan Pro et boostez votre salon
             </Text>
 
             <View style={styles.benefitsContainer}>
               <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#F97316' + '20' }]}>
-                  <Ionicons name="calendar" size={28} color="#F97316" />
+                <View style={[styles.benefitIcon, { backgroundColor: '#19191920' }]}>
+                  <Ionicons name="calendar" size={28} color="#191919" />
                 </View>
                 <Text style={[styles.benefitTitle, { color: colors.text }]}>Gestion des RDV</Text>
                 <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Gerez facilement vos reservations
+                  Gérez facilement vos réservations
                 </Text>
               </View>
 
               <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#22C55E' + '20' }]}>
+                <View style={[styles.benefitIcon, { backgroundColor: '#22C55E20' }]}>
                   <Ionicons name="people" size={28} color="#22C55E" />
                 </View>
                 <Text style={[styles.benefitTitle, { color: colors.text }]}>Plus de clients</Text>
                 <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Augmentez votre visibilite
+                  Augmentez votre visibilité
                 </Text>
               </View>
 
               <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
-                  <Ionicons name="stats-chart" size={28} color="#8B5CF6" />
+                <View style={[styles.benefitIcon, { backgroundColor: '#4A4A4A20' }]}>
+                  <Ionicons name="stats-chart" size={28} color="#4A4A4A" />
                 </View>
                 <Text style={[styles.benefitTitle, { color: colors.text }]}>Statistiques</Text>
                 <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
@@ -178,12 +156,12 @@ export default function CoiffeurDashboard() {
               </View>
 
               <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#3B82F6' + '20' }]}>
-                  <Ionicons name="card" size={28} color="#3B82F6" />
+                <View style={[styles.benefitIcon, { backgroundColor: '#19191920' }]}>
+                  <Ionicons name="card" size={28} color="#191919" />
                 </View>
                 <Text style={[styles.benefitTitle, { color: colors.text }]}>Paiements</Text>
                 <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Encaissez en toute securite
+                  Encaissez en toute sécurité
                 </Text>
               </View>
             </View>
@@ -191,43 +169,70 @@ export default function CoiffeurDashboard() {
 
           {/* CTA */}
           <View style={styles.ctaSection}>
-            <LinearGradient
-              colors={['#F97316', '#EA580C']}
-              style={styles.ctaCard}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
+            <View style={styles.ctaCard}>
               <Ionicons name="cut" size={48} color="#FFFFFF" />
-              <Text style={styles.ctaTitle}>Pret a commencer ?</Text>
+              <Text style={styles.ctaTitle}>Prêt à commencer ?</Text>
               <Text style={styles.ctaDesc}>
-                Inscrivez-vous gratuitement et commencez a recevoir des reservations
+                Inscrivez-vous gratuitement et commencez à recevoir des réservations
               </Text>
               <TouchableOpacity
                 style={styles.ctaButton}
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
               >
-                <Text style={styles.ctaButtonText}>Creer mon compte Pro</Text>
+                <Text style={styles.ctaButtonText}>Créer mon compte Pro</Text>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
+            <View style={styles.socialLinks}>
+              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://instagram.com/afroplan')}>
+                <Ionicons name="logo-instagram" size={24} color="#191919" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://tiktok.com/@afroplan')}>
+                <Ionicons name="logo-tiktok" size={24} color="#191919" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.socialButton} onPress={() => openLink('https://linkedin.com/company/afroplan')}>
+                <Ionicons name="logo-linkedin" size={24} color="#191919" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
+              <Text style={[styles.supportLink, { color: colors.primary }]}>Support</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={{ height: 100 }} />
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  // Dashboard pour coiffeur connecte
+  // Dashboard pour coiffeur connecté
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {renderHeader()}
+        {/* Header */}
+        <View style={styles.dashboardHeader}>
+          <View>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+              {getGreeting()}
+            </Text>
+            <Text style={[styles.userName, { color: colors.text }]}>
+              {profile?.full_name || 'Coiffeur'}
+            </Text>
+          </View>
+          <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}>
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
         {/* Stats */}
         <View style={styles.statsContainer}>
@@ -236,14 +241,14 @@ export default function CoiffeurDashboard() {
               icon="calendar"
               title="Aujourd'hui"
               value={stats.todayBookings}
-              color={colors.primary}
+              color="#191919"
               onPress={() => router.push('/(coiffeur)/reservations')}
             />
             <StatCard
               icon="time"
               title="En attente"
               value={stats.pendingBookings}
-              color={colors.accent}
+              color="#4A4A4A"
               onPress={() => router.push('/(coiffeur)/reservations')}
             />
           </View>
@@ -251,14 +256,14 @@ export default function CoiffeurDashboard() {
             <StatCard
               icon="cash"
               title="Revenus (mois)"
-              value={`${stats.totalRevenue} EUR`}
-              color={colors.success}
+              value={`${stats.totalRevenue} €`}
+              color="#22C55E"
             />
             <StatCard
               icon="people"
               title="Clients"
               value={stats.totalClients}
-              color="#9B59B6"
+              color="#191919"
             />
           </View>
         </View>
@@ -273,11 +278,11 @@ export default function CoiffeurDashboard() {
               style={[styles.quickAction, { backgroundColor: colors.card }]}
               onPress={() => router.push('/(coiffeur)/salon')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#F97316' }]}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#191919' }]}>
                 <Ionicons name="storefront" size={24} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Gerer mon salon
+                Gérer mon salon
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </TouchableOpacity>
@@ -286,11 +291,11 @@ export default function CoiffeurDashboard() {
               style={[styles.quickAction, { backgroundColor: colors.card }]}
               onPress={() => router.push('/(coiffeur)/services')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#EA580C' }]}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#4A4A4A' }]}>
                 <Ionicons name="cut" size={24} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Gerer mes services
+                Gérer mes services
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </TouchableOpacity>
@@ -299,11 +304,11 @@ export default function CoiffeurDashboard() {
               style={[styles.quickAction, { backgroundColor: colors.card }]}
               onPress={() => router.push('/(coiffeur)/reservations')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.success }]}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#22C55E' }]}>
                 <Ionicons name="calendar" size={24} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: colors.text }]}>
-                Voir les reservations
+                Voir les réservations
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </TouchableOpacity>
@@ -317,35 +322,35 @@ export default function CoiffeurDashboard() {
               Prochains rendez-vous
             </Text>
             <TouchableOpacity onPress={() => router.push('/(coiffeur)/reservations')}>
-              <Text style={[styles.seeAll, { color: '#F97316' }]}>Voir tout</Text>
+              <Text style={[styles.seeAll, { color: '#191919' }]}>Voir tout</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.appointmentCard, { backgroundColor: colors.card }]}>
             <View style={styles.appointmentTime}>
-              <Text style={[styles.appointmentHour, { color: '#F97316' }]}>10:00</Text>
+              <Text style={[styles.appointmentHour, { color: '#191919' }]}>10:00</Text>
               <Text style={[styles.appointmentDuration, { color: colors.textSecondary }]}>1h</Text>
             </View>
             <View style={styles.appointmentInfo}>
               <Text style={[styles.appointmentClient, { color: colors.text }]}>Marie Dupont</Text>
               <Text style={[styles.appointmentService, { color: colors.textSecondary }]}>Tresses africaines</Text>
             </View>
-            <View style={[styles.appointmentStatus, { backgroundColor: colors.success + '20' }]}>
-              <Text style={[styles.appointmentStatusText, { color: colors.success }]}>Confirme</Text>
+            <View style={[styles.appointmentStatus, { backgroundColor: '#22C55E20' }]}>
+              <Text style={[styles.appointmentStatusText, { color: '#22C55E' }]}>Confirmé</Text>
             </View>
           </View>
 
           <View style={[styles.appointmentCard, { backgroundColor: colors.card }]}>
             <View style={styles.appointmentTime}>
-              <Text style={[styles.appointmentHour, { color: '#F97316' }]}>14:30</Text>
+              <Text style={[styles.appointmentHour, { color: '#191919' }]}>14:30</Text>
               <Text style={[styles.appointmentDuration, { color: colors.textSecondary }]}>45min</Text>
             </View>
             <View style={styles.appointmentInfo}>
               <Text style={[styles.appointmentClient, { color: colors.text }]}>Jean Martin</Text>
               <Text style={[styles.appointmentService, { color: colors.textSecondary }]}>Coupe homme</Text>
             </View>
-            <View style={[styles.appointmentStatus, { backgroundColor: '#F97316' + '20' }]}>
-              <Text style={[styles.appointmentStatusText, { color: '#F97316' }]}>En attente</Text>
+            <View style={[styles.appointmentStatus, { backgroundColor: '#19191920' }]}>
+              <Text style={[styles.appointmentStatusText, { color: '#191919' }]}>En attente</Text>
             </View>
           </View>
         </View>
@@ -361,85 +366,91 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  headerTop: {
+  headerContent: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  logoWrapper: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#191919',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   logoImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-  },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  logoSubtext: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
   },
   authButtons: {
     flexDirection: 'row',
     gap: 8,
   },
-  loginButton: {
-    borderWidth: 1,
-    borderColor: '#FFF',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  loginButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-  },
   registerButton: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    backgroundColor: '#f9f8f8',
+    borderWidth: 1.5,
+    borderColor: '#191919',
+    borderRadius: 20,
+    paddingHorizontal: isSmallScreen ? 12 : 16,
     paddingVertical: 8,
   },
   registerButtonText: {
+    color: '#191919',
     fontWeight: '600',
-    color: '#EA580C',
+    fontSize: isSmallScreen ? 12 : 14,
   },
-  welcomeSection: {
-    marginTop: 20,
+  loginButton: {
+    backgroundColor: '#191919',
+    borderRadius: 20,
+    paddingHorizontal: isSmallScreen ? 12 : 16,
+    paddingVertical: 8,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: isSmallScreen ? 12 : 14,
+  },
+  dashboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   greeting: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: FontSizes.md,
   },
   userName: {
-    fontSize: 24,
+    fontSize: FontSizes.xxl,
     fontWeight: '700',
-    color: '#FFF',
-    marginTop: 4,
+  },
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -466,7 +477,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   benefitCard: {
-    width: (width - 52) / 2,
+    width: (width - 44) / 2,
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
@@ -490,9 +501,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ctaSection: {
-    padding: 20,
+    padding: 16,
   },
   ctaCard: {
+    backgroundColor: '#191919',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
@@ -500,7 +512,7 @@ const styles = StyleSheet.create({
   ctaTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#FFFFFF',
     marginTop: 16,
   },
   ctaDesc: {
@@ -511,7 +523,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   ctaButton: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 12,
@@ -519,7 +531,36 @@ const styles = StyleSheet.create({
   ctaButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#EA580C',
+    color: '#191919',
+  },
+  footer: {
+    marginTop: 32,
+    paddingTop: 24,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  footerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  socialLinks: {
+    flexDirection: 'row',
+    gap: 24,
+    marginBottom: 16,
+  },
+  socialButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supportLink: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   statsContainer: {
     paddingHorizontal: 20,
@@ -549,8 +590,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statTitle: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: FontSizes.sm,
+    marginTop: Spacing.xs,
   },
   quickActions: {
     gap: 10,

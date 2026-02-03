@@ -1,12 +1,11 @@
 /**
  * Splash Screen - AfroPlan
  * Écran de bienvenue avec logo animé (effet heartbeat)
- * Durée: 10 secondes ou toucher pour passer
+ * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Animated, {
@@ -97,18 +96,13 @@ export default function SplashScreen() {
 
   return (
     <Pressable style={styles.pressable} onPress={navigateToApp}>
-      <LinearGradient
-        colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
-        style={styles.container}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <View style={styles.container}>
         <View style={styles.content}>
           {/* Logo animé */}
           <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
             <View style={styles.logoBackground}>
               <Image
-                source={require('@/assets/images/logo_afro.jpeg')}
+                source={require('@/assets/images/logo_afroplan.jpeg')}
                 style={styles.logo}
                 contentFit="contain"
               />
@@ -132,7 +126,7 @@ export default function SplashScreen() {
           </View>
           <Text style={styles.skipText}>Touchez l'écran pour continuer</Text>
         </Animated.View>
-      </LinearGradient>
+      </View>
     </Pressable>
   );
 }
@@ -168,6 +162,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    backgroundColor: '#f9f8f8', // Blanc charte graphique
   },
   content: {
     flex: 1,
@@ -180,42 +175,44 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logoBackground: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#191919',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 20,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
   },
   logo: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
   },
   textContainer: {
     alignItems: 'center',
   },
   welcomeText: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#4A4A4A', // Gris foncé
     fontWeight: '400',
     marginBottom: 8,
   },
   brandName: {
     fontSize: 42,
-    color: '#FFFFFF',
+    color: '#191919', // Noir charte graphique
     fontWeight: '700',
     letterSpacing: 1,
     marginBottom: 12,
   },
   tagline: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#808080', // Gris
     fontWeight: '400',
   },
   footer: {
@@ -230,10 +227,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#191919', // Noir charte graphique
   },
   skipText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#808080', // Gris
     fontSize: 14,
     marginTop: 20,
     fontWeight: '400',

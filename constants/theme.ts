@@ -1,121 +1,126 @@
 /**
  * Theme et couleurs pour AfroPlan
  * Application de decouverte de salons de coiffure Afro
+ *
+ * Charte graphique officielle:
+ * - Noir profond: #191919 (RVB: 25,25,25) - Puissance, fierté, raffinement
+ * - Blanc: #f9f8f8 (RVB: 249,248,248) - Équilibre, pureté, ouverture
+ * - Gris clair: #E5E5E5 - Neutralité, stabilité, modernité
  */
 
 import { Platform } from 'react-native';
 
-// Couleurs principales AfroPlan - Design violet/magenta
-const primaryColor = '#8B5CF6'; // Violet principal
-const accentColor = '#F97316'; // Orange accent
-const secondaryColor = '#7C3AED'; // Violet foncé
+// Couleurs principales AfroPlan - Charte graphique officielle
+const primaryColor = '#191919'; // Noir profond - couleur principale
+const accentColor = '#191919'; // Noir pour l'accent aussi
+const secondaryColor = '#4A4A4A'; // Gris foncé pour le secondaire
 
 export const Colors = {
   light: {
-    // Couleurs de base
-    text: '#1A1A1A',
-    textSecondary: '#666666',
-    textMuted: '#999999',
-    background: '#FFFFFF',
-    backgroundSecondary: '#F8F8F8',
+    // Couleurs de base - Charte graphique
+    text: '#191919',
+    textSecondary: '#4A4A4A',
+    textMuted: '#808080',
+    background: '#f9f8f8',
+    backgroundSecondary: '#F0F0F0',
     card: '#FFFFFF',
     border: '#E5E5E5',
 
-    // Couleurs de marque
+    // Couleurs de marque - Charte graphique
     primary: primaryColor,
-    primaryLight: '#A78BFA',
-    primaryDark: '#7C3AED',
+    primaryLight: '#4A4A4A',
+    primaryDark: '#000000',
     accent: accentColor,
-    accentLight: '#FB923C',
+    accentLight: '#4A4A4A',
     secondary: secondaryColor,
 
-    // Gradient colors
-    gradientStart: '#8B5CF6',
-    gradientEnd: '#EC4899',
+    // Gradient colors - Noir/Gris
+    gradientStart: '#191919',
+    gradientEnd: '#4A4A4A',
 
     // Couleurs fonctionnelles
     success: '#22C55E',
     warning: '#F59E0B',
     error: '#EF4444',
-    info: '#3B82F6',
+    info: '#191919',
 
     // Navigation
     tint: primaryColor,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: '#4A4A4A',
+    tabIconDefault: '#808080',
     tabIconSelected: primaryColor,
 
     // Composants specifiques
     inputBackground: '#F5F5F5',
-    inputBorder: '#E0E0E0',
-    placeholder: '#9CA3AF',
+    inputBorder: '#E5E5E5',
+    placeholder: '#808080',
     divider: '#E5E5E5',
     shadow: 'rgba(0, 0, 0, 0.1)',
     overlay: 'rgba(0, 0, 0, 0.5)',
 
     // Rating stars
-    starFilled: '#FBBF24',
-    starEmpty: '#D1D5DB',
+    starFilled: '#191919',
+    starEmpty: '#E5E5E5',
 
-    // Category badges
-    badgeBraids: '#8B5CF6',
-    badgeNatural: '#F97316',
-    badgeTwists: '#EC4899',
-    badgeLocs: '#22C55E',
-    badgeWeave: '#3B82F6',
+    // Category badges - Noir et gris
+    badgeBraids: '#191919',
+    badgeNatural: '#4A4A4A',
+    badgeTwists: '#191919',
+    badgeLocs: '#4A4A4A',
+    badgeWeave: '#191919',
   },
   dark: {
-    // Couleurs de base
-    text: '#F5F5F5',
-    textSecondary: '#A0A0A0',
-    textMuted: '#666666',
-    background: '#121212',
-    backgroundSecondary: '#1E1E1E',
-    card: '#252525',
-    border: '#333333',
+    // Couleurs de base - Mode sombre
+    text: '#f9f8f8',
+    textSecondary: '#C0C0C0',
+    textMuted: '#808080',
+    background: '#191919',
+    backgroundSecondary: '#252525',
+    card: '#2A2A2A',
+    border: '#404040',
 
     // Couleurs de marque
-    primary: '#A78BFA',
-    primaryLight: '#C4B5FD',
-    primaryDark: primaryColor,
-    accent: accentColor,
-    accentLight: '#FB923C',
-    secondary: '#8B5CF6',
+    primary: '#f9f8f8',
+    primaryLight: '#FFFFFF',
+    primaryDark: '#E5E5E5',
+    accent: '#f9f8f8',
+    accentLight: '#FFFFFF',
+    secondary: '#C0C0C0',
 
     // Gradient colors
-    gradientStart: '#8B5CF6',
-    gradientEnd: '#EC4899',
+    gradientStart: '#2A2A2A',
+    gradientEnd: '#191919',
 
     // Couleurs fonctionnelles
     success: '#22C55E',
     warning: '#F59E0B',
     error: '#EF4444',
-    info: '#3B82F6',
+    info: '#f9f8f8',
 
     // Navigation
-    tint: '#A78BFA',
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: '#A78BFA',
+    tint: '#f9f8f8',
+    icon: '#C0C0C0',
+    tabIconDefault: '#808080',
+    tabIconSelected: '#f9f8f8',
 
     // Composants specifiques
     inputBackground: '#2A2A2A',
     inputBorder: '#404040',
-    placeholder: '#6B7280',
-    divider: '#333333',
+    placeholder: '#808080',
+    divider: '#404040',
     shadow: 'rgba(0, 0, 0, 0.3)',
     overlay: 'rgba(0, 0, 0, 0.7)',
 
     // Rating stars
-    starFilled: '#FBBF24',
-    starEmpty: '#4B5563',
+    starFilled: '#f9f8f8',
+    starEmpty: '#404040',
 
     // Category badges
-    badgeBraids: '#A78BFA',
-    badgeNatural: '#FB923C',
-    badgeTwists: '#F472B6',
-    badgeLocs: '#34D399',
-    badgeWeave: '#60A5FA',
+    badgeBraids: '#f9f8f8',
+    badgeNatural: '#C0C0C0',
+    badgeTwists: '#f9f8f8',
+    badgeLocs: '#C0C0C0',
+    badgeWeave: '#f9f8f8',
   },
 };
 

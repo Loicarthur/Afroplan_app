@@ -2,8 +2,18 @@
  * Service d'authentification avec Supabase
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Profile, ProfileUpdate } from '@/types/database';
+
+// Vérifier si Supabase est configuré avant toute opération
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configuré. Veuillez créer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
 
 export type SignUpParams = {
   email: string;
@@ -23,6 +33,7 @@ export const authService = {
    * Inscription d'un nouvel utilisateur
    */
   async signUp({ email, password, fullName, phone, role = 'client' }: SignUpParams) {
+    checkSupabaseConfig();
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -46,6 +57,7 @@ export const authService = {
    * Connexion d'un utilisateur existant
    */
   async signIn({ email, password }: SignInParams) {
+    checkSupabaseConfig();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

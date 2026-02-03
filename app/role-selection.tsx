@@ -1,6 +1,7 @@
 /**
  * Écran de sélection de rôle - AfroPlan
  * Permet à l'utilisateur de choisir son parcours (Client ou Coiffeur)
+ * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
 import React from 'react';
@@ -12,11 +13,10 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,19 +30,16 @@ const isSmallScreen = height < 700;
 
 type UserRole = 'client' | 'coiffeur';
 
-const SELECTED_ROLE_KEY = '@afroplan_selected_role';
-
 interface RoleCardProps {
   role: UserRole;
   title: string;
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
-  gradient: string[];
   onPress: () => void;
   delay: number;
 }
 
-function RoleCard({ role, title, description, icon, gradient, onPress, delay }: RoleCardProps) {
+function RoleCard({ role, title, description, icon, onPress, delay }: RoleCardProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -50,12 +47,14 @@ function RoleCard({ role, title, description, icon, gradient, onPress, delay }: 
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 15 });
+    scale.value = withSpring(0.97, { damping: 15 });
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 15 });
   };
+
+  const isClient = role === 'client';
 
   return (
     <Animated.View
@@ -69,23 +68,18 @@ function RoleCard({ role, title, description, icon, gradient, onPress, delay }: 
         onPress={onPress}
         style={styles.cardTouchable}
       >
-        <LinearGradient
-          colors={gradient}
-          style={styles.card}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
+        <View style={[styles.card, isClient ? styles.cardClient : styles.cardCoiffeur]}>
           <View style={styles.cardContent}>
-            <View style={styles.iconContainer}>
-              <Ionicons name={icon} size={isSmallScreen ? 48 : 56} color="#FFFFFF" />
+            <View style={[styles.iconContainer, isClient ? styles.iconContainerClient : styles.iconContainerCoiffeur]}>
+              <Ionicons name={icon} size={isSmallScreen ? 36 : 44} color="#191919" />
             </View>
             <Text style={styles.cardTitle}>{title}</Text>
             <Text style={styles.cardDescription}>{description}</Text>
             <View style={styles.arrowContainer}>
-              <Ionicons name="arrow-forward-circle" size={32} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="arrow-forward-circle" size={28} color="#191919" />
             </View>
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -95,29 +89,27 @@ export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
 
   const handleRoleSelect = async (role: UserRole) => {
-    // Stocker le rôle sélectionné
-    await AsyncStorage.setItem(SELECTED_ROLE_KEY, role);
-
-    // Rediriger vers la page d'accueil correspondante
-    if (role === 'coiffeur') {
-      router.replace('/(coiffeur)');
-    } else {
-      router.replace('/(tabs)');
-    }
+    // Naviguer vers l'écran de bienvenue avec le rôle sélectionné
+    router.replace({
+      pathname: '/welcome',
+      params: { role }
+    });
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Header */}
+      {/* Header avec logo */}
       <Animated.View
         entering={FadeInDown.delay(200).duration(600)}
         style={styles.header}
       >
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/images/logo_afroplan.jpeg')}
+            style={styles.logoImage}
+            contentFit="contain"
+          />
+        </View>
         <Text style={styles.welcomeText}>Bienvenue sur</Text>
         <Text style={styles.brandName}>AfroPlan</Text>
         <Text style={styles.subtitle}>Choisissez votre profil pour commencer</Text>
@@ -130,7 +122,6 @@ export default function RoleSelectionScreen() {
           title="Je suis Client"
           description="Découvrez les meilleurs salons de coiffure afro près de chez vous et réservez en quelques clics"
           icon="person"
-          gradient={['#8B5CF6', '#7C3AED', '#6D28D9']}
           onPress={() => handleRoleSelect('client')}
           delay={400}
         />
@@ -140,7 +131,6 @@ export default function RoleSelectionScreen() {
           title="Je suis Coiffeur"
           description="Gérez votre salon, vos rendez-vous et développez votre clientèle avec AfroPlan Pro"
           icon="cut"
-          gradient={['#F97316', '#EA580C', '#C2410C']}
           onPress={() => handleRoleSelect('coiffeur')}
           delay={600}
         />
@@ -162,35 +152,55 @@ export default function RoleSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f9f8f8',
   },
   header: {
     alignItems: 'center',
     paddingTop: isSmallScreen ? 20 : 40,
     paddingHorizontal: 24,
   },
+  logoContainer: {
+    width: isSmallScreen ? 80 : 100,
+    height: isSmallScreen ? 80 : 100,
+    borderRadius: isSmallScreen ? 40 : 50,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#191919',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
   welcomeText: {
-    fontSize: isSmallScreen ? 16 : 18,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#808080',
     fontWeight: '400',
   },
   brandName: {
-    fontSize: isSmallScreen ? 36 : 42,
-    color: '#FFFFFF',
+    fontSize: isSmallScreen ? 32 : 38,
+    color: '#191919',
     fontWeight: '700',
     letterSpacing: 1,
-    marginVertical: 8,
+    marginVertical: 6,
   },
   subtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: isSmallScreen ? 13 : 15,
+    color: '#808080',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   cardsContainer: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
-    gap: isSmallScreen ? 16 : 24,
+    gap: isSmallScreen ? 16 : 20,
   },
   cardWrapper: {
     width: '100%',
@@ -199,49 +209,62 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 20,
     padding: isSmallScreen ? 20 : 24,
-    minHeight: isSmallScreen ? 150 : 180,
+    minHeight: isSmallScreen ? 140 : 160,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        shadowColor: '#191919',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 10,
+        elevation: 6,
       },
     }),
+  },
+  cardClient: {
+    borderColor: '#191919',
+  },
+  cardCoiffeur: {
+    borderColor: '#4A4A4A',
   },
   cardContent: {
     flex: 1,
   },
   iconContainer: {
-    width: isSmallScreen ? 70 : 80,
-    height: isSmallScreen ? 70 : 80,
-    borderRadius: isSmallScreen ? 35 : 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: isSmallScreen ? 60 : 70,
+    height: isSmallScreen ? 60 : 70,
+    borderRadius: isSmallScreen ? 30 : 35,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isSmallScreen ? 12 : 16,
   },
+  iconContainerClient: {
+    backgroundColor: '#F0F0F0',
+  },
+  iconContainerCoiffeur: {
+    backgroundColor: '#E5E5E5',
+  },
   cardTitle: {
-    fontSize: isSmallScreen ? 22 : 26,
+    fontSize: isSmallScreen ? 20 : 24,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#191919',
     marginBottom: 8,
   },
   cardDescription: {
     fontSize: isSmallScreen ? 13 : 14,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#4A4A4A',
     lineHeight: isSmallScreen ? 18 : 20,
     paddingRight: 40,
   },
   arrowContainer: {
     position: 'absolute',
     right: 0,
-    top: isSmallScreen ? 20 : 24,
+    top: isSmallScreen ? 16 : 20,
   },
   footer: {
     alignItems: 'center',
@@ -249,7 +272,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#808080',
     textAlign: 'center',
   },
 });
