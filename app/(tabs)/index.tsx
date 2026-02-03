@@ -537,7 +537,7 @@ export default function HomeScreen() {
             <View style={styles.socialLinks}>
               <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => openLink('https://instagram.com/afroplan')}
+                onPress={() => openLink('https://www.instagram.com/afro._plan?igsh=ODRhaWt6aWpsdHY=')}
               >
                 <Ionicons name="logo-instagram" size={20} color="#FFFFFF" />
               </TouchableOpacity>
@@ -549,7 +549,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => openLink('https://linkedin.com/company/afroplan')}
+                onPress={() => openLink('https://www.linkedin.com/company/afro-plan/')}
               >
                 <Ionicons name="logo-linkedin" size={20} color="#FFFFFF" />
               </TouchableOpacity>
