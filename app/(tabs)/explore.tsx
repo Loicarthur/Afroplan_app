@@ -1,5 +1,7 @@
 /**
- * Page Recherche AfroPlan - Design z4
+ * Page Recherche AfroPlan - Avec filtres avancés
+ * Préparé pour intégration Google Maps
+ * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
 import React, { useState } from 'react';
@@ -11,23 +13,41 @@ import {
   TouchableOpacity,
   TextInput,
   StatusBar,
+  Modal,
+  Platform,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Slider from '@react-native-community/slider';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 
-// Filtres de recherche
-const SEARCH_FILTERS = [
-  { id: 'nearby', name: 'Proche de moi', icon: 'location' },
-  { id: 'rated', name: 'Mieux notes', icon: 'star-outline' },
-  { id: 'available', name: 'Disponible', icon: 'time-outline' },
+const { width } = Dimensions.get('window');
+
+// Types de coiffure pour filtres
+const HAIRSTYLE_FILTERS = [
+  { id: 'all', name: 'Tous', icon: 'grid-outline' },
+  { id: 'tresses', name: 'Tresses', icon: 'cut-outline' },
+  { id: 'locks', name: 'Locks', icon: 'ribbon-outline' },
+  { id: 'coupe', name: 'Coupe', icon: 'scissors-outline' },
+  { id: 'soins', name: 'Soins', icon: 'heart-outline' },
+  { id: 'coloration', name: 'Coloration', icon: 'color-palette-outline' },
 ];
 
-// Donnees de test pour les salons
+// Filtres rapides
+const QUICK_FILTERS = [
+  { id: 'nearby', name: 'Proche de moi', icon: 'location' },
+  { id: 'rated', name: 'Mieux notés', icon: 'star' },
+  { id: 'available', name: 'Dispo maintenant', icon: 'time' },
+  { id: 'promo', name: 'Promos', icon: 'pricetag' },
+];
+
+// Données de test pour les salons
 const SALONS_DATA = [
   {
     id: '1',
@@ -35,11 +55,15 @@ const SALONS_DATA = [
     rating: 4.9,
     reviews_count: 234,
     price_level: '€€€',
-    address: 'Paris 18e',
+    address: '12 Rue des Martyrs, Paris 18e',
     distance: '1.2 km',
     availability: "Aujourd'hui 15h",
     availabilityColor: '#22C55E',
     image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    services: ['Tresses', 'Twists', 'Coloration'],
+    minPrice: 45,
+    hasPromo: true,
+    promoText: '-20%',
   },
   {
     id: '2',
@@ -47,11 +71,15 @@ const SALONS_DATA = [
     rating: 4.8,
     reviews_count: 189,
     price_level: '€€',
-    address: 'Paris 11e',
+    address: '8 Boulevard Voltaire, Paris 11e',
     distance: '2.5 km',
     availability: 'Demain 10h',
     availabilityColor: '#4A4A4A',
     image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    services: ['Locs', 'Coupe homme', 'Entretien'],
+    minPrice: 30,
+    hasPromo: false,
+    promoText: '',
   },
   {
     id: '3',
@@ -59,11 +87,15 @@ const SALONS_DATA = [
     rating: 4.7,
     reviews_count: 156,
     price_level: '€€€',
-    address: 'Paris 13e',
+    address: '45 Avenue d\'Italie, Paris 13e',
     distance: '3.8 km',
     availability: 'Mercredi 14h',
     availabilityColor: '#191919',
     image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    services: ['Soins', 'Hydratation', 'Coupe'],
+    minPrice: 35,
+    hasPromo: true,
+    promoText: '-15%',
   },
   {
     id: '4',
@@ -71,27 +103,79 @@ const SALONS_DATA = [
     rating: 4.6,
     reviews_count: 98,
     price_level: '€€',
-    address: 'Paris 20e',
+    address: '23 Rue de Bagnolet, Paris 20e',
     distance: '4.2 km',
     availability: "Aujourd'hui 18h",
     availabilityColor: '#22C55E',
     image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+    services: ['Tresses', 'Cornrows', 'Box braids'],
+    minPrice: 50,
+    hasPromo: false,
+    promoText: '',
   },
 ];
 
+// Types pour les filtres
+interface AdvancedFilters {
+  maxDistance: number;
+  minRating: number;
+  maxPrice: number;
+  location: 'salon' | 'domicile' | 'both';
+  onlyPromos: boolean;
+}
+
 export default function SearchScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('nearby');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedQuickFilters, setSelectedQuickFilters] = useState<string[]>(['nearby']);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  const filteredSalons = SALONS_DATA.filter((salon) =>
-    salon.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [filters, setFilters] = useState<AdvancedFilters>({
+    maxDistance: 10,
+    minRating: 4.0,
+    maxPrice: 200,
+    location: 'both',
+    onlyPromos: false,
+  });
+
+  // Filtrer les salons
+  const filteredSalons = SALONS_DATA.filter((salon) => {
+    const matchesSearch = salon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      salon.services.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesDistance = parseFloat(salon.distance) <= filters.maxDistance;
+    const matchesRating = salon.rating >= filters.minRating;
+    const matchesPrice = salon.minPrice <= filters.maxPrice;
+    const matchesPromo = !filters.onlyPromos || salon.hasPromo;
+
+    return matchesSearch && matchesDistance && matchesRating && matchesPrice && matchesPromo;
+  });
+
+  const toggleQuickFilter = (filterId: string) => {
+    setSelectedQuickFilters(prev =>
+      prev.includes(filterId)
+        ? prev.filter(id => id !== filterId)
+        : [...prev, filterId]
+    );
+  };
 
   const handleSalonPress = (salonId: string) => {
     router.push(`/salon/${salonId}`);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      maxDistance: 10,
+      minRating: 4.0,
+      maxPrice: 200,
+      location: 'both',
+      onlyPromos: false,
+    });
   };
 
   return (
@@ -101,134 +185,365 @@ export default function SearchScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Recherche</Text>
+        <TouchableOpacity
+          style={[styles.viewModeButton, { backgroundColor: colors.card }]}
+          onPress={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+        >
+          <Ionicons
+            name={viewMode === 'list' ? 'map-outline' : 'list-outline'}
+            size={20}
+            color={colors.text}
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Ionicons name="search" size={20} color={colors.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Salon, style, quartier..."
+            placeholder="Salon, coiffeur, style..."
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
-        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={[styles.filterButton, { backgroundColor: '#191919' }]}
+          onPress={() => setShowFiltersModal(true)}
+        >
           <Ionicons name="options" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Filter Chips */}
-      <View style={styles.filtersWrapper}>
+      {/* Category Filters */}
+      <View style={styles.categoryWrapper}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContainer}
+          contentContainerStyle={styles.categoryContainer}
         >
-          {SEARCH_FILTERS.map((filter) => (
+          {HAIRSTYLE_FILTERS.map((category) => (
             <TouchableOpacity
-              key={filter.id}
+              key={category.id}
               style={[
-                styles.filterChip,
-                {
-                  backgroundColor: selectedFilter === filter.id ? colors.primary : colors.background,
-                  borderColor: selectedFilter === filter.id ? colors.primary : colors.border,
-                },
+                styles.categoryChip,
+                selectedCategory === category.id
+                  ? styles.categoryChipSelected
+                  : { backgroundColor: colors.card },
               ]}
-              onPress={() => setSelectedFilter(filter.id)}
+              onPress={() => setSelectedCategory(category.id)}
             >
               <Ionicons
-                name={filter.icon as any}
+                name={category.icon as any}
                 size={16}
-                color={selectedFilter === filter.id ? '#FFFFFF' : colors.text}
+                color={selectedCategory === category.id ? '#FFFFFF' : colors.text}
               />
               <Text
                 style={[
-                  styles.filterChipText,
-                  {
-                    color: selectedFilter === filter.id ? '#FFFFFF' : colors.text,
-                  },
+                  styles.categoryChipText,
+                  { color: selectedCategory === category.id ? '#FFFFFF' : colors.text },
                 ]}
               >
-                {filter.name}
+                {category.name}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-        {/* Progress indicator */}
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View style={[styles.progressBar, { backgroundColor: colors.primary }]} />
-          </View>
-        </View>
+      </View>
+
+      {/* Quick Filters */}
+      <View style={styles.quickFiltersWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickFiltersContainer}
+        >
+          {QUICK_FILTERS.map((filter) => {
+            const isSelected = selectedQuickFilters.includes(filter.id);
+            return (
+              <TouchableOpacity
+                key={filter.id}
+                style={[
+                  styles.quickFilterChip,
+                  {
+                    backgroundColor: isSelected ? '#191919' : 'transparent',
+                    borderColor: isSelected ? '#191919' : colors.border,
+                  },
+                ]}
+                onPress={() => toggleQuickFilter(filter.id)}
+              >
+                <Ionicons
+                  name={filter.icon as any}
+                  size={14}
+                  color={isSelected ? '#FFFFFF' : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.quickFilterText,
+                    { color: isSelected ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  {filter.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Results Header */}
       <View style={styles.resultsHeader}>
         <Text style={[styles.resultsCount, { color: colors.text }]}>
-          {filteredSalons.length} salons trouves
+          {filteredSalons.length} salon{filteredSalons.length > 1 ? 's' : ''} trouvé{filteredSalons.length > 1 ? 's' : ''}
         </Text>
         <TouchableOpacity style={styles.sortButton}>
-          <Text style={[styles.sortText, { color: colors.primary }]}>Trier par</Text>
+          <Text style={[styles.sortText, { color: '#191919' }]}>Trier par</Text>
+          <Ionicons name="chevron-down" size={16} color="#191919" />
         </TouchableOpacity>
       </View>
 
-      {/* Salons List */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
+      {/* Map placeholder or List */}
+      {viewMode === 'map' ? (
+        <View style={[styles.mapPlaceholder, { backgroundColor: colors.card }]}>
+          <Ionicons name="map" size={48} color={colors.textMuted} />
+          <Text style={[styles.mapPlaceholderText, { color: colors.textSecondary }]}>
+            Carte Google Maps
+          </Text>
+          <Text style={[styles.mapPlaceholderSubtext, { color: colors.textMuted }]}>
+            Intégration en cours...
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+        >
+          {filteredSalons.map((salon, index) => (
+            <Animated.View
+              key={salon.id}
+              entering={FadeInUp.delay(index * 100).duration(400)}
+            >
+              <TouchableOpacity
+                style={[styles.salonCard, { backgroundColor: colors.card }]}
+                onPress={() => handleSalonPress(salon.id)}
+              >
+                <View style={styles.salonImageContainer}>
+                  <Image
+                    source={{ uri: salon.image }}
+                    style={styles.salonImage}
+                    contentFit="cover"
+                  />
+                  {salon.hasPromo && (
+                    <View style={styles.promoBadge}>
+                      <Text style={styles.promoBadgeText}>{salon.promoText}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.salonContent}>
+                  <View style={styles.salonHeader}>
+                    <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+                    <View style={styles.ratingBadge}>
+                      <Ionicons name="star" size={12} color="#F59E0B" />
+                      <Text style={styles.ratingText}>{salon.rating}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.servicesText, { color: colors.textSecondary }]}>
+                    {salon.services.join(' • ')}
+                  </Text>
+
+                  <View style={styles.locationRow}>
+                    <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.addressText, { color: colors.textMuted }]} numberOfLines={1}>
+                      {salon.address}
+                    </Text>
+                    <View style={styles.distanceBadge}>
+                      <Text style={styles.distanceText}>{salon.distance}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.salonFooter}>
+                    <View style={styles.priceContainer}>
+                      <Text style={[styles.priceLabel, { color: colors.textMuted }]}>À partir de</Text>
+                      <Text style={[styles.priceValue, { color: '#7C3AED' }]}>{salon.minPrice}€</Text>
+                    </View>
+
+                    <View style={[
+                      styles.availabilityBadge,
+                      { backgroundColor: salon.availabilityColor + '20' }
+                    ]}>
+                      <Ionicons name="time" size={12} color={salon.availabilityColor} />
+                      <Text style={[styles.availabilityText, { color: salon.availabilityColor }]}>
+                        {salon.availability}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
+
+      {/* Advanced Filters Modal */}
+      <Modal
+        visible={showFiltersModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFiltersModal(false)}
       >
-        {filteredSalons.map((salon) => (
-          <TouchableOpacity
-            key={salon.id}
-            style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => handleSalonPress(salon.id)}
-          >
-            <Image
-              source={{ uri: salon.image }}
-              style={styles.salonImage}
-              contentFit="cover"
-            />
-            <View style={styles.salonContent}>
-              <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowFiltersModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Filtres avancés</Text>
+            <TouchableOpacity onPress={resetFilters}>
+              <Text style={styles.resetText}>Réinitialiser</Text>
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#FBBF24" />
-                <Text style={[styles.ratingText, { color: colors.text }]}>
-                  {salon.rating}
-                </Text>
-                <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
-                  ({salon.reviews_count})
-                </Text>
-                <Text style={[styles.separator, { color: colors.textMuted }]}>•</Text>
-                <Text style={[styles.priceLevel, { color: colors.textMuted }]}>
-                  {salon.price_level}
-                </Text>
+          <ScrollView style={styles.modalContent}>
+            {/* Distance */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterHeader}>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>Distance maximum</Text>
+                <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.maxDistance} km</Text>
               </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={50}
+                step={1}
+                value={filters.maxDistance}
+                onValueChange={(value) => setFilters({ ...filters, maxDistance: value })}
+                minimumTrackTintColor="#191919"
+                maximumTrackTintColor="#E5E5E5"
+                thumbTintColor="#191919"
+              />
+            </View>
 
-              <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-                <Text style={[styles.addressText, { color: colors.textSecondary }]}>
-                  {salon.address}
-                </Text>
-                <Text style={[styles.distanceText, { color: colors.textMuted }]}>
-                  {salon.distance}
-                </Text>
+            {/* Rating */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterHeader}>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>Note minimum</Text>
+                <View style={styles.ratingDisplay}>
+                  <Ionicons name="star" size={14} color="#F59E0B" />
+                  <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.minRating.toFixed(1)}</Text>
+                </View>
               </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={3.0}
+                maximumValue={5.0}
+                step={0.1}
+                value={filters.minRating}
+                onValueChange={(value) => setFilters({ ...filters, minRating: value })}
+                minimumTrackTintColor="#191919"
+                maximumTrackTintColor="#E5E5E5"
+                thumbTintColor="#191919"
+              />
+            </View>
 
-              <View style={styles.availabilityRow}>
-                <Ionicons name="time-outline" size={14} color={salon.availabilityColor} />
-                <Text style={[styles.availabilityText, { color: salon.availabilityColor }]}>
-                  {salon.availability}
-                </Text>
+            {/* Max Price */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterHeader}>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>Budget maximum</Text>
+                <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.maxPrice}€</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={20}
+                maximumValue={300}
+                step={10}
+                value={filters.maxPrice}
+                onValueChange={(value) => setFilters({ ...filters, maxPrice: value })}
+                minimumTrackTintColor="#191919"
+                maximumTrackTintColor="#E5E5E5"
+                thumbTintColor="#191919"
+              />
+            </View>
+
+            {/* Location Type */}
+            <View style={styles.filterSection}>
+              <Text style={[styles.filterLabel, { color: colors.text }]}>Lieu</Text>
+              <View style={styles.locationOptions}>
+                {[
+                  { id: 'salon', label: 'En salon', icon: 'storefront' },
+                  { id: 'domicile', label: 'À domicile', icon: 'home' },
+                  { id: 'both', label: 'Les deux', icon: 'apps' },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      styles.locationOption,
+                      { backgroundColor: colors.card },
+                      filters.location === option.id && styles.locationOptionSelected,
+                    ]}
+                    onPress={() => setFilters({ ...filters, location: option.id as any })}
+                  >
+                    <Ionicons
+                      name={option.icon as any}
+                      size={20}
+                      color={filters.location === option.id ? '#FFFFFF' : colors.text}
+                    />
+                    <Text
+                      style={[
+                        styles.locationOptionText,
+                        { color: filters.location === option.id ? '#FFFFFF' : colors.text },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
-          </TouchableOpacity>
-        ))}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+
+            {/* Only Promos */}
+            <TouchableOpacity
+              style={[styles.promoToggle, { backgroundColor: colors.card }]}
+              onPress={() => setFilters({ ...filters, onlyPromos: !filters.onlyPromos })}
+            >
+              <View style={styles.promoToggleContent}>
+                <Ionicons name="pricetag" size={20} color="#7C3AED" />
+                <Text style={[styles.promoToggleText, { color: colors.text }]}>
+                  Uniquement les promotions
+                </Text>
+              </View>
+              <View style={[
+                styles.toggle,
+                filters.onlyPromos && styles.toggleActive,
+              ]}>
+                <View style={[
+                  styles.toggleThumb,
+                  filters.onlyPromos && styles.toggleThumbActive,
+                ]} />
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Apply Button */}
+          <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 16 }]}>
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={() => setShowFiltersModal(false)}
+            >
+              <Text style={styles.applyButtonText}>Voir {filteredSalons.length} résultats</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -238,6 +553,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 16,
@@ -245,6 +563,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
+  },
+  viewModeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -273,57 +598,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filtersWrapper: {
-    marginBottom: 16,
+  categoryWrapper: {
+    marginBottom: 12,
   },
-  filtersContainer: {
+  categoryContainer: {
     paddingHorizontal: 20,
     gap: 10,
   },
-  filterChip: {
+  categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
-    borderWidth: 1,
     gap: 6,
   },
-  filterChipText: {
+  categoryChipSelected: {
+    backgroundColor: '#191919',
+  },
+  categoryChipText: {
     fontSize: 13,
     fontWeight: '500',
   },
-  progressContainer: {
+  quickFiltersWrapper: {
+    marginBottom: 12,
+  },
+  quickFiltersContainer: {
     paddingHorizontal: 20,
-    marginTop: 12,
+    gap: 8,
   },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
+  quickFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
   },
-  progressBar: {
-    width: '30%',
-    height: '100%',
-    borderRadius: 2,
+  quickFilterText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   resultsCount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   sortText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  mapPlaceholder: {
+    flex: 1,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  mapPlaceholderSubtext: {
+    fontSize: 13,
+    marginTop: 4,
   },
   listContainer: {
     paddingHorizontal: 20,
@@ -331,65 +683,249 @@ const styles = StyleSheet.create({
   salonCard: {
     flexDirection: 'row',
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     overflow: 'hidden',
-    padding: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  salonImageContainer: {
+    position: 'relative',
   },
   salonImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 100,
+    height: 130,
+  },
+  promoBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  promoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   salonContent: {
     flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  salonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   salonName: {
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
+    flex: 1,
   },
-  ratingRow: {
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 3,
   },
   ratingText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+    color: '#92400E',
   },
-  reviewsText: {
+  servicesText: {
     fontSize: 12,
-    marginLeft: 2,
-  },
-  separator: {
-    marginHorizontal: 6,
-  },
-  priceLevel: {
-    fontSize: 12,
+    marginBottom: 6,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 4,
+    marginBottom: 8,
   },
   addressText: {
-    fontSize: 13,
-    marginLeft: 4,
+    flex: 1,
+    fontSize: 12,
+  },
+  distanceBadge: {
+    backgroundColor: '#E5E5E5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   distanceText: {
-    fontSize: 12,
-    marginLeft: 8,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4A4A4A',
   },
-  availabilityRow: {
+  salonFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  priceLabel: {
+    fontSize: 11,
+  },
+  priceValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  availabilityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
   availabilityText: {
-    fontSize: 13,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  resetText: {
+    fontSize: 14,
+    color: '#7C3AED',
     fontWeight: '500',
-    marginLeft: 4,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  filterSection: {
+    marginBottom: 28,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  filterValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  ratingDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  locationOptions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  locationOption: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  locationOptionSelected: {
+    backgroundColor: '#191919',
+    borderColor: '#191919',
+  },
+  locationOptionText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  promoToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  promoToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  promoToggleText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  toggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E5E5E5',
+    padding: 2,
+  },
+  toggleActive: {
+    backgroundColor: '#22C55E',
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  toggleThumbActive: {
+    transform: [{ translateX: 22 }],
+  },
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  applyButton: {
+    backgroundColor: '#191919',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

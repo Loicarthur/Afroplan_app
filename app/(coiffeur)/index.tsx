@@ -1,5 +1,6 @@
 /**
  * Dashboard Coiffeur AfroPlan
+ * Design basé sur sd.png et sde.png
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
@@ -21,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +59,36 @@ function StatCard({ icon, title, value, color, onPress }: StatCardProps) {
   );
 }
 
+// Composant Benefit Card pour l'écran non-connecté
+interface BenefitCardProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  iconBgColor: string;
+  iconColor: string;
+  delay: number;
+}
+
+function BenefitCard({ icon, title, description, iconBgColor, iconColor, delay }: BenefitCardProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(delay).duration(500)}
+      style={[styles.benefitCard, { backgroundColor: colors.card }]}
+    >
+      <View style={[styles.benefitIcon, { backgroundColor: iconBgColor }]}>
+        <Ionicons name={icon} size={28} color={iconColor} />
+      </View>
+      <Text style={[styles.benefitTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
+        {description}
+      </Text>
+    </Animated.View>
+  );
+}
+
 export default function CoiffeurDashboard() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -90,10 +122,15 @@ export default function CoiffeurDashboard() {
   if (!isAuthenticated || profile?.role !== 'coiffeur') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar style="dark" />
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={styles.header}>
+          {/* Header avec logo Afroplan */}
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(500)}
+            style={styles.header}
+          >
             <View style={styles.headerContent}>
+              {/* Logo Afroplan */}
               <View style={styles.logoWrapper}>
                 <Image
                   source={require('@/assets/images/logo_afroplan.jpeg')}
@@ -101,6 +138,8 @@ export default function CoiffeurDashboard() {
                   contentFit="contain"
                 />
               </View>
+
+              {/* Auth Buttons */}
               <View style={styles.authButtons}>
                 <TouchableOpacity
                   style={styles.registerButton}
@@ -116,64 +155,79 @@ export default function CoiffeurDashboard() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </Animated.View>
+
+          {/* AfroPlan Pro Badge */}
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(500)}
+            style={styles.proBadgeSection}
+          >
+            <View style={styles.proBadge}>
+              <Ionicons name="trending-up" size={18} color="#7C3AED" />
+              <Text style={styles.proBadgeText}>AfroPlan Pro</Text>
+            </View>
+          </Animated.View>
 
           {/* Section avantages */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            <Animated.Text
+              entering={FadeInUp.delay(250).duration(500)}
+              style={[styles.sectionTitle, { color: colors.text }]}
+            >
               Développez votre activité
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInUp.delay(300).duration(500)}
+              style={[styles.sectionSubtitle, { color: colors.textSecondary }]}
+            >
               Rejoignez la communauté AfroPlan Pro et boostez votre salon
-            </Text>
+            </Animated.Text>
 
             <View style={styles.benefitsContainer}>
-              <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#19191920' }]}>
-                  <Ionicons name="calendar" size={28} color="#191919" />
-                </View>
-                <Text style={[styles.benefitTitle, { color: colors.text }]}>Gestion des RDV</Text>
-                <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Gérez facilement vos réservations
-                </Text>
-              </View>
-
-              <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#22C55E20' }]}>
-                  <Ionicons name="people" size={28} color="#22C55E" />
-                </View>
-                <Text style={[styles.benefitTitle, { color: colors.text }]}>Plus de clients</Text>
-                <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Augmentez votre visibilité
-                </Text>
-              </View>
-
-              <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#4A4A4A20' }]}>
-                  <Ionicons name="stats-chart" size={28} color="#4A4A4A" />
-                </View>
-                <Text style={[styles.benefitTitle, { color: colors.text }]}>Statistiques</Text>
-                <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Suivez vos performances
-                </Text>
-              </View>
-
-              <View style={[styles.benefitCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#19191920' }]}>
-                  <Ionicons name="card" size={28} color="#191919" />
-                </View>
-                <Text style={[styles.benefitTitle, { color: colors.text }]}>Paiements</Text>
-                <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                  Encaissez en toute sécurité
-                </Text>
-              </View>
+              <BenefitCard
+                icon="calendar"
+                title="Gestion des RDV"
+                description="Gérez facilement vos réservations"
+                iconBgColor="#191919"
+                iconColor="#FFFFFF"
+                delay={350}
+              />
+              <BenefitCard
+                icon="people"
+                title="Plus de clients"
+                description="Augmentez votre visibilité"
+                iconBgColor="#22C55E20"
+                iconColor="#22C55E"
+                delay={400}
+              />
+              <BenefitCard
+                icon="stats-chart"
+                title="Statistiques"
+                description="Suivez vos performances"
+                iconBgColor="#F59E0B20"
+                iconColor="#F59E0B"
+                delay={450}
+              />
+              <BenefitCard
+                icon="card"
+                title="Paiements"
+                description="Encaissez en toute sécurité"
+                iconBgColor="#EC489920"
+                iconColor="#EC4899"
+                delay={500}
+              />
             </View>
           </View>
 
-          {/* CTA */}
-          <View style={styles.ctaSection}>
+          {/* CTA Section */}
+          <Animated.View
+            entering={FadeInUp.delay(550).duration(500)}
+            style={styles.ctaSection}
+          >
             <View style={styles.ctaCard}>
-              <Ionicons name="cut" size={48} color="#FFFFFF" />
+              <View style={styles.ctaIconContainer}>
+                <Ionicons name="cut" size={32} color="#FFFFFF" />
+              </View>
               <Text style={styles.ctaTitle}>Prêt à commencer ?</Text>
               <Text style={styles.ctaDesc}>
                 Inscrivez-vous gratuitement et commencez à recevoir des réservations
@@ -182,10 +236,30 @@ export default function CoiffeurDashboard() {
                 style={styles.ctaButton}
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
               >
+                <Ionicons name="sparkles" size={18} color="#191919" />
                 <Text style={styles.ctaButtonText}>Créer mon compte Pro</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
+
+          {/* Photo Help Section */}
+          <Animated.View
+            entering={FadeInUp.delay(600).duration(500)}
+            style={styles.helpSection}
+          >
+            <View style={styles.helpCard}>
+              <Ionicons name="camera" size={24} color="#7C3AED" />
+              <View style={styles.helpTextContainer}>
+                <Text style={[styles.helpTitle, { color: colors.text }]}>
+                  Besoin d'aide pour vos photos ?
+                </Text>
+                <Text style={[styles.helpDesc, { color: colors.textSecondary }]}>
+                  Si vous avez des difficultés pour des prises de photos professionnelles,
+                  contactez-nous et nous viendrons vous aider gratuitement !
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -195,8 +269,8 @@ export default function CoiffeurDashboard() {
 
   // Dashboard pour coiffeur connecté
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -213,9 +287,20 @@ export default function CoiffeurDashboard() {
               {profile?.full_name || 'Coiffeur'}
             </Text>
           </View>
-          <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}>
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => router.push('/(coiffeur)/messages' as any)}
+            >
+              <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>2</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}>
+              <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats */}
@@ -232,7 +317,7 @@ export default function CoiffeurDashboard() {
               icon="time"
               title="En attente"
               value={stats.pendingBookings}
-              color="#4A4A4A"
+              color="#F59E0B"
               onPress={() => router.push('/(coiffeur)/reservations')}
             />
           </View>
@@ -247,7 +332,7 @@ export default function CoiffeurDashboard() {
               icon="people"
               title="Clients"
               value={stats.totalClients}
-              color="#191919"
+              color="#7C3AED"
             />
           </View>
         </View>
@@ -275,7 +360,7 @@ export default function CoiffeurDashboard() {
               style={[styles.quickAction, { backgroundColor: colors.card }]}
               onPress={() => router.push('/(coiffeur)/services')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#4A4A4A' }]}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#7C3AED' }]}>
                 <Ionicons name="cut" size={24} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: colors.text }]}>
@@ -296,6 +381,22 @@ export default function CoiffeurDashboard() {
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickAction, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/(coiffeur)/messages' as any)}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#3B82F6' }]}>
+                <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>
+                Messages clients
+              </Text>
+              <View style={styles.messageBadge}>
+                <Text style={styles.messageBadgeText}>2 nouveaux</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -306,7 +407,7 @@ export default function CoiffeurDashboard() {
               Prochains rendez-vous
             </Text>
             <TouchableOpacity onPress={() => router.push('/(coiffeur)/reservations')}>
-              <Text style={[styles.seeAll, { color: '#191919' }]}>Voir tout</Text>
+              <Text style={[styles.seeAll, { color: '#7C3AED' }]}>Voir tout</Text>
             </TouchableOpacity>
           </View>
 
@@ -319,6 +420,9 @@ export default function CoiffeurDashboard() {
               <Text style={[styles.appointmentClient, { color: colors.text }]}>Marie Dupont</Text>
               <Text style={[styles.appointmentService, { color: colors.textSecondary }]}>Tresses africaines</Text>
             </View>
+            <TouchableOpacity style={styles.chatButton}>
+              <Ionicons name="chatbubble" size={16} color="#3B82F6" />
+            </TouchableOpacity>
             <View style={[styles.appointmentStatus, { backgroundColor: '#22C55E20' }]}>
               <Text style={[styles.appointmentStatusText, { color: '#22C55E' }]}>Confirmé</Text>
             </View>
@@ -333,15 +437,18 @@ export default function CoiffeurDashboard() {
               <Text style={[styles.appointmentClient, { color: colors.text }]}>Jean Martin</Text>
               <Text style={[styles.appointmentService, { color: colors.textSecondary }]}>Coupe homme</Text>
             </View>
-            <View style={[styles.appointmentStatus, { backgroundColor: '#19191920' }]}>
-              <Text style={[styles.appointmentStatusText, { color: '#191919' }]}>En attente</Text>
+            <TouchableOpacity style={styles.chatButton}>
+              <Ionicons name="chatbubble" size={16} color="#3B82F6" />
+            </TouchableOpacity>
+            <View style={[styles.appointmentStatus, { backgroundColor: '#F59E0B20' }]}>
+              <Text style={[styles.appointmentStatusText, { color: '#F59E0B' }]}>En attente</Text>
             </View>
           </View>
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -360,9 +467,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   logoWrapper: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
@@ -411,12 +518,167 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: isSmallScreen ? 12 : 14,
   },
+  proBadgeSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  proBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7C3AED',
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  benefitsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: isSmallScreen ? 10 : 12,
+    justifyContent: 'space-between',
+  },
+  benefitCard: {
+    width: isVerySmallScreen ? '100%' : (width - 44) / 2,
+    padding: isSmallScreen ? 14 : 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#191919',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  benefitIcon: {
+    width: isSmallScreen ? 52 : 60,
+    height: isSmallScreen ? 52 : 60,
+    borderRadius: isSmallScreen ? 26 : 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: isSmallScreen ? 10 : 14,
+  },
+  benefitTitle: {
+    fontSize: isSmallScreen ? 14 : 15,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  benefitDesc: {
+    fontSize: isSmallScreen ? 11 : 12,
+    textAlign: 'center',
+    lineHeight: isSmallScreen ? 15 : 17,
+  },
+  ctaSection: {
+    padding: 16,
+    paddingTop: 24,
+  },
+  ctaCard: {
+    backgroundColor: '#191919',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+  },
+  ctaIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  ctaTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  ctaDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  ctaButton: {
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  ctaButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#191919',
+  },
+  helpSection: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  helpCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#7C3AED10',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#7C3AED30',
+  },
+  helpTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  helpTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  helpDesc: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   dashboardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 8,
   },
   greeting: {
     fontSize: FontSizes.md,
@@ -431,108 +693,27 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  section: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    marginBottom: 20,
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  benefitsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: isSmallScreen ? 8 : 12,
-    justifyContent: 'space-between',
-  },
-  benefitCard: {
-    width: isVerySmallScreen ? '100%' : (width - 44) / 2,
-    padding: isSmallScreen ? 12 : 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#191919',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  benefitIcon: {
-    width: isSmallScreen ? 48 : 56,
-    height: isSmallScreen ? 48 : 56,
-    borderRadius: isSmallScreen ? 24 : 28,
+  notificationBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#EF4444',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: isSmallScreen ? 8 : 12,
   },
-  benefitTitle: {
-    fontSize: isSmallScreen ? 13 : 14,
-    fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  benefitDesc: {
-    fontSize: isSmallScreen ? 11 : 12,
-    textAlign: 'center',
-    lineHeight: isSmallScreen ? 14 : 16,
-  },
-  ctaSection: {
-    padding: 16,
-  },
-  ctaCard: {
-    backgroundColor: '#191919',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-  },
-  ctaTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+  notificationBadgeText: {
     color: '#FFFFFF',
-    marginTop: 16,
-  },
-  ctaDesc: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  ctaButton: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  ctaButtonText: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#191919',
   },
   statsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   statsRow: {
     flexDirection: 'row',
@@ -582,6 +763,27 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
+  },
+  messageBadge: {
+    backgroundColor: '#3B82F620',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  messageBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  chatButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#3B82F620',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
   appointmentCard: {
     flexDirection: 'row',

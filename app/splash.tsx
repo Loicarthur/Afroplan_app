@@ -41,7 +41,7 @@ export default function SplashScreen() {
     // Annuler les animations
     cancelAnimation(scale);
 
-    router.replace('/role-selection');
+    router.replace('/onboarding');
   };
 
   useEffect(() => {

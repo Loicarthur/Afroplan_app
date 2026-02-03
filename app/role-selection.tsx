@@ -1,10 +1,10 @@
 /**
  * Écran de sélection de rôle - AfroPlan
- * Permet à l'utilisateur de choisir son parcours (Client ou Coiffeur)
+ * Design basé sur exe.jpeg
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,116 +12,82 @@ import {
   Dimensions,
   TouchableOpacity,
   Platform,
+  ScrollView,
+  ImageBackground,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
   FadeInUp,
   FadeInDown,
-  interpolateColor,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
+const cardWidth = (width - 48 - 12) / 2;
 
 type UserRole = 'client' | 'coiffeur';
 
 interface RoleCardProps {
   role: UserRole;
   title: string;
-  description: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  subtitle: string;
+  description: string[];
+  buttonText: string;
+  imageSource: any;
   onPress: () => void;
   delay: number;
-  isSelected: boolean;
-  onSelect: () => void;
 }
 
-function RoleCard({ role, title, description, icon, onPress, delay, isSelected, onSelect }: RoleCardProps) {
-  const scale = useSharedValue(1);
-  const colorProgress = useSharedValue(0);
-
-  // Animation quand sélectionné
-  React.useEffect(() => {
-    colorProgress.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
-  }, [isSelected]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      colorProgress.value,
-      [0, 1],
-      ['#FFFFFF', '#191919']
-    ),
-    borderColor: '#191919',
-  }));
-
-  const animatedTextStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      colorProgress.value,
-      [0, 1],
-      ['#191919', '#FFFFFF']
-    ),
-  }));
-
-  const animatedDescStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      colorProgress.value,
-      [0, 1],
-      ['#4A4A4A', '#E5E5E5']
-    ),
-  }));
-
-  const animatedIconBgStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      colorProgress.value,
-      [0, 1],
-      ['#F0F0F0', '#FFFFFF']
-    ),
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15 });
-    onSelect();
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15 });
-  };
-
+function RoleCard({
+  role,
+  title,
+  subtitle,
+  description,
+  buttonText,
+  imageSource,
+  onPress,
+  delay,
+}: RoleCardProps) {
   return (
     <Animated.View
-      entering={FadeInUp.delay(delay).duration(600).springify()}
-      style={[styles.cardWrapper, animatedStyle]}
+      entering={FadeInUp.delay(delay).duration(600)}
+      style={styles.cardWrapper}
     >
       <TouchableOpacity
-        activeOpacity={0.9}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        activeOpacity={0.95}
         onPress={onPress}
-        style={styles.cardTouchable}
+        style={styles.card}
       >
-        <Animated.View style={[styles.card, animatedCardStyle]}>
-          <View style={styles.cardContent}>
-            <Animated.View style={[styles.iconContainer, animatedIconBgStyle]}>
-              <Ionicons name={icon} size={isSmallScreen ? 36 : 44} color="#191919" />
-            </Animated.View>
-            <Animated.Text style={[styles.cardTitle, animatedTextStyle]}>{title}</Animated.Text>
-            <Animated.Text style={[styles.cardDescription, animatedDescStyle]}>{description}</Animated.Text>
-            <View style={styles.arrowContainer}>
-              <Ionicons name="arrow-forward-circle" size={28} color={isSelected ? "#FFFFFF" : "#191919"} />
-            </View>
+        {/* Background Image */}
+        <Image
+          source={imageSource}
+          style={styles.cardImage}
+          contentFit="cover"
+        />
+
+        {/* Overlay gradient */}
+        <View style={styles.cardOverlay} />
+
+        {/* Content */}
+        <View style={styles.cardContent}>
+          <View style={styles.cardTextSection}>
+            <Text style={styles.cardTitle}>{title}</Text>
+            {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+            {description.map((line, index) => (
+              <Text key={index} style={styles.cardDescription}>{line}</Text>
+            ))}
           </View>
-        </Animated.View>
+
+          {/* Button */}
+          <TouchableOpacity style={styles.cardButton} onPress={onPress}>
+            <Text style={styles.cardButtonText}>{buttonText}</Text>
+            <Ionicons name="arrow-forward" size={16} color="#191919" />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -129,10 +95,8 @@ function RoleCard({ role, title, description, icon, onPress, delay, isSelected, 
 
 export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
 
-  const handleRoleSelect = async (role: UserRole) => {
-    // Naviguer vers l'écran de bienvenue avec le rôle sélectionné
+  const handleRoleSelect = (role: UserRole) => {
     router.replace({
       pathname: '/welcome',
       params: { role }
@@ -140,48 +104,92 @@ export default function RoleSelectionScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
-      {/* Header avec logo */}
-      <Animated.View
-        entering={FadeInDown.delay(200).duration(600)}
-        style={styles.header}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar style="dark" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/logo_afroplan.jpeg')}
-            style={styles.logoImage}
-            contentFit="contain"
+        {/* Header avec logo */}
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(600)}
+          style={styles.header}
+        >
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('@/assets/images/logo_afroplan.jpeg')}
+              style={styles.logoImage}
+              contentFit="contain"
+            />
+          </View>
+
+          {/* Brand Name */}
+          <Text style={styles.brandName}>AfroPlan</Text>
+          <Text style={styles.tagline}>La coiffure afro, réinventée.</Text>
+        </Animated.View>
+
+        {/* Question Section */}
+        <Animated.View
+          entering={FadeInUp.delay(300).duration(600)}
+          style={styles.questionSection}
+        >
+          <Text style={styles.questionTitle}>Qui êtes-vous aujourd'hui ?</Text>
+          <Text style={styles.questionSubtitle}>
+            Une expérience pensée pour chaque besoin.
+          </Text>
+        </Animated.View>
+
+        {/* Role Cards */}
+        <View style={styles.cardsContainer}>
+          <RoleCard
+            role="client"
+            title="Je veux"
+            subtitle="me faire coiffer"
+            description={[
+              "Trouve le coiffeur afro",
+              "idéal près de chez toi",
+              "Réserve en quelques clics,",
+              "sans stress"
+            ]}
+            buttonText="Trouver mon style"
+            imageSource={require('@/assets/images/p2.png')}
+            onPress={() => handleRoleSelect('client')}
+            delay={400}
+          />
+
+          <RoleCard
+            role="coiffeur"
+            title="Je suis"
+            subtitle="coiffeur / coiffeuse"
+            description={[
+              "Gère tes rendez-vous,",
+              "attire plus de clients",
+              "Et développe ton activité",
+              "avec AfroPlan Pro"
+            ]}
+            buttonText="Passer en mode Pro"
+            imageSource={require('@/assets/images/p1.png')}
+            onPress={() => handleRoleSelect('coiffeur')}
+            delay={500}
           />
         </View>
-        <Text style={styles.welcomeText}>Bienvenue sur</Text>
-        <Text style={styles.brandName}>AfroPlan</Text>
-        <Text style={styles.subtitle}>Choisissez votre profil pour commencer</Text>
-      </Animated.View>
 
-      {/* Role Cards */}
-      <View style={styles.cardsContainer}>
-        <RoleCard
-          role="client"
-          title="Je suis Client"
-          description="Découvrez les meilleurs salons de coiffure afro près de chez vous et réservez en quelques clics"
-          icon="person"
-          onPress={() => handleRoleSelect('client')}
-          delay={400}
-          isSelected={selectedRole === 'client'}
-          onSelect={() => setSelectedRole('client')}
-        />
-
-        <RoleCard
-          role="coiffeur"
-          title="Je suis Coiffeur"
-          description="Gérez votre salon, vos rendez-vous et développez votre clientèle avec AfroPlan Pro"
-          icon="cut"
-          onPress={() => handleRoleSelect('coiffeur')}
-          delay={600}
-          isSelected={selectedRole === 'coiffeur'}
-          onSelect={() => setSelectedRole('coiffeur')}
-        />
-      </View>
+        {/* Trust Section */}
+        <Animated.View
+          entering={FadeInUp.delay(600).duration(600)}
+          style={styles.trustSection}
+        >
+          <Text style={styles.trustText}>
+            Déjà +100 coiffeurs nous font confiance.
+          </Text>
+          <View style={styles.starsContainer}>
+            {[1, 2, 3, 4, 5, 6].map((_, index) => (
+              <Ionicons key={index} name="star" size={18} color="#191919" />
+            ))}
+          </View>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
@@ -191,106 +199,132 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9f8f8',
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
   header: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 20 : 40,
+    paddingTop: isSmallScreen ? 20 : 30,
     paddingHorizontal: 24,
   },
   logoContainer: {
-    width: isSmallScreen ? 80 : 100,
-    height: isSmallScreen ? 80 : 100,
-    borderRadius: isSmallScreen ? 40 : 50,
+    width: isSmallScreen ? 70 : 80,
+    height: isSmallScreen ? 70 : 80,
+    borderRadius: isSmallScreen ? 35 : 40,
+    backgroundColor: '#E8E8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#191919',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 2,
-    borderColor: '#E5E5E5',
+    marginBottom: 12,
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  welcomeText: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#808080',
-    fontWeight: '400',
+    width: '85%',
+    height: '85%',
   },
   brandName: {
-    fontSize: isSmallScreen ? 32 : 38,
+    fontSize: isSmallScreen ? 24 : 28,
     color: '#191919',
     fontWeight: '700',
-    letterSpacing: 1,
-    marginVertical: 6,
+    letterSpacing: 0.5,
   },
-  subtitle: {
-    fontSize: isSmallScreen ? 13 : 15,
+  tagline: {
+    fontSize: isSmallScreen ? 14 : 15,
+    color: '#808080',
+    marginTop: 4,
+  },
+  questionSection: {
+    alignItems: 'center',
+    paddingTop: isSmallScreen ? 24 : 32,
+    paddingHorizontal: 24,
+    marginBottom: isSmallScreen ? 20 : 24,
+  },
+  questionTitle: {
+    fontSize: isSmallScreen ? 22 : 26,
+    fontWeight: '700',
+    color: '#191919',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  questionSubtitle: {
+    fontSize: isSmallScreen ? 14 : 15,
     color: '#808080',
     textAlign: 'center',
-    marginTop: 6,
   },
   cardsContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 12,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    gap: isSmallScreen ? 16 : 20,
   },
   cardWrapper: {
-    width: '100%',
-  },
-  cardTouchable: {
-    width: '100%',
+    width: cardWidth,
   },
   card: {
+    height: isSmallScreen ? 280 : 320,
     borderRadius: 20,
-    padding: isSmallScreen ? 20 : 24,
-    minHeight: isSmallScreen ? 140 : 160,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#191919',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#191919',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
+    overflow: 'hidden',
+    backgroundColor: '#E5E5E5',
+  },
+  cardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  cardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   cardContent: {
     flex: 1,
+    padding: 16,
+    justifyContent: 'flex-end',
   },
-  iconContainer: {
-    width: isSmallScreen ? 60 : 70,
-    height: isSmallScreen ? 60 : 70,
-    borderRadius: isSmallScreen ? 30 : 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: isSmallScreen ? 12 : 16,
-    backgroundColor: '#F0F0F0',
+  cardTextSection: {
+    marginBottom: 16,
   },
   cardTitle: {
-    fontSize: isSmallScreen ? 20 : 24,
+    fontSize: isSmallScreen ? 18 : 20,
     fontWeight: '700',
-    color: '#191919',
+    color: '#FFFFFF',
+    marginBottom: 0,
+  },
+  cardSubtitle: {
+    fontSize: isSmallScreen ? 18 : 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   cardDescription: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: isSmallScreen ? 16 : 18,
+  },
+  cardButton: {
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 6,
+  },
+  cardButtonText: {
+    fontSize: isSmallScreen ? 13 : 14,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  trustSection: {
+    alignItems: 'center',
+    paddingTop: isSmallScreen ? 28 : 36,
+    paddingHorizontal: 24,
+  },
+  trustText: {
     fontSize: isSmallScreen ? 13 : 14,
     color: '#4A4A4A',
-    lineHeight: isSmallScreen ? 18 : 20,
-    paddingRight: 40,
+    marginBottom: 8,
   },
-  arrowContainer: {
-    position: 'absolute',
-    right: 0,
-    top: isSmallScreen ? 16 : 20,
+  starsContainer: {
+    flexDirection: 'row',
+    gap: 4,
   },
 });

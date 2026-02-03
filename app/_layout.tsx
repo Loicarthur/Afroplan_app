@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import { Colors } from '@/constants/theme';
 
 // Empecher le splash screen de se cacher automatiquement
@@ -57,8 +58,9 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={theme}>
-        <Stack>
+      <LanguageProvider>
+        <ThemeProvider value={theme}>
+          <Stack>
           <Stack.Screen
             name="index"
             options={{
@@ -73,7 +75,21 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="onboarding"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
+          <Stack.Screen
             name="role-selection"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
+          <Stack.Screen
+            name="welcome"
             options={{
               headerShown: false,
               animation: 'fade',
@@ -83,6 +99,7 @@ export default function RootLayout() {
           <Stack.Screen name="(coiffeur)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(salon)" options={{ headerShown: false }} />
+          <Stack.Screen name="chat" options={{ headerShown: false }} />
           <Stack.Screen
             name="checkout"
             options={{
@@ -114,9 +131,10 @@ export default function RootLayout() {
               title: 'Modal'
             }}
           />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </LanguageProvider>
     </AuthProvider>
   );
 }
