@@ -153,7 +153,7 @@ export default function RoleSelectionScreen() {
               "sans stress"
             ]}
             buttonText="Trouver mon style"
-            imageSource={require('@/assets/images/p2.png')}
+            imageSource={require('@/assets/images/espace_client.png')}
             onPress={() => handleRoleSelect('client')}
             delay={400}
           />
@@ -169,7 +169,7 @@ export default function RoleSelectionScreen() {
               "avec AfroPlan Pro"
             ]}
             buttonText="Passer en mode Pro"
-            imageSource={require('@/assets/images/p1.png')}
+            imageSource={require('@/assets/images/espace_coiffeur.png')}
             onPress={() => handleRoleSelect('coiffeur')}
             delay={500}
           />
