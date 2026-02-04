@@ -61,7 +61,18 @@ export default function ProfileScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { signOut } = useAuth();
 
-  const handleMenuPress = (id: string) => Alert.alert('Info', 'Fonctionnalité à venir');
+  const handleMenuPress = (id: string) => {
+    switch (id) {
+      case 'addresses':
+        router.push('/addresses');
+        break;
+      case 'bookings':
+        router.push('/(tabs)/bookings');
+        break;
+      default:
+        Alert.alert('Info', 'Fonctionnalité à venir');
+    }
+  };
   const handleSignOut = () => {
     Alert.alert(
       'Déconnexion',
