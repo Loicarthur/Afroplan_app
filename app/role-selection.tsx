@@ -97,10 +97,11 @@ export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
 
   const handleRoleSelect = (role: UserRole) => {
-    router.replace({
-      pathname: '/welcome',
-      params: { role }
-    });
+    if (role === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
   };
 
   return (
