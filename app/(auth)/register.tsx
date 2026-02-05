@@ -240,9 +240,9 @@ export default function RegisterScreen() {
           {/* Terms */}
           <Text style={[styles.terms, { color: colors.textSecondary }]}>
             En vous inscrivant, vous acceptez nos{' '}
-            <Text style={{ color: roleColor }}>Conditions d'utilisation</Text>
+            <Text style={{ color: roleColor }} onPress={() => router.push('/terms')}>Conditions d'utilisation</Text>
             {' '}et notre{' '}
-            <Text style={{ color: roleColor }}>Politique de confidentialité</Text>
+            <Text style={{ color: roleColor }} onPress={() => router.push('/privacy-policy')}>Politique de confidentialité</Text>
           </Text>
 
           {/* Login Link */}
