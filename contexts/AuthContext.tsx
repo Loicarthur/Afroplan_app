@@ -35,10 +35,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!session && !!user;
 
-  // Charger le profil utilisateur
+  // Charger le profil utilisateur (avec fallback creation si le trigger a echoue)
   const loadProfile = async (userId: string) => {
     try {
-      const userProfile = await authService.getProfile(userId);
+      let userProfile = await authService.getProfile(userId);
+
+      // Fallback: si le profil n'existe pas (trigger echoue), le creer
+      if (!userProfile && user?.email) {
+        const metadata = user.user_metadata || {};
+        await authService.ensureProfile(userId, {
+          email: user.email,
+          full_name: metadata.full_name || '',
+          phone: metadata.phone || null,
+          role: metadata.role || 'client',
+        });
+        userProfile = await authService.getProfile(userId);
+      }
+
       setProfile(userProfile);
     } catch (error) {
       console.error('Erreur lors du chargement du profil:', error);

@@ -327,12 +327,14 @@ CREATE POLICY "Les proprietaires peuvent gerer leur galerie" ON gallery_images
 -- ============================================
 
 -- Fonction pour creer automatiquement un profil lors de l'inscription
+-- NOTE: Le corps entier est protege par un EXCEPTION handler pour ne JAMAIS
+-- bloquer la creation de l'utilisateur dans auth.users
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
     user_role_val user_role;
 BEGIN
-    -- Determiner le role de maniere securisee (evite crash si valeur invalide)
+    -- Determiner le role de maniere securisee
     BEGIN
         user_role_val := COALESCE(
             NULLIF(TRIM(NEW.raw_user_meta_data->>'role'), '')::user_role,
@@ -342,14 +344,21 @@ BEGIN
         user_role_val := 'client'::user_role;
     END;
 
-    INSERT INTO profiles (id, email, full_name, phone, role)
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', ''),
-        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-        NEW.raw_user_meta_data->>'phone',
-        user_role_val
-    );
+    -- Inserer le profil (protege par exception pour ne pas bloquer auth.users)
+    BEGIN
+        INSERT INTO profiles (id, email, full_name, phone, role)
+        VALUES (
+            NEW.id,
+            COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', ''),
+            COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+            NEW.raw_user_meta_data->>'phone',
+            user_role_val
+        );
+    EXCEPTION WHEN OTHERS THEN
+        -- Log l'erreur mais ne bloque pas la creation de l'utilisateur
+        RAISE WARNING 'handle_new_user: echec creation profil pour %: %', NEW.id, SQLERRM;
+    END;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

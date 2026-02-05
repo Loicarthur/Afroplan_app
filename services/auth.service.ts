@@ -147,6 +147,8 @@ export const authService = {
    */
   async signUp({ email, password, fullName, phone, role = 'client' }: SignUpParams) {
     checkSupabaseConfig();
+
+    // Premiere tentative avec les metadonnees completes
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -160,17 +162,72 @@ export const authService = {
     });
 
     if (authError) {
-      // Erreur du trigger handle_new_user() dans la base de donnees
-      if (authError.message.toLowerCase().includes('database error saving new user')) {
-        throw new Error(
-          'Erreur de base de donnees lors de la creation du compte. ' +
-          'Verifiez que le schema SQL (schema.sql) a ete execute dans votre dashboard Supabase.'
-        );
+      // Si le trigger handle_new_user() a echoue, retenter sans metadonnees
+      // puis creer le profil manuellement
+      if (authError.message.toLowerCase().includes('database error')) {
+        const { data: retryData, error: retryError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (retryError) {
+          throw new Error(retryError.message);
+        }
+
+        // Creer le profil manuellement si l'utilisateur a ete cree
+        if (retryData.user) {
+          await this.ensureProfile(retryData.user.id, {
+            email,
+            full_name: fullName,
+            phone: phone || null,
+            role: role as 'client' | 'coiffeur',
+          });
+        }
+
+        return retryData;
       }
+
       throw new Error(authError.message);
     }
 
+    // Verifier que le profil a ete cree par le trigger, sinon le creer
+    if (authData.user) {
+      await this.ensureProfile(authData.user.id, {
+        email,
+        full_name: fullName,
+        phone: phone || null,
+        role: role as 'client' | 'coiffeur',
+      });
+    }
+
     return authData;
+  },
+
+  /**
+   * Verifier si le profil existe, sinon le creer (fallback si le trigger echoue)
+   */
+  async ensureProfile(userId: string, data: {
+    email: string;
+    full_name: string;
+    phone?: string | null;
+    role: 'client' | 'coiffeur';
+  }): Promise<void> {
+    const existing = await this.getProfile(userId);
+    if (existing) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email: data.email,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role,
+      });
+
+    if (error) {
+      console.warn('ensureProfile: echec de creation du profil:', error.message);
+    }
   },
 
   /**
