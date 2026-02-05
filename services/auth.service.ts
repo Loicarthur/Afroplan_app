@@ -153,13 +153,20 @@ export const authService = {
       options: {
         data: {
           full_name: fullName,
-          phone,
+          phone: phone || null,
           role,
         },
       },
     });
 
     if (authError) {
+      // Erreur du trigger handle_new_user() dans la base de donnees
+      if (authError.message.toLowerCase().includes('database error saving new user')) {
+        throw new Error(
+          'Erreur de base de donnees lors de la creation du compte. ' +
+          'Verifiez que le schema SQL (schema.sql) a ete execute dans votre dashboard Supabase.'
+        );
+      }
       throw new Error(authError.message);
     }
 

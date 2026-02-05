@@ -329,14 +329,26 @@ CREATE POLICY "Les proprietaires peuvent gerer leur galerie" ON gallery_images
 -- Fonction pour creer automatiquement un profil lors de l'inscription
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    user_role_val user_role;
 BEGIN
+    -- Determiner le role de maniere securisee (evite crash si valeur invalide)
+    BEGIN
+        user_role_val := COALESCE(
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'role'), '')::user_role,
+            'client'::user_role
+        );
+    EXCEPTION WHEN OTHERS THEN
+        user_role_val := 'client'::user_role;
+    END;
+
     INSERT INTO profiles (id, email, full_name, phone, role)
     VALUES (
         NEW.id,
-        NEW.email,
+        COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', ''),
         COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
         NEW.raw_user_meta_data->>'phone',
-        COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'client')
+        user_role_val
     );
     RETURN NEW;
 END;
