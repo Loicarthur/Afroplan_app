@@ -522,11 +522,11 @@ export default function HomeScreen() {
                 <Text style={[styles.footerLink, { color: '#191919' }]}>Support</Text>
               </TouchableOpacity>
               <Text style={styles.footerDot}>•</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/terms')}>
                 <Text style={[styles.footerLink, { color: '#191919' }]}>CGU</Text>
               </TouchableOpacity>
               <Text style={styles.footerDot}>•</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
                 <Text style={[styles.footerLink, { color: '#191919' }]}>Confidentialité</Text>
               </TouchableOpacity>
             </View>
