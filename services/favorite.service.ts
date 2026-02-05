@@ -2,14 +2,24 @@
  * Service pour la gestion des favoris
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Favorite, Salon } from '@/types';
+
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
 
 export const favoriteService = {
   /**
    * Ajouter un salon aux favoris
    */
   async addFavorite(userId: string, salonId: string): Promise<Favorite> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('favorites')
       .insert({ user_id: userId, salon_id: salonId })
@@ -42,6 +52,7 @@ export const favoriteService = {
    * Verifier si un salon est en favori
    */
   async isFavorite(userId: string, salonId: string): Promise<boolean> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('favorites')
       .select('id')
@@ -60,6 +71,7 @@ export const favoriteService = {
    * Recuperer tous les favoris d'un utilisateur
    */
   async getUserFavorites(userId: string): Promise<Salon[]> {
+    checkSupabaseConfig();
     const { data: favorites, error } = await supabase
       .from('favorites')
       .select('salon_id')
