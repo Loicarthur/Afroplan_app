@@ -1,66 +1,46 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+// Setup type definitions for built-in Supabase Runtime APIs
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
+console.log("Hello from Functions!")
 
-
-serve(async (req: Request) => {
+// Utilisation de Deno.serve pour démarrer le serveur HTTP
+Deno.serve(async (req: Request) => {
   try {
-    const { email, password, username } = await req.json()
+    const { name } = await req.json()
 
-    if (!email || !password || !username) {
+    if (!name) {
       return new Response(
-        JSON.stringify({ error: "Missing fields" }),
-        { status: 400 }
+        JSON.stringify({ error: "Missing 'name' field" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       )
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    )
-
-    // 1️⃣ Create Auth user
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      })
-
-    if (authError) {
-      return new Response(
-        JSON.stringify({ error: authError.message }),
-        { status: 400 }
-      )
-    }
-
-    // 2️⃣ Insert profile
-    const { error: dbError } = await supabase
-      .from("users")
-      .insert({
-        id: authData.user.id,
-        email,
-        username,
-      })
-
-    if (dbError) {
-      return new Response(
-        JSON.stringify({ error: dbError.message }),
-        { status: 400 }
-      )
+    const data = {
+      message: `Hello ${name}!`,
     }
 
     return new Response(
-      JSON.stringify({
-        message: "User created successfully 🚀",
-        userId: authData.user.id,
-      }),
-      { status: 201 }
+      JSON.stringify(data),
+      { headers: { "Content-Type": "application/json" } }
     )
-  } catch (error) {
+  } catch {
     return new Response(
       JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400 }
+      { status: 400, headers: { "Content-Type": "application/json" } }
     )
   }
 })
+
+/* Pour tester localement :
+
+1. Lance la stack Supabase :
+   supabase start
+
+2. Envoie une requête POST :
+
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/create-user' \
+  --header 'Authorization: Bearer <ton_token>' \
+  --header 'Content-Type: application/json' \
+  --data '{"name":"Functions"}'
+
+*/
