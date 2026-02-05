@@ -144,11 +144,57 @@ const validateSignUpParams = (params: SignUpParams): ValidationResult => {
 export const authService = {
   /**
    * Inscription d'un nouvel utilisateur
+   * Utilise la Edge Function create-user en priorite (bypass le trigger),
+   * puis fallback sur supabase.auth.signUp si la fonction n'est pas deployee
    */
   async signUp({ email, password, fullName, phone, role = 'client' }: SignUpParams) {
     checkSupabaseConfig();
 
-    // Premiere tentative avec les metadonnees completes
+    // 1) Essayer via la Edge Function (cree user + profil cote serveur)
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user', {
+        body: { email, password, fullName, phone: phone || null, role },
+      });
+
+      if (!fnError && fnData?.user) {
+        // Connecter l'utilisateur apres creation via Edge Function
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) {
+          // L'utilisateur est cree mais la connexion auto a echoue
+          // Retourner quand meme les donnees de creation
+          return { user: fnData.user, session: null };
+        }
+
+        return signInData;
+      }
+
+      // Si la Edge Function retourne une erreur metier, la propager
+      if (fnData?.error) {
+        throw new Error(fnData.error);
+      }
+    } catch (fnCatchError) {
+      // Si la Edge Function n'est pas deployee ou inaccessible,
+      // on continue avec le fallback ci-dessous
+      const errorMsg = fnCatchError instanceof Error ? fnCatchError.message : '';
+      const isEdgeFunctionUnavailable =
+        errorMsg.includes('FunctionsHttpError') ||
+        errorMsg.includes('FunctionsRelayError') ||
+        errorMsg.includes('FunctionsFetchError') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('Network request failed');
+
+      if (!isEdgeFunctionUnavailable) {
+        // Erreur metier (ex: email deja utilise) -> la propager
+        throw fnCatchError;
+      }
+      console.warn('Edge Function create-user non disponible, fallback sur auth.signUp');
+    }
+
+    // 2) Fallback: supabase.auth.signUp classique
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -162,8 +208,7 @@ export const authService = {
     });
 
     if (authError) {
-      // Si le trigger handle_new_user() a echoue, retenter sans metadonnees
-      // puis creer le profil manuellement
+      // Si le trigger echoue, retenter sans metadata puis creer le profil manuellement
       if (authError.message.toLowerCase().includes('database error')) {
         const { data: retryData, error: retryError } = await supabase.auth.signUp({
           email,
@@ -174,7 +219,6 @@ export const authService = {
           throw new Error(retryError.message);
         }
 
-        // Creer le profil manuellement si l'utilisateur a ete cree
         if (retryData.user) {
           await this.ensureProfile(retryData.user.id, {
             email,
