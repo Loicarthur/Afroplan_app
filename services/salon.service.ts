@@ -3,7 +3,7 @@
  * Inclut les filtres avances pour service a domicile, promotions, localisation
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Salon,
   SalonInsert,
@@ -27,6 +27,15 @@ import {
 
 const SALONS_PER_PAGE = 10;
 
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
+
 export const salonService = {
   /**
    * Recuperer tous les salons avec pagination et filtres
@@ -35,6 +44,7 @@ export const salonService = {
     page: number = 1,
     filters?: SalonFilters
   ): Promise<PaginatedResponse<Salon>> {
+    checkSupabaseConfig();
     let query = supabase
       .from('salons')
       .select('*', { count: 'exact' })
@@ -84,6 +94,7 @@ export const salonService = {
    * Rechercher des salons
    */
   async searchSalons(query: string, limit: number = 10): Promise<Salon[]> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('salons')
       .select('*')
@@ -103,6 +114,7 @@ export const salonService = {
    * Recuperer un salon par son ID avec tous les details
    */
   async getSalonById(id: string): Promise<SalonWithDetails | null> {
+    checkSupabaseConfig();
     const { data: salon, error } = await supabase
       .from('salons')
       .select('*')
@@ -167,6 +179,7 @@ export const salonService = {
    * Recuperer les salons populaires
    */
   async getPopularSalons(limit: number = 6): Promise<Salon[]> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('salons')
       .select('*')
@@ -358,6 +371,7 @@ export const salonService = {
    * Recuperer toutes les categories
    */
   async getCategories(): Promise<Category[]> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('categories')
       .select('*')

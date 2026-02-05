@@ -3,7 +3,7 @@
  * Gere les details professionnels, disponibilites, et zones de couverture
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Profile,
   CoiffeurDetails,
@@ -23,6 +23,15 @@ import {
 } from '@/types';
 
 const COIFFEURS_PER_PAGE = 10;
+
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
 
 export const coiffeurService = {
   // ============================================

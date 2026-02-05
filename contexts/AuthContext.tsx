@@ -4,7 +4,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { authService } from '@/services';
 import { Profile } from '@/types';
 
@@ -54,6 +54,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Initialiser la session au demarrage
   useEffect(() => {
+    // Ne pas tenter de connexion si Supabase n'est pas configure
+    if (!isSupabaseConfigured()) {
+      console.warn(
+        'Supabase non configure - mode hors ligne. ' +
+        'Creez un fichier .env avec vos identifiants Supabase (voir .env.example).'
+      );
+      setIsLoading(false);
+      return;
+    }
+
     const initSession = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();

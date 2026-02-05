@@ -3,7 +3,7 @@
  * Gere les adresses, preferences et historique
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Profile,
   ProfileUpdate,
@@ -17,6 +17,15 @@ import {
 } from '@/types';
 
 const ITEMS_PER_PAGE = 10;
+
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
 
 export const clientService = {
   // ============================================
