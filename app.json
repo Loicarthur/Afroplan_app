@@ -26,9 +26,10 @@
       "package": "com.afroplan.app",
       "versionCode": 1,
       "permissions": [
-        "INTERNET",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -49,7 +50,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": ""
+        "projectId": "b133bcbd-6f4e-465b-99d8-66efa944eaa9"
       }
     }
   }

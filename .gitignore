@@ -45,3 +45,15 @@ coverage/
 *.log
 tmp/
 temp/
+
+# --- AJOUTS POUR RÉSOLRE L'ERREUR ---
+
+# Supabase (Évite les erreurs de permissions sur les fichiers temporaires)
+supabase/.temp/
+supabase/.storage/
+supabase/functions/.import_map.json
+
+# Build Lockfiles
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
