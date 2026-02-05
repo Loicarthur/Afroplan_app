@@ -1,4 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-Deno.serve(async (req: Request) => {
-  // Gerer les requetes CORS preflight
+serve(async (req: Request) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -15,77 +16,68 @@ Deno.serve(async (req: Request) => {
   try {
     const { email, password, fullName, phone, role } = await req.json()
 
-    // Validation des champs requis
     if (!email || !password || !fullName) {
       return new Response(
-        JSON.stringify({ error: 'Email, mot de passe et nom complet sont requis' }),
+        JSON.stringify({ error: "Email, mot de passe et nom complet sont requis" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Valider le role
     const validRole = (role === 'client' || role === 'coiffeur') ? role : 'client'
 
-    // Client admin avec service_role key (disponible automatiquement dans les Edge Functions)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     )
 
-    // Creer l'utilisateur via l'API admin (bypass le trigger)
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-        phone: phone || null,
-        role: validRole,
-      },
-    })
-
-    if (userError) {
-      return new Response(
-        JSON.stringify({ error: userError.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Creer le profil directement (upsert pour eviter les doublons si le trigger a marche)
-    if (userData.user) {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: userData.user.id,
-          email: email.toLowerCase(),
+    // 1. Creer l'utilisateur auth
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
           full_name: fullName,
           phone: phone || null,
           role: validRole,
-        }, { onConflict: 'id' })
+        },
+      })
 
-      if (profileError) {
-        console.error('Erreur creation profil:', profileError.message)
-        // Ne pas echouer la requete - l'utilisateur est deja cree
-      }
+    if (authError) {
+      return new Response(
+        JSON.stringify({ error: authError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 2. Creer le profil dans la table profiles (upsert si le trigger l'a deja cree)
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: authData.user.id,
+        email: email.toLowerCase(),
+        full_name: fullName,
+        phone: phone || null,
+        role: validRole,
+      }, { onConflict: 'id' })
+
+    if (profileError) {
+      console.error('Erreur creation profil:', profileError.message)
+      // Ne pas echouer - l'utilisateur auth est deja cree
     }
 
     return new Response(
       JSON.stringify({
-        user: userData.user,
-        message: 'Utilisateur cree avec succes',
+        user: authData.user,
+        message: "Utilisateur cree avec succes",
+        userId: authData.user.id,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Corps JSON invalide" }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
