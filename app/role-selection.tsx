@@ -120,7 +120,7 @@ export default function RoleSelectionScreen() {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/favicon.ico')}
+              source={require('@/assets/images/icon.png')}
               style={styles.logoImage}
               contentFit="contain"
             />
