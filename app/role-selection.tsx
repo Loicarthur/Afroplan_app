@@ -228,9 +228,9 @@ const styles = StyleSheet.create({
   // ── Question ──
   questionSection: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 18 : 24,
+    paddingTop: isSmallScreen ? 14 : 18,
     paddingHorizontal: 24,
-    marginBottom: isSmallScreen ? 16 : 20,
+    marginBottom: isSmallScreen ? 12 : 16,
   },
   questionTitle: {
     fontSize: isSmallScreen ? 20 : 24,
@@ -242,13 +242,13 @@ const styles = StyleSheet.create({
   // ── Cards ──
   cardsContainer: {
     paddingHorizontal: 24,
-    gap: isSmallScreen ? 14 : 16,
+    gap: isSmallScreen ? 12 : 14,
   },
   cardWrapper: {
     width: cardWidth,
   },
   card: {
-    height: isSmallScreen ? 190 : 220,
+    height: isSmallScreen ? 170 : 195,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#E5E5E5',
@@ -330,7 +330,8 @@ const styles = StyleSheet.create({
   // ── Trust Section ──
   trustSection: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 18 : 24,
+    paddingTop: isSmallScreen ? 16 : 20,
+    paddingBottom: isSmallScreen ? 8 : 12,
     paddingHorizontal: 24,
   },
   trustText: {
