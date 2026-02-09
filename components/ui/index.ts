@@ -10,3 +10,4 @@ export { SearchBar } from './SearchBar';
 export { Rating } from './Rating';
 export { Collapsible } from './collapsible';
 export { IconSymbol } from './icon-symbol';
+export { SuccessModal } from './SuccessModal';

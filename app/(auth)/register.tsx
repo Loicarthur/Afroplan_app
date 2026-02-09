@@ -1,9 +1,9 @@
 /**
  * Page d'inscription AfroPlan
- * Design responsive amélioré
+ * Après inscription, connexion automatique + modale de succès
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, SuccessModal } from '@/components/ui';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -37,7 +37,7 @@ type UserRole = 'client' | 'coiffeur';
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signUp, isLoading } = useAuth();
+  const { signUp, signIn, isLoading, profile } = useAuth();
   const params = useLocalSearchParams<{ role?: string }>();
 
   const [fullName, setFullName] = useState('');
@@ -47,6 +47,8 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showSuccess, setShowSuccess] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -91,18 +93,28 @@ export default function RegisterScreen() {
     if (!validate()) return;
 
     try {
+      // 1. Inscription
       await signUp(email, password, fullName, phone || undefined, selectedRole);
-      Alert.alert(
-        'Inscription réussie',
-        'Un email de confirmation vous a été envoyé. Veuillez vérifier votre boîte de réception.',
-        [{
-          text: 'OK',
-          onPress: () => router.replace({
-            pathname: '/(auth)/login',
-            params: { role: selectedRole }
-          })
-        }]
-      );
+
+      // 2. Connexion automatique après inscription
+      try {
+        await signIn(email, password);
+        setShowSuccess(true);
+      } catch {
+        // Si la connexion auto échoue (ex: confirmation email requise),
+        // rediriger vers login
+        Alert.alert(
+          'Inscription réussie',
+          'Veuillez vérifier votre email puis vous connecter.',
+          [{
+            text: 'OK',
+            onPress: () => router.replace({
+              pathname: '/(auth)/login',
+              params: { role: selectedRole }
+            })
+          }]
+        );
+      }
     } catch (error) {
       Alert.alert(
         'Erreur d\'inscription',
@@ -111,11 +123,22 @@ export default function RegisterScreen() {
     }
   };
 
+  const handleSuccessDismiss = () => {
+    setShowSuccess(false);
+    if (!hasRedirected.current) {
+      hasRedirected.current = true;
+      const role = profile?.role || selectedRole;
+      if (role === 'coiffeur') {
+        router.replace('/(coiffeur)');
+      } else {
+        router.replace('/(tabs)');
+      }
+    }
+  };
+
   const isClient = selectedRole === 'client';
-  const roleColor = isClient ? '#191919' : '#191919';
-  const roleGradient = isClient
-    ? ['#191919', '#4A4A4A']
-    : ['#191919', '#4A4A4A'];
+  const roleColor = '#191919';
+  const roleGradient: [string, string] = ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -272,6 +295,14 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modale de succès */}
+      <SuccessModal
+        visible={showSuccess}
+        title="Inscription réussie"
+        message={`Bienvenue sur AfroPlan, ${fullName} !`}
+        onDismiss={handleSuccessDismiss}
+      />
     </SafeAreaView>
   );
 }

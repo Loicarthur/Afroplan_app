@@ -3,7 +3,7 @@
  * Design responsive amélioré
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, SuccessModal } from '@/components/ui';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -44,6 +44,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -79,7 +81,8 @@ export default function LoginScreen() {
 
     try {
       await signIn(email, password);
-      // La redirection sera gérée après le chargement du profil
+      // Afficher la modale de succès — la redirection se fait via le useEffect sur profile
+      setShowSuccess(true);
     } catch (error) {
       Alert.alert(
         'Erreur de connexion',
@@ -88,27 +91,28 @@ export default function LoginScreen() {
     }
   };
 
-  // Rediriger après connexion en fonction du rôle du profil
+  // Rediriger après connexion + modale de succès
   useEffect(() => {
-    const handleRedirectAfterLogin = async () => {
-      if (profile?.role) {
-        // Utiliser le rôle du profil utilisateur
-        if (profile.role === 'coiffeur') {
-          router.replace('/(coiffeur)');
-        } else {
-          router.replace('/(tabs)');
-        }
-      }
-    };
+    if (profile?.role && showSuccess && !hasRedirected.current) {
+      // La modale est visible, la redirection se fera quand elle se ferme
+    }
+  }, [profile, showSuccess]);
 
-    handleRedirectAfterLogin();
-  }, [profile]);
+  const handleSuccessDismiss = () => {
+    setShowSuccess(false);
+    if (profile?.role && !hasRedirected.current) {
+      hasRedirected.current = true;
+      if (profile.role === 'coiffeur') {
+        router.replace('/(coiffeur)');
+      } else {
+        router.replace('/(tabs)');
+      }
+    }
+  };
 
   const isClient = selectedRole === 'client';
-  const roleColor = isClient ? '#191919' : '#191919';
-  const roleGradient = isClient
-    ? ['#191919', '#4A4A4A']
-    : ['#191919', '#4A4A4A'];
+  const roleColor = '#191919';
+  const roleGradient: [string, string] = ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -265,6 +269,14 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modale de succès */}
+      <SuccessModal
+        visible={showSuccess}
+        title="Connexion réussie"
+        message="Bienvenue sur AfroPlan !"
+        onDismiss={handleSuccessDismiss}
+      />
     </SafeAreaView>
   );
 }
