@@ -2,14 +2,24 @@
  * Service pour la gestion des avis
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Review, ReviewInsert, ReviewWithClient } from '@/types';
+
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
 
 export const reviewService = {
   /**
    * Creer un nouvel avis
    */
   async createReview(review: ReviewInsert): Promise<Review> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('reviews')
       .insert(review)
@@ -77,6 +87,7 @@ export const reviewService = {
    * Recuperer les avis d'un client
    */
   async getClientReviews(clientId: string): Promise<ReviewWithClient[]> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('reviews')
       .select(

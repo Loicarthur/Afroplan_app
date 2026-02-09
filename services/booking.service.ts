@@ -2,7 +2,7 @@
  * Service pour la gestion des reservations
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Booking,
   BookingInsert,
@@ -13,11 +13,21 @@ import {
 
 const BOOKINGS_PER_PAGE = 10;
 
+const checkSupabaseConfig = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase non configure. Veuillez creer un fichier .env avec vos identifiants Supabase. ' +
+      'Consultez .env.example pour le format.'
+    );
+  }
+};
+
 export const bookingService = {
   /**
    * Creer une nouvelle reservation
    */
   async createBooking(booking: BookingInsert): Promise<Booking> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('bookings')
       .insert(booking)
@@ -39,6 +49,7 @@ export const bookingService = {
     status?: Booking['status'],
     page: number = 1
   ): Promise<PaginatedResponse<BookingWithDetails>> {
+    checkSupabaseConfig();
     let query = supabase
       .from('bookings')
       .select(
@@ -136,6 +147,7 @@ export const bookingService = {
    * Recuperer une reservation par son ID
    */
   async getBookingById(id: string): Promise<BookingWithDetails | null> {
+    checkSupabaseConfig();
     const { data, error } = await supabase
       .from('bookings')
       .select(
@@ -306,6 +318,7 @@ export const bookingService = {
    * Recuperer les reservations a venir d'un client
    */
   async getUpcomingBookings(clientId: string, limit: number = 5): Promise<BookingWithDetails[]> {
+    checkSupabaseConfig();
     const today = new Date().toISOString().split('T')[0];
 
     const { data, error } = await supabase

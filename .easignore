@@ -1,0 +1,35 @@
+# Dépendances (EAS les réinstalle proprement sur le serveur)
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Expo & Build
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# --- LE COUPABLE DE VOS ERREURS ---
+# On ignore absolument tout ce qui est temporaire ou système
+supabase/.temp/
+supabase/.storage/
+tmp/
+temp/
+*.log
+
+# Fichiers de configuration locale (Peuvent causer des conflits de droits)
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

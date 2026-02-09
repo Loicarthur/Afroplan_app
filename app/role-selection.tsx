@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
-  ImageBackground,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,16 +26,15 @@ import Animated, {
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
-const cardWidth = (width - 48 - 12) / 2;
+const cardWidth = width - 48;
 
 type UserRole = 'client' | 'coiffeur';
 
 interface RoleCardProps {
   role: UserRole;
-  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
   subtitle: string;
-  description: string[];
-  buttonText: string;
   imageSource: any;
   onPress: () => void;
   delay: number;
@@ -44,10 +42,9 @@ interface RoleCardProps {
 
 function RoleCard({
   role,
-  title,
+  icon,
+  label,
   subtitle,
-  description,
-  buttonText,
   imageSource,
   onPress,
   delay,
@@ -58,7 +55,7 @@ function RoleCard({
       style={styles.cardWrapper}
     >
       <TouchableOpacity
-        activeOpacity={0.95}
+        activeOpacity={0.92}
         onPress={onPress}
         style={styles.card}
       >
@@ -67,26 +64,31 @@ function RoleCard({
           source={imageSource}
           style={styles.cardImage}
           contentFit="cover"
+          contentPosition="top"
         />
 
-        {/* Overlay gradient */}
-        <View style={styles.cardOverlay} />
+        {/* Overlay gradient - plus subtil en haut, plus sombre en bas */}
+        <View style={styles.cardOverlayTop} />
+        <View style={styles.cardOverlayBottom} />
 
         {/* Content */}
         <View style={styles.cardContent}>
-          <View style={styles.cardTextSection}>
-            <Text style={styles.cardTitle}>{title}</Text>
-            {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
-            {description.map((line, index) => (
-              <Text key={index} style={styles.cardDescription}>{line}</Text>
-            ))}
+          {/* Badge icône */}
+          <View style={styles.cardIconBadge}>
+            <Ionicons name={icon} size={20} color="#FFFFFF" />
           </View>
 
-          {/* Button */}
-          <TouchableOpacity style={styles.cardButton} onPress={onPress}>
-            <Text style={styles.cardButtonText}>{buttonText}</Text>
+          {/* Textes */}
+          <Text style={styles.cardLabel}>{label}</Text>
+          <Text style={styles.cardSubtitle}>{subtitle}</Text>
+
+          {/* Bouton */}
+          <View style={styles.cardButton}>
+            <Text style={styles.cardButtonText}>
+              {role === 'client' ? 'Commencer' : 'Accéder'}
+            </Text>
             <Ionicons name="arrow-forward" size={16} color="#191919" />
-          </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -111,22 +113,18 @@ export default function RoleSelectionScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Header avec logo */}
+        {/* Header avec logo agrandi */}
         <Animated.View
           entering={FadeInDown.delay(200).duration(600)}
           style={styles.header}
         >
-          {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/logo_afroplan.jpeg')}
+              source={require('@/assets/images/icon.png')}
               style={styles.logoImage}
               contentFit="contain"
             />
           </View>
-
-          {/* Brand Name */}
-          <Text style={styles.brandName}>AfroPlan</Text>
           <Text style={styles.tagline}>La coiffure afro, réinventée.</Text>
         </Animated.View>
 
@@ -135,25 +133,16 @@ export default function RoleSelectionScreen() {
           entering={FadeInUp.delay(300).duration(600)}
           style={styles.questionSection}
         >
-          <Text style={styles.questionTitle}>Qui êtes-vous aujourd'hui ?</Text>
-          <Text style={styles.questionSubtitle}>
-            Une expérience pensée pour chaque besoin.
-          </Text>
+          <Text style={styles.questionTitle}>Choisissez votre espace</Text>
         </Animated.View>
 
-        {/* Role Cards */}
+        {/* Role Cards - empilées verticalement */}
         <View style={styles.cardsContainer}>
           <RoleCard
             role="client"
-            title="Je veux"
-            subtitle="me faire coiffer"
-            description={[
-              "Trouve le coiffeur afro",
-              "idéal près de chez toi",
-              "Réserve en quelques clics,",
-              "sans stress"
-            ]}
-            buttonText="Trouver mon style"
+            icon="person-outline"
+            label="Espace Client"
+            subtitle="Trouve ton coiffeur afro et réserve en quelques clics"
             imageSource={require('@/assets/images/espace_client.jpg')}
             onPress={() => handleRoleSelect('client')}
             delay={400}
@@ -161,22 +150,16 @@ export default function RoleSelectionScreen() {
 
           <RoleCard
             role="coiffeur"
-            title="Je suis"
-            subtitle="coiffeur / coiffeuse"
-            description={[
-              "Gère tes rendez-vous,",
-              "attire plus de clients",
-              "Et développe ton activité",
-              "avec AfroPlan Pro"
-            ]}
-            buttonText="Passer en mode Pro"
+            icon="cut-outline"
+            label="Espace Coiffeur"
+            subtitle="Gère tes rendez-vous et développe ton activité"
             imageSource={require('@/assets/images/espace_coiffeur.jpg')}
             onPress={() => handleRoleSelect('coiffeur')}
             delay={500}
           />
         </View>
 
-        {/* Trust Section */}
+        {/* Trust Section - remonté */}
         <Animated.View
           entering={FadeInUp.delay(600).duration(600)}
           style={styles.trustSection}
@@ -185,8 +168,8 @@ export default function RoleSelectionScreen() {
             Déjà +100 coiffeurs nous font confiance.
           </Text>
           <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5, 6].map((_, index) => (
-              <Ionicons key={index} name="star" size={18} color="#191919" />
+            {[1, 2, 3, 4, 5].map((_, index) => (
+              <Ionicons key={index} name="star" size={16} color="#191919" />
             ))}
           </View>
         </Animated.View>
@@ -202,130 +185,162 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
+
+  // ── Header & Logo ──
   header: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 20 : 30,
+    paddingTop: isSmallScreen ? 16 : 24,
     paddingHorizontal: 24,
   },
   logoContainer: {
-    width: isSmallScreen ? 70 : 80,
-    height: isSmallScreen ? 70 : 80,
-    borderRadius: isSmallScreen ? 35 : 40,
-    backgroundColor: '#E8E8E8',
+    width: isSmallScreen ? 110 : 130,
+    height: isSmallScreen ? 110 : 130,
+    borderRadius: isSmallScreen ? 55 : 65,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   logoImage: {
-    width: '85%',
-    height: '85%',
-  },
-  brandName: {
-    fontSize: isSmallScreen ? 24 : 28,
-    color: '#191919',
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    width: '100%',
+    height: '100%',
   },
   tagline: {
-    fontSize: isSmallScreen ? 14 : 15,
+    fontSize: isSmallScreen ? 13 : 14,
     color: '#808080',
-    marginTop: 4,
+    marginTop: 0,
   },
+
+  // ── Question ──
   questionSection: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 24 : 32,
+    paddingTop: isSmallScreen ? 14 : 18,
     paddingHorizontal: 24,
-    marginBottom: isSmallScreen ? 20 : 24,
+    marginBottom: isSmallScreen ? 12 : 16,
   },
   questionTitle: {
-    fontSize: isSmallScreen ? 22 : 26,
+    fontSize: isSmallScreen ? 20 : 24,
     fontWeight: '700',
     color: '#191919',
     textAlign: 'center',
-    marginBottom: 8,
   },
-  questionSubtitle: {
-    fontSize: isSmallScreen ? 14 : 15,
-    color: '#808080',
-    textAlign: 'center',
-  },
+
+  // ── Cards ──
   cardsContainer: {
-    flexDirection: 'row',
     paddingHorizontal: 24,
-    gap: 12,
-    justifyContent: 'center',
+    gap: isSmallScreen ? 12 : 14,
   },
   cardWrapper: {
     width: cardWidth,
   },
   card: {
-    height: isSmallScreen ? 280 : 320,
+    height: isSmallScreen ? 170 : 195,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#E5E5E5',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   cardImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  cardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  cardOverlayTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+    backgroundColor: 'rgba(0, 0, 0, 0.10)',
+  },
+  cardOverlayBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '70%',
+    backgroundColor: 'rgba(0, 0, 0, 0.50)',
   },
   cardContent: {
     flex: 1,
-    padding: 16,
+    padding: isSmallScreen ? 18 : 22,
     justifyContent: 'flex-end',
   },
-  cardTextSection: {
-    marginBottom: 16,
+  cardIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  cardTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: '700',
+  cardLabel: {
+    fontSize: isSmallScreen ? 22 : 26,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 0,
+    marginBottom: 4,
+    letterSpacing: 0.3,
   },
   cardSubtitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  cardDescription: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: isSmallScreen ? 16 : 18,
+    fontSize: isSmallScreen ? 13 : 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    lineHeight: isSmallScreen ? 18 : 20,
+    marginBottom: 14,
   },
   cardButton: {
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     gap: 6,
   },
   cardButtonText: {
     fontSize: isSmallScreen ? 13 : 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#191919',
   },
+
+  // ── Trust Section ──
   trustSection: {
     alignItems: 'center',
-    paddingTop: isSmallScreen ? 28 : 36,
+    paddingTop: isSmallScreen ? 16 : 20,
+    paddingBottom: isSmallScreen ? 8 : 12,
     paddingHorizontal: 24,
   },
   trustText: {
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: isSmallScreen ? 12 : 13,
     color: '#4A4A4A',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   starsContainer: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 3,
   },
 });
