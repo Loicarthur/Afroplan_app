@@ -120,7 +120,7 @@ export default function RoleSelectionScreen() {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/icon.png')}
+              source={require('@/assets/images/favicon.ico')}
               style={styles.logoImage}
               contentFit="contain"
             />
@@ -197,9 +197,23 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: isSmallScreen ? 110 : 130,
     height: isSmallScreen ? 110 : 130,
+    borderRadius: isSmallScreen ? 55 : 65,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   logoImage: {
     width: '100%',
