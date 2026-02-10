@@ -68,6 +68,9 @@ export interface Database {
           is_verified: boolean;
           is_active: boolean;
           opening_hours: Json | null;
+          offers_home_service: boolean;
+          home_service_description: string | null;
+          min_home_service_amount: number;
           created_at: string;
           updated_at: string;
         };
@@ -92,6 +95,9 @@ export interface Database {
           is_verified?: boolean;
           is_active?: boolean;
           opening_hours?: Json | null;
+          offers_home_service?: boolean;
+          home_service_description?: string | null;
+          min_home_service_amount?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -116,6 +122,9 @@ export interface Database {
           is_verified?: boolean;
           is_active?: boolean;
           opening_hours?: Json | null;
+          offers_home_service?: boolean;
+          home_service_description?: string | null;
+          min_home_service_amount?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -131,6 +140,9 @@ export interface Database {
           category: string;
           image_url: string | null;
           is_active: boolean;
+          service_location: 'salon' | 'domicile' | 'both';
+          home_service_additional_fee: number;
+          min_booking_notice_hours: number;
           created_at: string;
           updated_at: string;
         };
@@ -144,6 +156,9 @@ export interface Database {
           category: string;
           image_url?: string | null;
           is_active?: boolean;
+          service_location?: 'salon' | 'domicile' | 'both';
+          home_service_additional_fee?: number;
+          min_booking_notice_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -157,6 +172,9 @@ export interface Database {
           category?: string;
           image_url?: string | null;
           is_active?: boolean;
+          service_location?: 'salon' | 'domicile' | 'both';
+          home_service_additional_fee?: number;
+          min_booking_notice_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -180,6 +198,13 @@ export interface Database {
           amount_paid: number;
           remaining_amount: number | null;
           payment_date: string | null;
+          service_location: 'salon' | 'domicile' | 'both';
+          client_address: string | null;
+          client_latitude: number | null;
+          client_longitude: number | null;
+          home_service_fee: number;
+          promotion_id: string | null;
+          discount_amount: number;
           created_at: string;
           updated_at: string;
         };
@@ -201,6 +226,13 @@ export interface Database {
           amount_paid?: number;
           remaining_amount?: number | null;
           payment_date?: string | null;
+          service_location?: 'salon' | 'domicile' | 'both';
+          client_address?: string | null;
+          client_latitude?: number | null;
+          client_longitude?: number | null;
+          home_service_fee?: number;
+          promotion_id?: string | null;
+          discount_amount?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -222,6 +254,13 @@ export interface Database {
           amount_paid?: number;
           remaining_amount?: number | null;
           payment_date?: string | null;
+          service_location?: 'salon' | 'domicile' | 'both';
+          client_address?: string | null;
+          client_latitude?: number | null;
+          client_longitude?: number | null;
+          home_service_fee?: number;
+          promotion_id?: string | null;
+          discount_amount?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -364,7 +403,13 @@ export interface Database {
       user_role: 'client' | 'coiffeur' | 'admin';
       booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
       payment_method: 'full' | 'deposit' | 'on_site';
-      payment_status: 'pending' | 'partial' | 'completed' | 'refunded';
+      booking_payment_status: 'pending' | 'partial' | 'completed' | 'refunded';
+      service_location_type: 'salon' | 'domicile' | 'both';
+      promotion_type: 'percentage' | 'fixed_amount' | 'free_service';
+      promotion_status: 'draft' | 'active' | 'paused' | 'expired';
+      stripe_payment_status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+      subscription_plan: 'free' | 'starter' | 'pro' | 'premium';
+      subscription_status: 'active' | 'cancelled' | 'past_due' | 'trialing';
     };
   };
 }
