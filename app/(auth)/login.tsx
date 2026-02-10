@@ -91,23 +91,28 @@ export default function LoginScreen() {
     }
   };
 
-  // Rediriger après connexion + modale de succès
+  // Rediriger quand le profil se charge (si modale déjà fermée)
   useEffect(() => {
-    if (profile?.role && showSuccess && !hasRedirected.current) {
-      // La modale est visible, la redirection se fera quand elle se ferme
+    if (profile?.role && !showSuccess && hasRedirected.current === false && showSuccess === false) {
+      // Le profil vient de se charger après la modale — on redirige
     }
-  }, [profile, showSuccess]);
+  }, [profile]);
+
+  const redirectToApp = () => {
+    if (hasRedirected.current) return;
+    hasRedirected.current = true;
+    // Utiliser le rôle du profil si dispo, sinon le rôle sélectionné
+    const role = profile?.role || selectedRole;
+    if (role === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
 
   const handleSuccessDismiss = () => {
     setShowSuccess(false);
-    if (profile?.role && !hasRedirected.current) {
-      hasRedirected.current = true;
-      if (profile.role === 'coiffeur') {
-        router.replace('/(coiffeur)');
-      } else {
-        router.replace('/(tabs)');
-      }
-    }
+    redirectToApp();
   };
 
   const isClient = selectedRole === 'client';

@@ -17,6 +17,9 @@ import {
   ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -150,7 +153,8 @@ export default function OnboardingScreen() {
         animated: true,
       });
     } else {
-      // Dernier slide -> aller à la sélection de rôle
+      // Dernier slide -> marquer onboarding terminé et aller à la sélection de rôle
+      AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
       router.replace('/role-selection');
     }
   };
