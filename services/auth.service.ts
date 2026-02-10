@@ -131,8 +131,8 @@ const validateSignUpParams = (params: SignUpParams): ValidationResult => {
   const phoneError = validatePhone(params.phone);
   if (phoneError) errors.phone = phoneError;
 
-  if (params.role && !['client', 'coiffeur'].includes(params.role)) {
-    errors.role = 'Le role doit etre "client" ou "coiffeur"';
+  if (params.role && !['client', 'coiffeur', 'admin'].includes(params.role)) {
+    errors.role = 'Le role doit etre "client", "coiffeur" ou "admin"';
   }
 
   return {

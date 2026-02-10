@@ -41,6 +41,10 @@ DROP FUNCTION IF EXISTS increment_promotion_usage() CASCADE;
 DROP FUNCTION IF EXISTS calculate_distance_km(DECIMAL, DECIMAL, DECIMAL, DECIMAL) CASCADE;
 DROP FUNCTION IF EXISTS find_home_service_coiffeurs(DECIMAL, DECIMAL, TEXT, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS record_platform_commission() CASCADE;
+DROP FUNCTION IF EXISTS is_admin() CASCADE;
+DROP FUNCTION IF EXISTS is_coiffeur() CASCADE;
+DROP FUNCTION IF EXISTS is_client() CASCADE;
+DROP FUNCTION IF EXISTS promote_to_admin(TEXT) CASCADE;
 
 -- Supprimer les tables (ordre inverse des dépendances)
 DROP TABLE IF EXISTS platform_revenue CASCADE;
@@ -533,34 +537,81 @@ CREATE INDEX idx_platform_revenue_type ON platform_revenue(source_type);
 CREATE INDEX idx_platform_revenue_salon ON platform_revenue(salon_id);
 
 -- ============================================
--- ÉTAPE 7: ROW LEVEL SECURITY (RLS)
+-- ÉTAPE 7: FONCTION HELPER ADMIN (avant les policies)
 -- ============================================
+
+-- Vérifie si l'utilisateur courant est admin (utilisée dans toutes les policies)
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- Vérifie si l'utilisateur courant est un coiffeur
+CREATE OR REPLACE FUNCTION is_coiffeur()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role = 'coiffeur'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- Vérifie si l'utilisateur courant est un client
+CREATE OR REPLACE FUNCTION is_client()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role = 'client'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- ============================================
+-- ÉTAPE 8: ROW LEVEL SECURITY (RLS)
+-- ============================================
+-- Chaque table a une policy admin qui donne un accès TOTAL
+-- Les policies client/coiffeur sont strictement séparées
 
 -- PROFILES
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_profiles" ON profiles FOR ALL USING (is_admin());
 CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
 CREATE POLICY "profiles_insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "profiles_update" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- CATEGORIES
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_categories" ON categories FOR ALL USING (is_admin());
 CREATE POLICY "categories_select" ON categories FOR SELECT USING (is_active = true);
 
 -- SALONS
 ALTER TABLE salons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_salons" ON salons FOR ALL USING (is_admin());
 CREATE POLICY "salons_select" ON salons FOR SELECT USING (is_active = true);
 CREATE POLICY "salons_insert" ON salons FOR INSERT WITH CHECK (
-    auth.uid() = owner_id AND
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'coiffeur')
+    auth.uid() = owner_id AND is_coiffeur()
 );
 CREATE POLICY "salons_update" ON salons FOR UPDATE USING (auth.uid() = owner_id);
+CREATE POLICY "salons_delete" ON salons FOR DELETE USING (auth.uid() = owner_id);
 
 -- SALON_CATEGORIES
 ALTER TABLE salon_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_salon_categories" ON salon_categories FOR ALL USING (is_admin());
 CREATE POLICY "salon_categories_select" ON salon_categories FOR SELECT USING (true);
+CREATE POLICY "salon_categories_manage" ON salon_categories FOR ALL USING (
+    EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
+);
 
 -- SERVICES
 ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_services" ON services FOR ALL USING (is_admin());
 CREATE POLICY "services_select" ON services FOR SELECT USING (is_active = true);
 CREATE POLICY "services_manage" ON services FOR ALL USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
@@ -568,31 +619,42 @@ CREATE POLICY "services_manage" ON services FOR ALL USING (
 
 -- BOOKINGS
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_bookings" ON bookings FOR ALL USING (is_admin());
+-- Client: voit et crée ses propres réservations
 CREATE POLICY "bookings_client_select" ON bookings FOR SELECT USING (auth.uid() = client_id);
-CREATE POLICY "bookings_salon_select" ON bookings FOR SELECT USING (
+CREATE POLICY "bookings_client_insert" ON bookings FOR INSERT WITH CHECK (
+    auth.uid() = client_id AND is_client()
+);
+CREATE POLICY "bookings_client_update" ON bookings FOR UPDATE USING (auth.uid() = client_id);
+-- Coiffeur: voit et gère les réservations de SON salon
+CREATE POLICY "bookings_coiffeur_select" ON bookings FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
-CREATE POLICY "bookings_client_insert" ON bookings FOR INSERT WITH CHECK (auth.uid() = client_id);
-CREATE POLICY "bookings_client_update" ON bookings FOR UPDATE USING (auth.uid() = client_id);
-CREATE POLICY "bookings_salon_update" ON bookings FOR UPDATE USING (
+CREATE POLICY "bookings_coiffeur_update" ON bookings FOR UPDATE USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
 
 -- REVIEWS
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_reviews" ON reviews FOR ALL USING (is_admin());
 CREATE POLICY "reviews_select" ON reviews FOR SELECT USING (true);
-CREATE POLICY "reviews_insert" ON reviews FOR INSERT WITH CHECK (auth.uid() = client_id);
+-- Seul un client peut créer/modifier/supprimer un avis
+CREATE POLICY "reviews_insert" ON reviews FOR INSERT WITH CHECK (
+    auth.uid() = client_id AND is_client()
+);
 CREATE POLICY "reviews_update" ON reviews FOR UPDATE USING (auth.uid() = client_id);
 CREATE POLICY "reviews_delete" ON reviews FOR DELETE USING (auth.uid() = client_id);
 
 -- FAVORITES
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_favorites" ON favorites FOR ALL USING (is_admin());
 CREATE POLICY "favorites_select" ON favorites FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "favorites_insert" ON favorites FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "favorites_delete" ON favorites FOR DELETE USING (auth.uid() = user_id);
 
 -- GALLERY_IMAGES
 ALTER TABLE gallery_images ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_gallery" ON gallery_images FOR ALL USING (is_admin());
 CREATE POLICY "gallery_select" ON gallery_images FOR SELECT USING (true);
 CREATE POLICY "gallery_manage" ON gallery_images FOR ALL USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
@@ -600,20 +662,22 @@ CREATE POLICY "gallery_manage" ON gallery_images FOR ALL USING (
 
 -- COIFFEUR_DETAILS
 ALTER TABLE coiffeur_details ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_coiffeur_details" ON coiffeur_details FOR ALL USING (is_admin());
 CREATE POLICY "coiffeur_details_select" ON coiffeur_details FOR SELECT USING (true);
 CREATE POLICY "coiffeur_details_insert" ON coiffeur_details FOR INSERT WITH CHECK (
-    auth.uid() = user_id AND
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'coiffeur')
+    auth.uid() = user_id AND is_coiffeur()
 );
 CREATE POLICY "coiffeur_details_update" ON coiffeur_details FOR UPDATE USING (auth.uid() = user_id);
 
 -- COVERAGE_ZONES
 ALTER TABLE coverage_zones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_coverage_zones" ON coverage_zones FOR ALL USING (is_admin());
 CREATE POLICY "coverage_zones_select" ON coverage_zones FOR SELECT USING (is_active = true);
 CREATE POLICY "coverage_zones_manage" ON coverage_zones FOR ALL USING (auth.uid() = coiffeur_id);
 
 -- PROMOTIONS
 ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_promotions" ON promotions FOR ALL USING (is_admin());
 CREATE POLICY "promotions_public_select" ON promotions FOR SELECT USING (
     status = 'active' AND NOW() >= start_date AND NOW() <= end_date
 );
@@ -626,6 +690,7 @@ CREATE POLICY "promotions_manage" ON promotions FOR ALL USING (
 
 -- PROMOTION_USAGES
 ALTER TABLE promotion_usages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_promo_usages" ON promotion_usages FOR ALL USING (is_admin());
 CREATE POLICY "promo_usages_user_select" ON promotion_usages FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "promo_usages_salon_select" ON promotion_usages FOR SELECT USING (
     EXISTS (
@@ -637,16 +702,19 @@ CREATE POLICY "promo_usages_insert" ON promotion_usages FOR INSERT WITH CHECK (a
 
 -- CLIENT_ADDRESSES
 ALTER TABLE client_addresses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_client_addresses" ON client_addresses FOR ALL USING (is_admin());
 CREATE POLICY "client_addresses_select" ON client_addresses FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "client_addresses_manage" ON client_addresses FOR ALL USING (auth.uid() = user_id);
 
 -- COIFFEUR_AVAILABILITY
 ALTER TABLE coiffeur_availability ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_availability" ON coiffeur_availability FOR ALL USING (is_admin());
 CREATE POLICY "availability_select" ON coiffeur_availability FOR SELECT USING (true);
 CREATE POLICY "availability_manage" ON coiffeur_availability FOR ALL USING (auth.uid() = coiffeur_id);
 
 -- STRIPE_ACCOUNTS
 ALTER TABLE stripe_accounts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_stripe" ON stripe_accounts FOR ALL USING (is_admin());
 CREATE POLICY "stripe_select" ON stripe_accounts FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
@@ -656,6 +724,7 @@ CREATE POLICY "stripe_update" ON stripe_accounts FOR UPDATE USING (
 
 -- PAYMENTS
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_payments" ON payments FOR ALL USING (is_admin());
 CREATE POLICY "payments_client_select" ON payments FOR SELECT USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = booking_id AND bookings.client_id = auth.uid())
 );
@@ -665,18 +734,21 @@ CREATE POLICY "payments_salon_select" ON payments FOR SELECT USING (
 
 -- COMMISSION_PAYOUTS
 ALTER TABLE commission_payouts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_payouts" ON commission_payouts FOR ALL USING (is_admin());
 CREATE POLICY "payouts_select" ON commission_payouts FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
 
 -- SUBSCRIPTION_INVOICES
 ALTER TABLE subscription_invoices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_invoices" ON subscription_invoices FOR ALL USING (is_admin());
 CREATE POLICY "invoices_select" ON subscription_invoices FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
 
--- PLATFORM_REVENUE
+-- PLATFORM_REVENUE (Admin seulement !)
 ALTER TABLE platform_revenue ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_full_access_revenue" ON platform_revenue FOR ALL USING (is_admin());
 
 -- ============================================
 -- ÉTAPE 8: FONCTIONS
@@ -877,8 +949,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Promouvoir un utilisateur en admin (à appeler manuellement via SQL)
+-- Exemple : SELECT promote_to_admin('ton-email@gmail.com');
+CREATE OR REPLACE FUNCTION promote_to_admin(p_email TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    v_user_id UUID;
+    v_old_role user_role;
+BEGIN
+    SELECT id, role INTO v_user_id, v_old_role
+    FROM profiles WHERE email = p_email;
+
+    IF v_user_id IS NULL THEN
+        RETURN 'ERREUR: Aucun utilisateur trouvé avec email ' || p_email;
+    END IF;
+
+    IF v_old_role = 'admin' THEN
+        RETURN 'INFO: ' || p_email || ' est déjà admin';
+    END IF;
+
+    UPDATE profiles SET role = 'admin', updated_at = NOW()
+    WHERE id = v_user_id;
+
+    RETURN 'OK: ' || p_email || ' promu admin (ancien rôle: ' || v_old_role || ')';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ============================================
--- ÉTAPE 9: TRIGGERS
+-- ÉTAPE 10: TRIGGERS
 -- ============================================
 
 -- Profil auto-créé à l'inscription
@@ -914,7 +1012,7 @@ CREATE TRIGGER on_payment_completed
     FOR EACH ROW EXECUTE FUNCTION record_platform_commission();
 
 -- ============================================
--- ÉTAPE 10: VUES
+-- ÉTAPE 11: VUES
 -- ============================================
 
 CREATE OR REPLACE VIEW active_promotions AS
@@ -951,7 +1049,7 @@ GROUP BY DATE_TRUNC('month', period_date), source_type
 ORDER BY month DESC;
 
 -- ============================================
--- ÉTAPE 11: DONNÉES INITIALES
+-- ÉTAPE 12: DONNÉES INITIALES
 -- ============================================
 
 INSERT INTO categories (name, slug, description, icon, "order") VALUES
@@ -967,7 +1065,7 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
     ('Mariage', 'mariage', 'Coiffures de mariage', 'diamond-outline', 10);
 
 -- ============================================
--- ÉTAPE 12: STORAGE BUCKETS
+-- ÉTAPE 13: STORAGE BUCKETS
 -- ============================================
 -- À créer manuellement dans Supabase Dashboard > Storage:
 -- 1. avatars  (public)
@@ -975,5 +1073,16 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
 -- 3. gallery  (public)
 
 -- ============================================
+-- ÉTAPE 14: PROMOUVOIR UN ADMIN
+-- ============================================
+-- Après avoir créé votre compte via l'app, exécutez dans le SQL Editor de Supabase :
+--
+--   SELECT promote_to_admin('votre-email@gmail.com');
+--
+-- Cela donne un accès total (lecture/écriture/suppression) sur TOUTES les tables.
+-- ============================================
+
+-- ============================================
 -- TERMINÉ ! Votre base de données est prête.
+-- Rôles disponibles : client, coiffeur, admin
 -- ============================================

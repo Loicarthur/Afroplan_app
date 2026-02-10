@@ -109,7 +109,7 @@ export default function CoiffeurProfilScreen() {
               await signOut();
               router.replace('/(tabs)');
             } catch (error) {
-              console.error('Erreur lors de la deconnexion:', error);
+              if (__DEV__) console.error('Erreur deconnexion:', error);
             }
           },
         },

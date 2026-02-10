@@ -178,7 +178,7 @@ export default function ProfileScreen() {
             try {
               await signOut();
             } catch (error) {
-              console.error('Erreur lors de la déconnexion:', error);
+              if (__DEV__) console.error('Erreur déconnexion:', error);
             }
           },
         },
