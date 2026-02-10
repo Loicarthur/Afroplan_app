@@ -16,6 +16,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
@@ -98,7 +101,9 @@ function RoleCard({
 export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
 
-  const handleRoleSelect = (role: UserRole) => {
+  const handleRoleSelect = async (role: UserRole) => {
+    // Sauvegarder le rôle choisi puis accéder directement à l'app
+    await AsyncStorage.setItem(SELECTED_ROLE_KEY, role);
     if (role === 'coiffeur') {
       router.replace('/(coiffeur)');
     } else {
