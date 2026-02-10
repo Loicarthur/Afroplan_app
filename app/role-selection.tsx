@@ -102,12 +102,13 @@ export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
 
   const handleRoleSelect = async (role: UserRole) => {
-    // Sauvegarder le rôle choisi puis envoyer vers le login
+    // Sauvegarder le rôle choisi puis accéder directement à l'app
     await AsyncStorage.setItem(SELECTED_ROLE_KEY, role);
-    router.push({
-      pathname: '/(auth)/login',
-      params: { role },
-    });
+    if (role === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
   };
 
   return (

@@ -3,7 +3,7 @@
  * Design épuré - Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { AuthGuardModal } from '@/components/ui';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - Spacing.md * 2 - Spacing.md) / 2;
@@ -77,6 +80,35 @@ const SAVED_STYLES = [
 export default function FavoritesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { isAuthenticated } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Si pas connecté, afficher un écran invitant à se connecter
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.authPrompt}>
+          <View style={styles.authIconContainer}>
+            <Ionicons name="heart" size={48} color={colors.textMuted} />
+          </View>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Vos favoris</Text>
+          <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
+            Connectez-vous pour sauvegarder vos salons et styles préférés
+          </Text>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.authButtonText}>Se connecter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const handleRemoveSalon = (salonId: string) => {
     console.log('Remove salon:', salonId);
@@ -315,5 +347,49 @@ const styles = StyleSheet.create({
   stylePrice: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
+  },
+
+  /* Auth Prompt */
+  authPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  authIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  authTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  authMessage: {
+    fontSize: FontSizes.md,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  authButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  authLink: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
   },
 });

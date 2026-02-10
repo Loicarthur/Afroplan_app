@@ -25,7 +25,9 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { Colors, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 
 const { width } = Dimensions.get('window');
@@ -193,6 +195,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, profile } = useAuth();
+  const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
@@ -388,7 +391,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={coiffeur.id}
                 style={[styles.coiffeurCard, { backgroundColor: colors.card }]}
-                onPress={() => router.push(`/salon/${coiffeur.id}`)}
+                onPress={() => requireAuth(() => router.push(`/salon/${coiffeur.id}`))}
               >
                 <View style={styles.coiffeurImageContainer}>
                   <Image source={{ uri: coiffeur.image }} style={styles.coiffeurImage} contentFit="cover" />
@@ -429,7 +432,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={salon.id}
               style={[styles.salonCard, { backgroundColor: colors.card }]}
-              onPress={() => router.push(`/salon/${salon.id}`)}
+              onPress={() => requireAuth(() => router.push(`/salon/${salon.id}`))}
             >
               <Image source={{ uri: salon.image }} style={styles.salonImage} contentFit="cover" />
               <View style={styles.salonInfo}>
@@ -563,6 +566,13 @@ export default function HomeScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Auth Guard Modal */}
+      <AuthGuardModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        message="Connectez-vous pour voir les détails du salon et réserver"
+      />
     </SafeAreaView>
   );
 }
