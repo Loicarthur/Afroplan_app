@@ -73,10 +73,10 @@ export default function SplashScreen() {
       withTiming(1, { duration: 800 })
     );
 
-    // Navigation après 10 secondes
+    // Navigation après 3 secondes
     timerRef.current = setTimeout(() => {
       navigateToApp();
-    }, 10000);
+    }, 3000);
 
     return () => {
       if (timerRef.current) {

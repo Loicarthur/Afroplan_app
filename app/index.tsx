@@ -27,9 +27,9 @@ export default function Index() {
     );
   }
 
-  // Première fois → onboarding
+  // Première fois → splash (puis onboarding)
   if (!onboardingDone) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href="/splash" />;
   }
 
   // Sinon → sélection de rôle
