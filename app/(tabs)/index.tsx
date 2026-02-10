@@ -211,7 +211,7 @@ export default function HomeScreen() {
   };
 
   const handleSearch = (filters: any) => {
-    console.log('Search filters:', filters);
+    // TODO: appliquer les filtres de recherche
     router.push('/(tabs)/explore');
   };
 

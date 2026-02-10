@@ -111,7 +111,7 @@ export default function FavoritesScreen() {
   }
 
   const handleRemoveSalon = (salonId: string) => {
-    console.log('Remove salon:', salonId);
+    // TODO: appel API suppression favori
   };
 
   const getCategoryLabel = (category: string) => {

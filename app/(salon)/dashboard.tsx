@@ -129,7 +129,7 @@ export default function SalonDashboard() {
       'Vous allez être redirigé vers Stripe pour configurer vos paiements.',
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Continuer', onPress: () => console.log('Redirect to Stripe onboarding') },
+        { text: 'Continuer', onPress: () => { /* TODO: Stripe onboarding */ } },
       ]
     );
   };

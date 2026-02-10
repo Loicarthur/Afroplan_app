@@ -72,7 +72,7 @@ export function SuccessModal({
       scaleAnim.setValue(0);
       opacityAnim.setValue(0);
     }
-  }, [visible]);
+  }, [visible, duration, onDismiss, scaleAnim, opacityAnim]);
 
   return (
     <Modal

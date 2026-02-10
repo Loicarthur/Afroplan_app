@@ -1,12 +1,15 @@
 /**
  * Contexte d'authentification pour l'application AfroPlan
+ * Gère session, profil, rôles (client/coiffeur/admin) et memoization
  */
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { authService } from '@/services';
 import { Profile } from '@/types';
+
+type UserRole = 'client' | 'coiffeur' | 'admin';
 
 type AuthContextType = {
   session: Session | null;
@@ -14,6 +17,10 @@ type AuthContextType = {
   profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isCoiffeur: boolean;
+  isClient: boolean;
+  role: UserRole | null;
   signUp: (email: string, password: string, fullName: string, phone?: string, role?: 'client' | 'coiffeur') => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -33,33 +40,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!session && !!user;
-
   // Charger le profil utilisateur
-  const loadProfile = async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string) => {
     try {
       const userProfile = await authService.getProfile(userId);
       setProfile(userProfile);
     } catch (error) {
-      console.error('Erreur lors du chargement du profil:', error);
+      if (__DEV__) console.error('Erreur chargement profil:', error);
     }
-  };
+  }, []);
 
   // Rafraichir le profil
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user?.id) {
       await loadProfile(user.id);
     }
-  };
+  }, [user?.id, loadProfile]);
 
   // Initialiser la session au demarrage
   useEffect(() => {
-    // Ne pas tenter de connexion si Supabase n'est pas configure
     if (!isSupabaseConfigured()) {
-      console.warn(
-        'Supabase non configure - mode hors ligne. ' +
-        'Creez un fichier .env avec vos identifiants Supabase (voir .env.example).'
-      );
+      if (__DEV__) {
+        console.warn(
+          'Supabase non configure - mode hors ligne. ' +
+          'Creez un fichier .env avec vos identifiants Supabase (voir .env.example).'
+        );
+      }
       setIsLoading(false);
       return;
     }
@@ -74,7 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await loadProfile(currentSession.user.id);
         }
       } catch (error) {
-        console.error('Erreur lors de l\'initialisation de la session:', error);
+        if (__DEV__) console.error('Erreur init session:', error);
       } finally {
         setIsLoading(false);
       }
@@ -82,7 +88,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initSession();
 
-    // Ecouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         setSession(newSession);
@@ -99,10 +104,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   // Inscription
-  const signUp = async (
+  const signUp = useCallback(async (
     email: string,
     password: string,
     fullName: string,
@@ -115,10 +120,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Connexion
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const { user: authUser } = await authService.signIn({ email, password });
@@ -128,10 +133,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadProfile]);
 
   // Deconnexion
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
       await authService.signOut();
@@ -139,30 +144,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Mettre a jour le profil
-  const updateProfile = async (updates: Partial<Profile>) => {
+  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!user?.id) {
       throw new Error('Utilisateur non connecte');
     }
-
     const updatedProfile = await authService.updateProfile(user.id, updates);
     setProfile(updatedProfile);
-  };
+  }, [user?.id]);
 
-  const value: AuthContextType = {
-    session,
-    user,
-    profile,
-    isLoading,
-    isAuthenticated,
-    signUp,
-    signIn,
-    signOut,
-    updateProfile,
-    refreshProfile,
-  };
+  // Memoize le value pour éviter les re-renders en cascade sur tout l'arbre
+  const value = useMemo<AuthContextType>(() => {
+    const isAuthenticated = !!session && !!user;
+    const role = (profile?.role as UserRole) ?? null;
+
+    return {
+      session,
+      user,
+      profile,
+      isLoading,
+      isAuthenticated,
+      isAdmin: role === 'admin',
+      isCoiffeur: role === 'coiffeur',
+      isClient: role === 'client',
+      role,
+      signUp,
+      signIn,
+      signOut,
+      updateProfile,
+      refreshProfile,
+    };
+  }, [session, user, profile, isLoading, signUp, signIn, signOut, updateProfile, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
