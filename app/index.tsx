@@ -1,16 +1,18 @@
 /**
- * Point d'entrée - Redirige selon l'état d'onboarding
- * L'accueil est accessible sans connexion
+ * Point d'entree - Redirige selon l'etat d'authentification
+ * Connecte → app directement | Pas connecte → splash/onboarding
  */
 
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 
 export default function Index() {
+  const { isAuthenticated, isLoading, profile } = useAuth();
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -19,7 +21,8 @@ export default function Index() {
     });
   }, []);
 
-  if (onboardingDone === null) {
+  // Attendre le chargement auth + onboarding check
+  if (isLoading || onboardingDone === null) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#191919" />
@@ -27,12 +30,20 @@ export default function Index() {
     );
   }
 
-  // Première fois → splash (puis onboarding)
+  // Connecte → direction l'app selon le role
+  if (isAuthenticated && profile) {
+    if (profile.role === 'coiffeur') {
+      return <Redirect href="/(coiffeur)" />;
+    }
+    return <Redirect href="/(tabs)" />;
+  }
+
+  // Pas connecte, premiere fois → splash (puis onboarding)
   if (!onboardingDone) {
     return <Redirect href="/splash" />;
   }
 
-  // Sinon → sélection de rôle
+  // Pas connecte, onboarding deja vu → selection de role
   return <Redirect href="/role-selection" />;
 }
 
