@@ -22,7 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, AuthGuardModal } from '@/components/ui';
 
 // Liste des specialites de coiffure afro
 const AFRO_SPECIALTIES = [
@@ -48,7 +48,7 @@ const MAX_PHOTOS = 4;
 export default function SalonManagementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, user } = useAuth();
+  const { profile, user, isAuthenticated } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -164,6 +164,33 @@ export default function SalonManagementScreen() {
       setIsSaving(false);
     }
   };
+
+  // Si pas connecté → écran invitant à se connecter
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+        <View style={styles.authPrompt}>
+          <View style={styles.authIconContainer}>
+            <Ionicons name="storefront" size={48} color={colors.textMuted} />
+          </View>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Mon salon</Text>
+          <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
+            Connectez-vous pour créer et gérer votre salon, ajouter vos photos et spécialités
+          </Text>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.authButtonText}>Se connecter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
+            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte Pro</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -498,5 +525,49 @@ const styles = StyleSheet.create({
   saveSection: {
     paddingHorizontal: Spacing.md,
     marginTop: Spacing.lg,
+  },
+
+  /* Auth Prompt */
+  authPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  authIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  authTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  authMessage: {
+    fontSize: FontSizes.md,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  authButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  authLink: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
   },
 });

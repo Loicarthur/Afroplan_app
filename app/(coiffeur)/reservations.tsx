@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { router } from 'expo-router';
+
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
@@ -94,7 +96,7 @@ const MOCK_BOOKINGS: BookingItem[] = [
 export default function CoiffeurReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile } = useAuth();
+  const { profile, isAuthenticated } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed'>('all');
@@ -187,6 +189,33 @@ export default function CoiffeurReservationsScreen() {
       ]
     );
   };
+
+  // Si pas connecté → écran invitant à se connecter
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+        <View style={styles.authPrompt}>
+          <View style={styles.authIconContainer}>
+            <Ionicons name="calendar" size={48} color={colors.textMuted} />
+          </View>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Réservations</Text>
+          <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
+            Connectez-vous pour voir et gérer les réservations de vos clients
+          </Text>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.authButtonText}>Se connecter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
+            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte Pro</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -468,5 +497,49 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  /* Auth Prompt */
+  authPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  authIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  authTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  authMessage: {
+    fontSize: FontSizes.md,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  authButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  authLink: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
   },
 });
