@@ -107,7 +107,7 @@ export default function CoiffeurProfilScreen() {
           onPress: async () => {
             try {
               await signOut();
-              router.replace('/(tabs)');
+              router.replace('/onboarding');
             } catch (error) {
               if (__DEV__) console.error('Erreur deconnexion:', error);
             }
