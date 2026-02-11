@@ -17,8 +17,6 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +24,8 @@ import Animated, {
   FadeInUp,
   FadeInDown,
 } from 'react-native-reanimated';
+
+const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;

@@ -18,8 +18,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -33,6 +31,8 @@ import Animated, {
   FadeIn,
   FadeInUp,
 } from 'react-native-reanimated';
+
+const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 
 const { width, height } = Dimensions.get('window');
 
