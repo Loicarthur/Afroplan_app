@@ -19,7 +19,7 @@ import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { Button } from '@/components/ui';
+
 
 type MenuItemProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -171,7 +171,7 @@ export default function CoiffeurProfilScreen() {
                 Mode Client
               </Text>
               <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
-                Basculer vers l'espace client
+                Basculer vers l&apos;espace client
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />

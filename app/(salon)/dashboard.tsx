@@ -16,13 +16,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { paymentService, SUBSCRIPTION_PLANS, SubscriptionPlan } from '@/services/payment.service';
+import { Colors, Shadows } from '@/constants/theme';
+import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '@/services/payment.service';
 
 const { width } = Dimensions.get('window');
 
@@ -56,7 +55,7 @@ export default function SalonDashboard() {
   const [balance, setBalance] = useState({ availableBalance: 0, currency: 'eur' });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>('free');
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
-  const [isStripeConnected, setIsStripeConnected] = useState(false);
+  const [, setIsStripeConnected] = useState(false);
 
   // Données de démonstration
   const mockStats: PaymentStats = {
@@ -100,10 +99,6 @@ export default function SalonDashboard() {
     },
   ];
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [period]);
-
   const loadDashboardData = async () => {
     // Pour le moment, utiliser les données de démo
     setStats(mockStats);
@@ -113,6 +108,11 @@ export default function SalonDashboard() {
     setIsStripeConnected(true);
   };
 
+  useEffect(() => {
+    loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadDashboardData();
@@ -121,17 +121,6 @@ export default function SalonDashboard() {
 
   const formatAmount = (cents: number) => {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
-  };
-
-  const handleConnectStripe = () => {
-    Alert.alert(
-      'Connecter Stripe',
-      'Vous allez être redirigé vers Stripe pour configurer vos paiements.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Continuer', onPress: () => { /* TODO: Stripe onboarding */ } },
-      ]
-    );
   };
 
   const handleUpgradePlan = () => {
@@ -254,7 +243,7 @@ export default function SalonDashboard() {
             {stats ? formatAmount(stats.totalRevenue) : '--'}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-            Chiffre d'affaires
+            Chiffre d&apos;affaires
           </Text>
         </View>
 

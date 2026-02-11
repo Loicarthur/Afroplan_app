@@ -240,7 +240,7 @@ export default function ProfileScreen() {
                 Mode Coiffeur
               </Text>
               <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
-                Basculer vers l'espace coiffeur
+                Basculer vers l&apos;espace coiffeur
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />

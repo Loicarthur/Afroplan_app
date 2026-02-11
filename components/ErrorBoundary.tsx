@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <Text style={styles.icon}>!</Text>
           <Text style={styles.title}>Oups, une erreur est survenue</Text>
           <Text style={styles.message}>
-            L'application a rencontre un probleme inattendu.
+            L&apos;application a rencontre un probleme inattendu.
           </Text>
           {__DEV__ && this.state.error && (
             <Text style={styles.errorDetail}>

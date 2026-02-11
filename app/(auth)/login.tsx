@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input, SuccessModal } from '@/components/ui';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
@@ -96,7 +96,7 @@ export default function LoginScreen() {
     if (profile?.role && !showSuccess && hasRedirected.current === false && showSuccess === false) {
       // Le profil vient de se charger après la modale — on redirige
     }
-  }, [profile]);
+  }, [profile, showSuccess]);
 
   const redirectToApp = () => {
     if (hasRedirected.current) return;
@@ -250,14 +250,14 @@ export default function LoginScreen() {
           {/* Register Link */}
           <View style={styles.registerContainer}>
             <Text style={[styles.registerText, { color: colors.textSecondary }]}>
-              Vous n'avez pas de compte?
+              Vous n&apos;avez pas de compte?
             </Text>
             <TouchableOpacity onPress={() => router.push({
               pathname: '/(auth)/register',
               params: { role: selectedRole }
             })}>
               <Text style={[styles.registerLink, { color: roleColor }]}>
-                {' '}S'inscrire
+                {' '}S&apos;inscrire
               </Text>
             </TouchableOpacity>
           </View>

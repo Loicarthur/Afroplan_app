@@ -2,7 +2,7 @@
  * Page de gestion du salon - Espace Coiffeur AfroPlan
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -21,8 +20,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { Button, Input, AuthGuardModal } from '@/components/ui';
+import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { Button } from '@/components/ui';
 
 // Liste des specialites de coiffure afro
 const AFRO_SPECIALTIES = [
@@ -48,9 +47,8 @@ const MAX_PHOTOS = 4;
 export default function SalonManagementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
-  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Informations du salon
@@ -158,7 +156,7 @@ export default function SalonManagementScreen() {
         'Les informations de votre salon ont ete sauvegardees avec succes.',
         [{ text: 'OK' }]
       );
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde');
     } finally {
       setIsSaving(false);
@@ -201,7 +199,7 @@ export default function SalonManagementScreen() {
             Photos du salon ({photos.length}/{MAX_PHOTOS})
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Ajoutez jusqu'a {MAX_PHOTOS} photos de votre salon
+            Ajoutez jusqu&apos;a {MAX_PHOTOS} photos de votre salon
           </Text>
 
           <View style={styles.photosGrid}>
@@ -299,7 +297,7 @@ export default function SalonManagementScreen() {
               editable={false}
             />
             <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-              L'email est celui de votre compte et ne peut pas etre modifie
+              L&apos;email est celui de votre compte et ne peut pas etre modifie
             </Text>
           </View>
         </View>

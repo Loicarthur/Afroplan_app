@@ -12,14 +12,11 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
-  ImageBackground,
   FlatList,
   ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -29,10 +26,9 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
-  interpolate,
-  FadeIn,
-  FadeInUp,
 } from 'react-native-reanimated';
+
+const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 
 const { width, height } = Dimensions.get('window');
 
@@ -125,7 +121,7 @@ export default function OnboardingScreen() {
       -1,
       false
     );
-  }, []);
+  }, [pulseOpacity]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     opacity: pulseOpacity.value,
@@ -193,7 +189,7 @@ export default function OnboardingScreen() {
             pulseStyle
           ]}
         >
-          <Text style={styles.touchText}>Touchez l'écran pour continuer</Text>
+          <Text style={styles.touchText}>Touchez l&apos;écran pour continuer</Text>
         </Animated.View>
       </View>
     </TouchableWithoutFeedback>

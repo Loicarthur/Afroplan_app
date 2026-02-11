@@ -3,7 +3,7 @@
  * Paiement sécurisé pour les réservations
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,8 @@ import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { paymentService, BOOKING_DEPOSIT } from '@/services/payment.service';
+import { Colors, Shadows } from '@/constants/theme';
+import { BOOKING_DEPOSIT } from '@/services/payment.service';
 
 interface BookingDetails {
   salonName: string;
@@ -36,7 +36,7 @@ interface BookingDetails {
 export default function CheckoutScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile } = useAuth();
+  useAuth();
   const params = useLocalSearchParams();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +100,7 @@ export default function CheckoutScreen() {
           },
         ]
       );
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Erreur de paiement',
         'Une erreur est survenue. Veuillez réessayer.',
@@ -328,7 +328,7 @@ export default function CheckoutScreen() {
               Paiement sécurisé en 2 étapes
             </Text>
             <Text style={[styles.depositInfoText, { color: '#15803D' }]}>
-              1. Payez 10€ d'acompte maintenant{'\n'}
+              1. Payez 10€ d&apos;acompte maintenant{'\n'}
               2. Réglez le reste ({formatAmount(remainingAmount)}) au salon
             </Text>
           </View>
@@ -338,7 +338,7 @@ export default function CheckoutScreen() {
         <View style={styles.termsContainer}>
           <Ionicons name="shield-checkmark" size={16} color={colors.textMuted} />
           <Text style={[styles.termsText, { color: colors.textMuted }]}>
-            Paiement sécurisé par Stripe. En payant, vous acceptez nos conditions d'utilisation et notre politique d'annulation.
+            Paiement sécurisé par Stripe. En payant, vous acceptez nos conditions d&apos;utilisation et notre politique d&apos;annulation.
           </Text>
         </View>
 
@@ -362,7 +362,7 @@ export default function CheckoutScreen() {
               <>
                 <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
                 <Text style={styles.payButtonText}>
-                  Payer l'acompte de {formatAmount(depositAmount)}
+                  Payer l&apos;acompte de {formatAmount(depositAmount)}
                 </Text>
               </>
             )}

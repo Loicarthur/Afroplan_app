@@ -2,7 +2,7 @@
  * Page de reservation avec options de paiement AfroPlan
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalon } from '@/hooks/use-salons';
-import { useAvailableSlots, useCreateBooking } from '@/hooks/use-bookings';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { PaymentMethod, DEPOSIT_AMOUNT } from '@/types/database';
 
@@ -30,7 +29,7 @@ type TimeSlot = {
 };
 
 export default function BookingScreen() {
-  const { id, serviceId, serviceName, servicePrice, serviceDuration } = useLocalSearchParams<{
+  const { id, serviceName, servicePrice, serviceDuration } = useLocalSearchParams<{
     id: string;
     serviceId: string;
     serviceName: string;
@@ -40,13 +39,12 @@ export default function BookingScreen() {
 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, isAuthenticated } = useAuth();
-  const { salon, isLoading: loadingSalon } = useSalon(id || '');
+  const { isAuthenticated } = useAuth();
+  const { isLoading: loadingSalon } = useSalon(id || '');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('deposit');
-  const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const price = parseFloat(servicePrice || '0');
@@ -164,7 +162,7 @@ export default function BookingScreen() {
           },
         ]
       );
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Une erreur est survenue lors de la reservation');
     } finally {
       setIsSubmitting(false);

@@ -3,7 +3,7 @@
  * Design épuré - Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,6 @@ import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { AuthGuardModal } from '@/components/ui';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - Spacing.md * 2 - Spacing.md) / 2;
@@ -81,7 +80,6 @@ export default function FavoritesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Si pas connecté, afficher un écran invitant à se connecter
   if (!isAuthenticated) {

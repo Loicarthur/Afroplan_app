@@ -4,7 +4,7 @@
  * "Rechercher mon salon/coiffeur"
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,15 +19,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeIn,
   FadeInUp,
-  FadeOut,
   SlideInRight,
   SlideOutLeft,
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 // Types de coiffure
 const HAIRSTYLE_TYPES = [

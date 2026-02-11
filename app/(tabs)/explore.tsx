@@ -15,19 +15,16 @@ import {
   StatusBar,
   Modal,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-
-const { width } = Dimensions.get('window');
+import { Colors } from '@/constants/theme';
 
 // Types de coiffure pour filtres
 const HAIRSTYLE_FILTERS = [
