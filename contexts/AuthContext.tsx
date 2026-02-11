@@ -40,13 +40,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Charger le profil utilisateur
+  // Charger le profil utilisateur (crée le profil automatiquement s'il est manquant)
   const loadProfile = useCallback(async (userId: string) => {
     try {
       const userProfile = await authService.getProfile(userId);
       setProfile(userProfile);
     } catch (error) {
-      if (__DEV__) console.error('Erreur chargement profil:', error);
+      if (__DEV__) console.warn('Profil non chargé:', error);
     }
   }, []);
 
