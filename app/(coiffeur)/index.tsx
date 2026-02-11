@@ -15,6 +15,7 @@ import {
   Dimensions,
   Platform,
   Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -92,7 +93,7 @@ function BenefitCard({ icon, title, description, iconBgColor, iconColor, delay }
 export default function CoiffeurDashboard() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, isAuthenticated } = useAuth();
+  const { profile, isAuthenticated, refreshProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const [stats] = useState({
@@ -118,8 +119,28 @@ export default function CoiffeurDashboard() {
     Linking.openURL(url).catch(() => {});
   };
 
-  // Contenu pour utilisateur non connecté ou non-coiffeur
-  if (!isAuthenticated || profile?.role !== 'coiffeur') {
+  // Fonction pour upgrader le rôle client → coiffeur
+  const handleBecomeCoiffeur = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'coiffeur' })
+        .eq('id', profile?.id);
+
+      if (error) throw error;
+
+      // Rafraîchir le profil dans le contexte pour que isCoiffeur = true
+      await refreshProfile();
+      router.push('/(coiffeur)/salon');
+    } catch (err) {
+      Alert.alert('Erreur', 'Impossible de mettre à jour votre profil. Réessayez.');
+      if (__DEV__) console.warn('Erreur upgrade coiffeur:', err);
+    }
+  };
+
+  // Contenu pour utilisateur non connecté
+  if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <StatusBar style="dark" />
@@ -258,6 +279,110 @@ export default function CoiffeurDashboard() {
                   contactez-nous et nous viendrons vous aider gratuitement !
                 </Text>
               </View>
+            </View>
+          </Animated.View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Client connecté mais pas encore coiffeur → écran de bienvenue avec CTA
+  if (profile?.role !== 'coiffeur') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar style="dark" />
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Header retour client */}
+          <View style={styles.dashboardHeader}>
+            <View>
+              <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+                {getGreeting()} {profile?.full_name || ''}
+              </Text>
+              <Text style={[styles.userName, { color: colors.text }]}>
+                Espace Coiffeur
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => router.replace('/(tabs)')}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Section avantages */}
+          <View style={styles.section}>
+            <Animated.Text
+              entering={FadeInUp.delay(200).duration(500)}
+              style={[styles.sectionTitle, { color: colors.text }]}
+            >
+              Lancez votre activité
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInUp.delay(250).duration(500)}
+              style={[styles.sectionSubtitle, { color: colors.textSecondary }]}
+            >
+              Vous êtes aussi coiffeur ? Créez votre salon en quelques clics
+            </Animated.Text>
+
+            <View style={styles.benefitsContainer}>
+              <BenefitCard
+                icon="calendar"
+                title="Gestion des RDV"
+                description="Gérez facilement vos réservations"
+                iconBgColor="#191919"
+                iconColor="#FFFFFF"
+                delay={300}
+              />
+              <BenefitCard
+                icon="people"
+                title="Plus de clients"
+                description="Augmentez votre visibilité"
+                iconBgColor="#22C55E20"
+                iconColor="#22C55E"
+                delay={350}
+              />
+              <BenefitCard
+                icon="stats-chart"
+                title="Statistiques"
+                description="Suivez vos performances"
+                iconBgColor="#F59E0B20"
+                iconColor="#F59E0B"
+                delay={400}
+              />
+              <BenefitCard
+                icon="card"
+                title="Paiements"
+                description="Encaissez en toute sécurité"
+                iconBgColor="#EC489920"
+                iconColor="#EC4899"
+                delay={450}
+              />
+            </View>
+          </View>
+
+          {/* CTA Devenir coiffeur */}
+          <Animated.View
+            entering={FadeInUp.delay(500).duration(500)}
+            style={styles.ctaSection}
+          >
+            <View style={styles.ctaCard}>
+              <View style={styles.ctaIconContainer}>
+                <Ionicons name="cut" size={32} color="#FFFFFF" />
+              </View>
+              <Text style={styles.ctaTitle}>Prêt à commencer ?</Text>
+              <Text style={styles.ctaDesc}>
+                Activez votre profil coiffeur et créez votre salon pour recevoir des réservations
+              </Text>
+              <TouchableOpacity
+                style={styles.ctaButton}
+                onPress={handleBecomeCoiffeur}
+              >
+                <Ionicons name="sparkles" size={18} color="#191919" />
+                <Text style={styles.ctaButtonText}>Devenir Coiffeur</Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
 
