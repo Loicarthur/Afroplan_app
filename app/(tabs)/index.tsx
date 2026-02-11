@@ -26,7 +26,7 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
-import { Colors, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 

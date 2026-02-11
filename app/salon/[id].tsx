@@ -9,7 +9,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Linking,
   Alert,
 } from 'react-native';
@@ -25,7 +24,6 @@ import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/t
 import { Button, Rating } from '@/components/ui';
 import { Service } from '@/types';
 
-const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = 300;
 
 export default function SalonDetailScreen() {
@@ -50,12 +48,6 @@ export default function SalonDetailScreen() {
   const handleEmail = () => {
     if (salon?.email) {
       Linking.openURL(`mailto:${salon.email}`);
-    }
-  };
-
-  const handleWebsite = () => {
-    if (salon?.website) {
-      Linking.openURL(salon.website);
     }
   };
 
@@ -131,7 +123,7 @@ export default function SalonDetailScreen() {
           Salon introuvable
         </Text>
         <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>
-          Ce salon n'existe pas ou a ete supprime
+          Ce salon n&apos;existe pas ou a ete supprime
         </Text>
         <Button
           title="Retour"

@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input, SuccessModal } from '@/components/ui';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
@@ -263,7 +263,7 @@ export default function RegisterScreen() {
           {/* Terms */}
           <Text style={[styles.terms, { color: colors.textSecondary }]}>
             En vous inscrivant, vous acceptez nos{' '}
-            <Text style={{ color: roleColor }} onPress={() => router.push('/terms')}>Conditions d'utilisation</Text>
+            <Text style={{ color: roleColor }} onPress={() => router.push('/terms')}>Conditions d&apos;utilisation</Text>
             {' '}et notre{' '}
             <Text style={{ color: roleColor }} onPress={() => router.push('/privacy-policy')}>Politique de confidentialité</Text>
           </Text>

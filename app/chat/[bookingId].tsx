@@ -14,9 +14,8 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
 } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +26,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 
-const { width } = Dimensions.get('window');
 
 interface Message {
   id: string;
@@ -172,7 +170,7 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { profile } = useAuth();
-  const params = useLocalSearchParams<{ bookingId: string }>();
+  useLocalSearchParams<{ bookingId: string }>();
 
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const [inputText, setInputText] = useState('');

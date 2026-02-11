@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Shadows } from '@/constants/theme';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '@/services/payment.service';
 
 export default function SubscriptionScreen() {

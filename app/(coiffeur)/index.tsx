@@ -14,12 +14,10 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
-  Linking,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -27,9 +25,9 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Spacing, FontSizes, Shadows } from '@/constants/theme';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
 const isVerySmallScreen = width < 340;
 
@@ -113,10 +111,6 @@ export default function CoiffeurDashboard() {
     if (hour < 12) return 'Bonjour';
     if (hour < 18) return 'Bon après-midi';
     return 'Bonsoir';
-  };
-
-  const openLink = (url: string) => {
-    Linking.openURL(url).catch(() => {});
   };
 
   // Fonction pour upgrader le rôle client → coiffeur
@@ -272,7 +266,7 @@ export default function CoiffeurDashboard() {
               <Ionicons name="camera" size={24} color="#7C3AED" />
               <View style={styles.helpTextContainer}>
                 <Text style={[styles.helpTitle, { color: colors.text }]}>
-                  Besoin d'aide pour vos photos ?
+                  Besoin d&apos;aide pour vos photos ?
                 </Text>
                 <Text style={[styles.helpDesc, { color: colors.textSecondary }]}>
                   Si vous avez des difficultés pour des prises de photos professionnelles,

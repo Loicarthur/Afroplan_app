@@ -12,7 +12,6 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
-  ImageBackground,
   FlatList,
   ViewToken,
 } from 'react-native';
@@ -27,9 +26,6 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
-  interpolate,
-  FadeIn,
-  FadeInUp,
 } from 'react-native-reanimated';
 
 const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
@@ -125,7 +121,7 @@ export default function OnboardingScreen() {
       -1,
       false
     );
-  }, []);
+  }, [pulseOpacity]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     opacity: pulseOpacity.value,
@@ -193,7 +189,7 @@ export default function OnboardingScreen() {
             pulseStyle
           ]}
         >
-          <Text style={styles.touchText}>Touchez l'écran pour continuer</Text>
+          <Text style={styles.touchText}>Touchez l&apos;écran pour continuer</Text>
         </Animated.View>
       </View>
     </TouchableWithoutFeedback>

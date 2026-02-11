@@ -96,7 +96,7 @@ const MOCK_BOOKINGS: BookingItem[] = [
 export default function CoiffeurReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed'>('all');

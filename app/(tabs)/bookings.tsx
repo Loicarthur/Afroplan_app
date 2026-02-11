@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Shadows } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
