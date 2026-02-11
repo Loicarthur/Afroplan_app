@@ -288,13 +288,13 @@ export default function CoiffeurDashboard() {
     );
   }
 
-  // Client connecté mais pas encore coiffeur → écran de bienvenue avec CTA
+  // Client connecté mais pas encore coiffeur → écran d'accueil avec CTA créer salon
   if (profile?.role !== 'coiffeur') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <StatusBar style="dark" />
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Header retour client */}
+          {/* Header avec retour vers espace client */}
           <View style={styles.dashboardHeader}>
             <View>
               <Text style={[styles.greeting, { color: colors.textSecondary }]}>
@@ -324,7 +324,7 @@ export default function CoiffeurDashboard() {
               entering={FadeInUp.delay(250).duration(500)}
               style={[styles.sectionSubtitle, { color: colors.textSecondary }]}
             >
-              Vous êtes aussi coiffeur ? Créez votre salon en quelques clics
+              Créez votre salon en quelques clics et recevez des réservations
             </Animated.Text>
 
             <View style={styles.benefitsContainer}>
@@ -363,25 +363,25 @@ export default function CoiffeurDashboard() {
             </View>
           </View>
 
-          {/* CTA Devenir coiffeur */}
+          {/* CTA Créer mon salon */}
           <Animated.View
             entering={FadeInUp.delay(500).duration(500)}
             style={styles.ctaSection}
           >
             <View style={styles.ctaCard}>
               <View style={styles.ctaIconContainer}>
-                <Ionicons name="cut" size={32} color="#FFFFFF" />
+                <Ionicons name="storefront" size={32} color="#FFFFFF" />
               </View>
-              <Text style={styles.ctaTitle}>Prêt à commencer ?</Text>
+              <Text style={styles.ctaTitle}>Créer mon salon</Text>
               <Text style={styles.ctaDesc}>
-                Activez votre profil coiffeur et créez votre salon pour recevoir des réservations
+                Configurez votre salon et commencez à recevoir des réservations dès maintenant
               </Text>
               <TouchableOpacity
                 style={styles.ctaButton}
                 onPress={handleBecomeCoiffeur}
               >
-                <Ionicons name="sparkles" size={18} color="#191919" />
-                <Text style={styles.ctaButtonText}>Devenir Coiffeur</Text>
+                <Ionicons name="add-circle-outline" size={18} color="#191919" />
+                <Text style={styles.ctaButtonText}>Commencer</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

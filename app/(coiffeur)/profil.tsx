@@ -158,13 +158,14 @@ export default function CoiffeurProfilScreen() {
           </View>
         </View>
 
-        {/* Switch to Client Mode */}
+        {/* Switch Mode Client (style CityGo) */}
         <View style={styles.switchSection}>
           <TouchableOpacity
             style={[styles.switchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={handleSwitchToClient}
+            activeOpacity={0.7}
           >
-            <Ionicons name="swap-horizontal" size={24} color={colors.primary} />
+            <Ionicons name="person-outline" size={24} color={colors.primary} />
             <View style={styles.switchContent}>
               <Text style={[styles.switchTitle, { color: colors.text }]}>
                 Mode Client
