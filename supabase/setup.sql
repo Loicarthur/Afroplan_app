@@ -8,6 +8,8 @@
 -- ============================================
 -- ÉTAPE 1: NETTOYAGE COMPLET
 -- ============================================
+-- Ordre : vues → tables (CASCADE supprime auto les triggers) → fonctions → types
+-- Cela évite l'erreur "relation does not exist" si les tables ont déjà été supprimées
 
 -- Supprimer les vues
 DROP VIEW IF EXISTS platform_monthly_revenue CASCADE;
@@ -15,38 +17,10 @@ DROP VIEW IF EXISTS salon_revenue_summary CASCADE;
 DROP VIEW IF EXISTS active_promotions CASCADE;
 DROP VIEW IF EXISTS home_service_coiffeurs CASCADE;
 
--- Supprimer les triggers
+-- Supprimer le trigger sur auth.users (cette table existe toujours dans Supabase)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
-DROP TRIGGER IF EXISTS update_salons_updated_at ON salons;
-DROP TRIGGER IF EXISTS update_services_updated_at ON services;
-DROP TRIGGER IF EXISTS update_bookings_updated_at ON bookings;
-DROP TRIGGER IF EXISTS update_reviews_updated_at ON reviews;
-DROP TRIGGER IF EXISTS update_salon_rating_on_review ON reviews;
-DROP TRIGGER IF EXISTS update_coiffeur_details_updated_at ON coiffeur_details;
-DROP TRIGGER IF EXISTS update_promotions_updated_at ON promotions;
-DROP TRIGGER IF EXISTS update_client_addresses_updated_at ON client_addresses;
-DROP TRIGGER IF EXISTS on_promotion_usage_insert ON promotion_usages;
-DROP TRIGGER IF EXISTS on_payment_completed ON payments;
-DROP TRIGGER IF EXISTS update_stripe_accounts_updated_at ON stripe_accounts;
-DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 
--- Supprimer les fonctions
-DROP FUNCTION IF EXISTS handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
-DROP FUNCTION IF EXISTS update_salon_rating() CASCADE;
-DROP FUNCTION IF EXISTS is_promotion_valid(UUID, UUID, UUID, DECIMAL) CASCADE;
-DROP FUNCTION IF EXISTS calculate_promotion_discount(UUID, DECIMAL) CASCADE;
-DROP FUNCTION IF EXISTS increment_promotion_usage() CASCADE;
-DROP FUNCTION IF EXISTS calculate_distance_km(DECIMAL, DECIMAL, DECIMAL, DECIMAL) CASCADE;
-DROP FUNCTION IF EXISTS find_home_service_coiffeurs(DECIMAL, DECIMAL, TEXT, INTEGER) CASCADE;
-DROP FUNCTION IF EXISTS record_platform_commission() CASCADE;
-DROP FUNCTION IF EXISTS is_admin() CASCADE;
-DROP FUNCTION IF EXISTS is_coiffeur() CASCADE;
-DROP FUNCTION IF EXISTS is_client() CASCADE;
-DROP FUNCTION IF EXISTS promote_to_admin(TEXT) CASCADE;
-
--- Supprimer les tables (ordre inverse des dépendances)
+-- Supprimer les tables (CASCADE supprime automatiquement tous les triggers et contraintes associés)
 DROP TABLE IF EXISTS platform_revenue CASCADE;
 DROP TABLE IF EXISTS subscription_invoices CASCADE;
 DROP TABLE IF EXISTS commission_payouts CASCADE;
@@ -67,6 +41,21 @@ DROP TABLE IF EXISTS salon_categories CASCADE;
 DROP TABLE IF EXISTS salons CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
+
+-- Supprimer les fonctions (après les tables car CASCADE a déjà nettoyé les dépendances)
+DROP FUNCTION IF EXISTS handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
+DROP FUNCTION IF EXISTS update_salon_rating() CASCADE;
+DROP FUNCTION IF EXISTS is_promotion_valid(UUID, UUID, UUID, DECIMAL) CASCADE;
+DROP FUNCTION IF EXISTS calculate_promotion_discount(UUID, DECIMAL) CASCADE;
+DROP FUNCTION IF EXISTS increment_promotion_usage() CASCADE;
+DROP FUNCTION IF EXISTS calculate_distance_km(DECIMAL, DECIMAL, DECIMAL, DECIMAL) CASCADE;
+DROP FUNCTION IF EXISTS find_home_service_coiffeurs(DECIMAL, DECIMAL, TEXT, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS record_platform_commission() CASCADE;
+DROP FUNCTION IF EXISTS is_admin() CASCADE;
+DROP FUNCTION IF EXISTS is_coiffeur() CASCADE;
+DROP FUNCTION IF EXISTS is_client() CASCADE;
+DROP FUNCTION IF EXISTS promote_to_admin(TEXT) CASCADE;
 
 -- Supprimer les types
 DROP TYPE IF EXISTS user_role CASCADE;
