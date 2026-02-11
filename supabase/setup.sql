@@ -1013,6 +1013,18 @@ CREATE TRIGGER on_payment_completed
     FOR EACH ROW EXECUTE FUNCTION record_platform_commission();
 
 -- ============================================
+-- ÉTAPE 12: PERMISSIONS (GRANT)
+-- ============================================
+-- Sans ces permissions, les rôles Supabase (anon/authenticated)
+-- ne peuvent pas accéder aux tables même avec RLS configuré
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+
+-- ============================================
 -- ÉTAPE 11: VUES
 -- ============================================
 
