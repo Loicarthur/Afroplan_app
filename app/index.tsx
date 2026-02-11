@@ -1,6 +1,6 @@
 /**
- * Point d'entree - Redirige selon l'etat d'authentification
- * Connecte → app directement | Pas connecte → toujours onboarding
+ * Point d'entrée - Redirige selon l'état d'authentification
+ * Connecté → app selon rôle | Pas connecté → login
  */
 
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -18,7 +18,7 @@ export default function Index() {
     );
   }
 
-  // Connecte → direction l'app selon le role
+  // Connecté → direction l'app selon le rôle
   if (isAuthenticated && profile) {
     if (profile.role === 'coiffeur') {
       return <Redirect href="/(coiffeur)" />;
@@ -26,8 +26,8 @@ export default function Index() {
     return <Redirect href="/(tabs)" />;
   }
 
-  // Pas connecte → toujours splash + onboarding
-  return <Redirect href="/splash" />;
+  // Pas connecté → onboarding
+  return <Redirect href="/onboarding" />;
 }
 
 const styles = StyleSheet.create({

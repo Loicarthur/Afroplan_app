@@ -44,8 +44,7 @@ const AfroPlanDarkTheme = {
 };
 
 export const unstable_settings = {
-  // Démarrer directement sur l'onboarding (carousel de photos)
-  initialRouteName: 'onboarding',
+  initialRouteName: 'index',
 };
 
 export default function RootLayout() {
@@ -69,13 +68,6 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
-            name="splash"
-            options={{
-              headerShown: false,
-              animation: 'none',
-            }}
-          />
-          <Stack.Screen
             name="onboarding"
             options={{
               headerShown: false,
@@ -84,13 +76,6 @@ export default function RootLayout() {
           />
           <Stack.Screen
             name="role-selection"
-            options={{
-              headerShown: false,
-              animation: 'fade',
-            }}
-          />
-          <Stack.Screen
-            name="welcome"
             options={{
               headerShown: false,
               animation: 'fade',
