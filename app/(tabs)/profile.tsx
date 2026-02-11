@@ -227,27 +227,31 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* ── SWITCH COIFFEUR (si applicable) ── */}
-        {profile?.role === 'coiffeur' && (
-          <View style={styles.switchSection}>
-            <TouchableOpacity
-              style={[styles.switchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={handleSwitchToCoiffeur}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="swap-horizontal" size={24} color={colors.primary} />
-              <View style={styles.switchContent}>
-                <Text style={[styles.switchTitle, { color: colors.text }]}>
-                  Espace Coiffeur
-                </Text>
-                <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
-                  Gérer votre salon et vos services
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* ── SWITCH ESPACE COIFFEUR (visible pour tous) ── */}
+        <View style={styles.switchSection}>
+          <TouchableOpacity
+            style={[styles.switchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleSwitchToCoiffeur}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={profile?.role === 'coiffeur' ? 'swap-horizontal' : 'cut-outline'}
+              size={24}
+              color={colors.primary}
+            />
+            <View style={styles.switchContent}>
+              <Text style={[styles.switchTitle, { color: colors.text }]}>
+                {profile?.role === 'coiffeur' ? 'Espace Coiffeur' : 'Devenir Coiffeur'}
+              </Text>
+              <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
+                {profile?.role === 'coiffeur'
+                  ? 'Gérer votre salon et vos services'
+                  : 'Créez votre salon et recevez des clients'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
 
         {/* ── RENDEZ-VOUS RÉCENTS ── */}
         <View style={styles.menuSection}>

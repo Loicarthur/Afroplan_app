@@ -63,6 +63,7 @@ DROP TYPE IF EXISTS booking_status CASCADE;
 DROP TYPE IF EXISTS payment_method CASCADE;
 DROP TYPE IF EXISTS booking_payment_status CASCADE;
 DROP TYPE IF EXISTS service_location_type CASCADE;
+DROP TYPE IF EXISTS booking_source CASCADE;
 DROP TYPE IF EXISTS promotion_type CASCADE;
 DROP TYPE IF EXISTS promotion_status CASCADE;
 DROP TYPE IF EXISTS stripe_payment_status CASCADE;
@@ -82,6 +83,7 @@ CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'comple
 CREATE TYPE payment_method AS ENUM ('full', 'deposit', 'on_site');
 CREATE TYPE booking_payment_status AS ENUM ('pending', 'partial', 'completed', 'refunded');
 CREATE TYPE service_location_type AS ENUM ('salon', 'domicile', 'both');
+CREATE TYPE booking_source AS ENUM ('client_app', 'coiffeur_walkin', 'coiffeur_for_client');
 CREATE TYPE promotion_type AS ENUM ('percentage', 'fixed_amount', 'free_service');
 CREATE TYPE promotion_status AS ENUM ('draft', 'active', 'paused', 'expired');
 CREATE TYPE stripe_payment_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'refunded');
@@ -212,6 +214,9 @@ CREATE TABLE bookings (
     home_service_fee DECIMAL(10, 2) DEFAULT 0,
     promotion_id UUID,
     discount_amount DECIMAL(10, 2) DEFAULT 0,
+    -- Qui a créé la réservation et comment (walk-in, app client, coiffeur pour un client)
+    created_by UUID REFERENCES profiles(id),
+    source booking_source DEFAULT 'client_app',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -220,6 +225,7 @@ CREATE INDEX idx_bookings_client ON bookings(client_id);
 CREATE INDEX idx_bookings_salon ON bookings(salon_id);
 CREATE INDEX idx_bookings_date ON bookings(booking_date);
 CREATE INDEX idx_bookings_status ON bookings(status);
+CREATE INDEX idx_bookings_source ON bookings(source);
 
 -- REVIEWS
 CREATE TABLE reviews (
@@ -585,7 +591,7 @@ ALTER TABLE salons ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_full_access_salons" ON salons FOR ALL USING (is_admin());
 CREATE POLICY "salons_select" ON salons FOR SELECT USING (is_active = true);
 CREATE POLICY "salons_insert" ON salons FOR INSERT WITH CHECK (
-    auth.uid() = owner_id AND is_coiffeur()
+    auth.uid() = owner_id
 );
 CREATE POLICY "salons_update" ON salons FOR UPDATE USING (auth.uid() = owner_id);
 CREATE POLICY "salons_delete" ON salons FOR DELETE USING (auth.uid() = owner_id);
@@ -609,18 +615,24 @@ CREATE POLICY "services_manage" ON services FOR ALL USING (
 -- BOOKINGS
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_full_access_bookings" ON bookings FOR ALL USING (is_admin());
--- Client: voit et crée ses propres réservations
-CREATE POLICY "bookings_client_select" ON bookings FOR SELECT USING (auth.uid() = client_id);
-CREATE POLICY "bookings_client_insert" ON bookings FOR INSERT WITH CHECK (
-    auth.uid() = client_id AND is_client()
+-- Tout utilisateur peut voir ses propres réservations (client OU coiffeur en mode client)
+CREATE POLICY "bookings_own_select" ON bookings FOR SELECT USING (auth.uid() = client_id);
+-- Tout utilisateur authentifié peut créer une réservation pour lui-même (client ou coiffeur en mode client)
+CREATE POLICY "bookings_own_insert" ON bookings FOR INSERT WITH CHECK (
+    auth.uid() = client_id
 );
-CREATE POLICY "bookings_client_update" ON bookings FOR UPDATE USING (auth.uid() = client_id);
+CREATE POLICY "bookings_own_update" ON bookings FOR UPDATE USING (auth.uid() = client_id);
 -- Coiffeur: voit et gère les réservations de SON salon
 CREATE POLICY "bookings_coiffeur_select" ON bookings FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
 CREATE POLICY "bookings_coiffeur_update" ON bookings FOR UPDATE USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
+);
+-- Coiffeur: peut créer un RDV walk-in pour un client arrivé au salon
+CREATE POLICY "bookings_coiffeur_walkin_insert" ON bookings FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
+    AND source IN ('coiffeur_walkin', 'coiffeur_for_client')
 );
 
 -- REVIEWS
