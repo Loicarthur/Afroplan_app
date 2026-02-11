@@ -1,0 +1,84 @@
+name: EAS Production Build & Submit
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+      submit:
+        description: 'Submit to stores after build'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-android:
+    name: Build & Submit Android
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'android' || inputs.platform == 'all'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Android production
+        run: eas build --platform android --profile production --non-interactive
+
+      - name: Submit to Play Store
+        if: inputs.submit
+        run: eas submit --platform android --profile production --non-interactive
+
+  build-ios:
+    name: Build & Submit iOS
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'ios' || inputs.platform == 'all'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build iOS production
+        run: eas build --platform ios --profile production --non-interactive
+
+      - name: Submit to App Store
+        if: inputs.submit
+        run: eas submit --platform ios --profile production --non-interactive

@@ -6,11 +6,10 @@ import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 
-
-
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Colors } from '@/constants/theme';
 
 // Empecher le splash screen de se cacher automatiquement
@@ -57,10 +56,11 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <ThemeProvider value={theme}>
-          <Stack>
+    <ErrorBoundary>
+      <AuthProvider>
+        <LanguageProvider>
+          <ThemeProvider value={theme}>
+            <Stack>
           <Stack.Screen
             name="index"
             options={{
@@ -124,17 +124,11 @@ export default function RootLayout() {
               animation: 'slide_from_right',
             }}
           />
-          <Stack.Screen
-            name="modal"
-            options={{
-              presentation: 'modal',
-              title: 'Modal'
-            }}
-          />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </LanguageProvider>
-    </AuthProvider>
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </LanguageProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
