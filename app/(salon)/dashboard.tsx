@@ -128,7 +128,7 @@ export default function SalonDashboard() {
   };
 
   const handleViewPayments = () => {
-    router.push('/(salon)/payments');
+    router.push('/(salon)/payments' as any);
   };
 
   const handleWithdraw = () => {
@@ -367,7 +367,7 @@ export default function SalonDashboard() {
         <View style={styles.actionsGrid}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/reservations')}
+            onPress={() => router.push('/(salon)/reservations' as any)}
           >
             <Ionicons name="calendar-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>
@@ -377,7 +377,7 @@ export default function SalonDashboard() {
 
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/services')}
+            onPress={() => router.push('/(salon)/services' as any)}
           >
             <Ionicons name="pricetag-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>
@@ -387,7 +387,7 @@ export default function SalonDashboard() {
 
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/reviews')}
+            onPress={() => router.push('/(salon)/reviews' as any)}
           >
             <Ionicons name="star-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>

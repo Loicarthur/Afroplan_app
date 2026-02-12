@@ -213,7 +213,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={isLoading}
               fullWidth
-              style={[styles.loginButton, { backgroundColor: roleColor }]}
+              style={{...styles.loginButton, backgroundColor: roleColor}}
             />
           </View>
 

@@ -292,7 +292,7 @@ export const salonService = {
 
     const { data: reviews, error, count } = await supabase
       .from('reviews')
-      .select('*, client:profiles(*)', { count: 'exact' })
+      .select('*, client:profiles!reviews_client_id_fkey(*)', { count: 'exact' })
       .eq('salon_id', salonId)
       .order('created_at', { ascending: false })
       .range(from, to);

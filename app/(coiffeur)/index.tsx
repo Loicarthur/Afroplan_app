@@ -119,8 +119,8 @@ export default function CoiffeurDashboard() {
       const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase
         .from('profiles')
-        .update({ role: 'coiffeur' })
-        .eq('id', profile?.id);
+        .update({ role: 'coiffeur' as const })
+        .eq('id', profile?.id ?? '');
 
       if (error) throw error;
 

@@ -256,7 +256,7 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               loading={isLoading}
               fullWidth
-              style={[styles.registerButton, { backgroundColor: roleColor }]}
+              style={{...styles.registerButton, backgroundColor: roleColor}}
             />
           </View>
 

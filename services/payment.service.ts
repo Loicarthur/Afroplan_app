@@ -94,12 +94,12 @@ export interface PaymentIntent {
 export interface StripeAccount {
   id: string;
   salonId: string;
-  stripeAccountId: string;
+  stripeAccountId: string | null;
   isOnboarded: boolean;
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   subscriptionPlan: SubscriptionPlan;
-  subscriptionStatus: 'active' | 'cancelled' | 'past_due' | null;
+  subscriptionStatus: 'active' | 'cancelled' | 'past_due' | 'trialing' | null;
 }
 
 export const paymentService = {
@@ -206,7 +206,7 @@ export const paymentService = {
         *,
         booking:bookings(
           *,
-          client:profiles(*),
+          client:profiles!bookings_client_id_fkey(*),
           service:services(*)
         )
       `, { count: 'exact' })

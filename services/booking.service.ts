@@ -57,7 +57,7 @@ export const bookingService = {
         *,
         salon:salons(*),
         service:services(*),
-        coiffeur:profiles(*)
+        coiffeur:profiles!bookings_coiffeur_id_fkey(*)
       `,
         { count: 'exact' }
       )
@@ -104,7 +104,7 @@ export const bookingService = {
       .select(
         `
         *,
-        client:profiles(*),
+        client:profiles!bookings_client_id_fkey(*),
         service:services(*)
       `,
         { count: 'exact' }
@@ -155,8 +155,8 @@ export const bookingService = {
         *,
         salon:salons(*),
         service:services(*),
-        client:profiles(*),
-        coiffeur:profiles(*)
+        client:profiles!bookings_client_id_fkey(*),
+        coiffeur:profiles!bookings_coiffeur_id_fkey(*)
       `
       )
       .eq('id', id)
@@ -274,7 +274,7 @@ export const bookingService = {
 
     // Calculer les creneaux disponibles (logique simplifiee)
     const slots: string[] = [];
-    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' }) as keyof typeof salon.opening_hours;
+    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as keyof typeof salon.opening_hours;
     const daySchedule = (salon.opening_hours as any)[dayOfWeek];
 
     if (!daySchedule || daySchedule.isClosed) {

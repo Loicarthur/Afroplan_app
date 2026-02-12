@@ -45,6 +45,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       salons: {
         Row: {
@@ -128,6 +129,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       services: {
         Row: {
@@ -178,6 +180,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       bookings: {
         Row: {
@@ -270,6 +273,43 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "bookings_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bookings_salon_id_fkey";
+            columns: ["salon_id"];
+            isOneToOne: false;
+            referencedRelation: "salons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bookings_service_id_fkey";
+            columns: ["service_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bookings_coiffeur_id_fkey";
+            columns: ["coiffeur_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fk_bookings_promotion";
+            columns: ["promotion_id"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       reviews: {
         Row: {
@@ -302,6 +342,22 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "reviews_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reviews_salon_id_fkey";
+            columns: ["salon_id"];
+            isOneToOne: false;
+            referencedRelation: "salons";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       favorites: {
         Row: {
@@ -322,6 +378,7 @@ export interface Database {
           salon_id?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       categories: {
         Row: {
@@ -357,6 +414,7 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       salon_categories: {
         Row: {
@@ -371,6 +429,7 @@ export interface Database {
           salon_id?: string;
           category_id?: string;
         };
+        Relationships: [];
       };
       gallery_images: {
         Row: {
@@ -397,6 +456,510 @@ export interface Database {
           order?: number;
           created_at?: string;
         };
+        Relationships: [];
+      };
+      coiffeur_details: {
+        Row: {
+          id: string;
+          user_id: string;
+          bio: string | null;
+          years_of_experience: number;
+          specialties: string[] | null;
+          certifications: string[] | null;
+          offers_home_service: boolean;
+          offers_salon_service: boolean;
+          home_service_fee: number;
+          min_home_service_distance: number;
+          max_home_service_distance: number;
+          is_available: boolean;
+          vacation_mode: boolean;
+          vacation_start: string | null;
+          vacation_end: string | null;
+          instagram_url: string | null;
+          facebook_url: string | null;
+          tiktok_url: string | null;
+          portfolio_url: string | null;
+          total_clients_served: number;
+          total_bookings_completed: number;
+          cancellation_rate: number;
+          is_identity_verified: boolean;
+          is_address_verified: boolean;
+          has_insurance: boolean;
+          insurance_number: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          bio?: string | null;
+          years_of_experience?: number;
+          specialties?: string[] | null;
+          certifications?: string[] | null;
+          offers_home_service?: boolean;
+          offers_salon_service?: boolean;
+          home_service_fee?: number;
+          min_home_service_distance?: number;
+          max_home_service_distance?: number;
+          is_available?: boolean;
+          vacation_mode?: boolean;
+          vacation_start?: string | null;
+          vacation_end?: string | null;
+          instagram_url?: string | null;
+          facebook_url?: string | null;
+          tiktok_url?: string | null;
+          portfolio_url?: string | null;
+          total_clients_served?: number;
+          total_bookings_completed?: number;
+          cancellation_rate?: number;
+          is_identity_verified?: boolean;
+          is_address_verified?: boolean;
+          has_insurance?: boolean;
+          insurance_number?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          bio?: string | null;
+          years_of_experience?: number;
+          specialties?: string[] | null;
+          certifications?: string[] | null;
+          offers_home_service?: boolean;
+          offers_salon_service?: boolean;
+          home_service_fee?: number;
+          min_home_service_distance?: number;
+          max_home_service_distance?: number;
+          is_available?: boolean;
+          vacation_mode?: boolean;
+          vacation_start?: string | null;
+          vacation_end?: string | null;
+          instagram_url?: string | null;
+          facebook_url?: string | null;
+          tiktok_url?: string | null;
+          portfolio_url?: string | null;
+          total_clients_served?: number;
+          total_bookings_completed?: number;
+          cancellation_rate?: number;
+          is_identity_verified?: boolean;
+          is_address_verified?: boolean;
+          has_insurance?: boolean;
+          insurance_number?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      coverage_zones: {
+        Row: {
+          id: string;
+          coiffeur_id: string;
+          city: string;
+          postal_code: string | null;
+          department: string | null;
+          region: string | null;
+          country: string;
+          center_latitude: number | null;
+          center_longitude: number | null;
+          radius_km: number;
+          additional_fee: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          coiffeur_id: string;
+          city: string;
+          postal_code?: string | null;
+          department?: string | null;
+          region?: string | null;
+          country?: string;
+          center_latitude?: number | null;
+          center_longitude?: number | null;
+          radius_km?: number;
+          additional_fee?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          coiffeur_id?: string;
+          city?: string;
+          postal_code?: string | null;
+          department?: string | null;
+          region?: string | null;
+          country?: string;
+          center_latitude?: number | null;
+          center_longitude?: number | null;
+          radius_km?: number;
+          additional_fee?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      promotions: {
+        Row: {
+          id: string;
+          salon_id: string;
+          title: string;
+          description: string | null;
+          code: string | null;
+          type: 'percentage' | 'fixed_amount' | 'free_service';
+          value: number;
+          min_purchase_amount: number;
+          max_discount_amount: number | null;
+          applicable_service_ids: string[] | null;
+          applicable_categories: string[] | null;
+          max_uses: number | null;
+          max_uses_per_user: number;
+          current_uses: number;
+          start_date: string;
+          end_date: string;
+          first_booking_only: boolean;
+          new_clients_only: boolean;
+          valid_days: number[] | null;
+          status: 'draft' | 'active' | 'paused' | 'expired';
+          image_url: string | null;
+          banner_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          salon_id: string;
+          title: string;
+          description?: string | null;
+          code?: string | null;
+          type?: 'percentage' | 'fixed_amount' | 'free_service';
+          value: number;
+          min_purchase_amount?: number;
+          max_discount_amount?: number | null;
+          applicable_service_ids?: string[] | null;
+          applicable_categories?: string[] | null;
+          max_uses?: number | null;
+          max_uses_per_user?: number;
+          current_uses?: number;
+          start_date?: string;
+          end_date: string;
+          first_booking_only?: boolean;
+          new_clients_only?: boolean;
+          valid_days?: number[] | null;
+          status?: 'draft' | 'active' | 'paused' | 'expired';
+          image_url?: string | null;
+          banner_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          salon_id?: string;
+          title?: string;
+          description?: string | null;
+          code?: string | null;
+          type?: 'percentage' | 'fixed_amount' | 'free_service';
+          value?: number;
+          min_purchase_amount?: number;
+          max_discount_amount?: number | null;
+          applicable_service_ids?: string[] | null;
+          applicable_categories?: string[] | null;
+          max_uses?: number | null;
+          max_uses_per_user?: number;
+          current_uses?: number;
+          start_date?: string;
+          end_date?: string;
+          first_booking_only?: boolean;
+          new_clients_only?: boolean;
+          valid_days?: number[] | null;
+          status?: 'draft' | 'active' | 'paused' | 'expired';
+          image_url?: string | null;
+          banner_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "promotions_salon_id_fkey";
+            columns: ["salon_id"];
+            isOneToOne: false;
+            referencedRelation: "salons";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      promotion_usages: {
+        Row: {
+          id: string;
+          promotion_id: string;
+          user_id: string;
+          booking_id: string | null;
+          discount_applied: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          promotion_id: string;
+          user_id: string;
+          booking_id?: string | null;
+          discount_applied: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          promotion_id?: string;
+          user_id?: string;
+          booking_id?: string | null;
+          discount_applied?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "promotion_usages_promotion_id_fkey";
+            columns: ["promotion_id"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "promotion_usages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_addresses: {
+        Row: {
+          id: string;
+          user_id: string;
+          label: string;
+          address: string;
+          city: string;
+          postal_code: string;
+          country: string;
+          latitude: number | null;
+          longitude: number | null;
+          additional_info: string | null;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          label?: string;
+          address: string;
+          city: string;
+          postal_code: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          additional_info?: string | null;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          label?: string;
+          address?: string;
+          city?: string;
+          postal_code?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          additional_info?: string | null;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      coiffeur_availability: {
+        Row: {
+          id: string;
+          coiffeur_id: string;
+          specific_date: string | null;
+          day_of_week: number | null;
+          start_time: string;
+          end_time: string;
+          is_available: boolean;
+          service_location: 'salon' | 'domicile' | 'both';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          coiffeur_id: string;
+          specific_date?: string | null;
+          day_of_week?: number | null;
+          start_time: string;
+          end_time: string;
+          is_available?: boolean;
+          service_location?: 'salon' | 'domicile' | 'both';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          coiffeur_id?: string;
+          specific_date?: string | null;
+          day_of_week?: number | null;
+          start_time?: string;
+          end_time?: string;
+          is_available?: boolean;
+          service_location?: 'salon' | 'domicile' | 'both';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      stripe_accounts: {
+        Row: {
+          id: string;
+          salon_id: string;
+          stripe_account_id: string | null;
+          is_onboarded: boolean;
+          charges_enabled: boolean;
+          payouts_enabled: boolean;
+          subscription_plan: 'free' | 'starter' | 'pro' | 'premium';
+          subscription_status: 'active' | 'cancelled' | 'past_due' | 'trialing' | null;
+          stripe_subscription_id: string | null;
+          subscription_started_at: string | null;
+          subscription_ends_at: string | null;
+          default_currency: string;
+          country: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          salon_id: string;
+          stripe_account_id?: string | null;
+          is_onboarded?: boolean;
+          charges_enabled?: boolean;
+          payouts_enabled?: boolean;
+          subscription_plan?: 'free' | 'starter' | 'pro' | 'premium';
+          subscription_status?: 'active' | 'cancelled' | 'past_due' | 'trialing' | null;
+          stripe_subscription_id?: string | null;
+          subscription_started_at?: string | null;
+          subscription_ends_at?: string | null;
+          default_currency?: string;
+          country?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          salon_id?: string;
+          stripe_account_id?: string | null;
+          is_onboarded?: boolean;
+          charges_enabled?: boolean;
+          payouts_enabled?: boolean;
+          subscription_plan?: 'free' | 'starter' | 'pro' | 'premium';
+          subscription_status?: 'active' | 'cancelled' | 'past_due' | 'trialing' | null;
+          stripe_subscription_id?: string | null;
+          subscription_started_at?: string | null;
+          subscription_ends_at?: string | null;
+          default_currency?: string;
+          country?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      payments: {
+        Row: {
+          id: string;
+          booking_id: string;
+          salon_id: string;
+          amount: number;
+          total_service_price: number;
+          remaining_amount: number;
+          commission: number;
+          salon_amount: number;
+          commission_rate: number;
+          currency: string;
+          payment_type: string;
+          status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+          stripe_payment_intent_id: string | null;
+          stripe_transfer_id: string | null;
+          paid_at: string | null;
+          transferred_at: string | null;
+          is_paid_out: boolean;
+          payout_date: string | null;
+          refunded_at: string | null;
+          refund_reason: string | null;
+          stripe_refund_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          booking_id: string;
+          salon_id: string;
+          amount: number;
+          total_service_price: number;
+          remaining_amount: number;
+          commission: number;
+          salon_amount: number;
+          commission_rate: number;
+          currency?: string;
+          payment_type?: string;
+          status?: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+          stripe_payment_intent_id?: string | null;
+          stripe_transfer_id?: string | null;
+          paid_at?: string | null;
+          transferred_at?: string | null;
+          is_paid_out?: boolean;
+          payout_date?: string | null;
+          refunded_at?: string | null;
+          refund_reason?: string | null;
+          stripe_refund_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          booking_id?: string;
+          salon_id?: string;
+          amount?: number;
+          total_service_price?: number;
+          remaining_amount?: number;
+          commission?: number;
+          salon_amount?: number;
+          commission_rate?: number;
+          currency?: string;
+          payment_type?: string;
+          status?: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+          stripe_payment_intent_id?: string | null;
+          stripe_transfer_id?: string | null;
+          paid_at?: string | null;
+          transferred_at?: string | null;
+          is_paid_out?: boolean;
+          payout_date?: string | null;
+          refunded_at?: string | null;
+          refund_reason?: string | null;
+          stripe_refund_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey";
+            columns: ["booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_salon_id_fkey";
+            columns: ["salon_id"];
+            isOneToOne: false;
+            referencedRelation: "salons";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {
@@ -461,7 +1024,7 @@ export type BookingWithDetails = Booking & {
   salon?: Salon;
   service?: Service;
   client?: Profile;
-  coiffeur?: Profile;
+  coiffeur?: Profile | null;
 };
 
 export type ReviewWithClient = Review & {
