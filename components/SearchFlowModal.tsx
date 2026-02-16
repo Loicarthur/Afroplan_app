@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -25,7 +24,6 @@ import Animated, {
   SlideOutLeft,
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
-import { useLocation } from '@/hooks/use-location';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
@@ -85,7 +83,12 @@ const DISTANCE_PRESETS = [
 export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFlowModalProps) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { location: userLocation, getCurrentLocation, isLoading: locationLoading, formatDistance } = useLocation();
+
+  // 🔥 Localisation désactivée (temporairement)
+  const userLocation = null;
+  const getCurrentLocation = () => {};
+  const locationLoading = false;
+
   const [step, setStep] = useState(1);
   const [filters, setFilters] = useState<SearchFilters>({
     hairstyle: null,
@@ -147,7 +150,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
 
   const canProceed = () => {
     if (step === 1) return filters.hairstyle !== null;
-    return true; // Les autres étapes sont optionnelles
+    return true;
   };
 
   // Render step content
@@ -274,32 +277,20 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             <Text style={styles.stepTitle}>{t('search.budgetDistance')}</Text>
             <Text style={styles.stepSubtitle}>{t('search.optional')}</Text>
 
-            {/* Geolocation button */}
+            {/* Geolocation button (désactivé) */}
             <View style={styles.filterSection}>
               <TouchableOpacity
-                style={[
-                  styles.geoButton,
-                  userLocation && styles.geoButtonActive,
-                ]}
+                style={styles.geoButton}
                 onPress={getCurrentLocation}
-                disabled={locationLoading}
+                disabled={true}
               >
-                {locationLoading ? (
-                  <ActivityIndicator size="small" color="#191919" />
-                ) : (
-                  <Ionicons
-                    name={userLocation ? 'location' : 'location-outline'}
-                    size={22}
-                    color={userLocation ? '#22C55E' : '#191919'}
-                  />
-                )}
-                <Text style={[
-                  styles.geoButtonText,
-                  userLocation && styles.geoButtonTextActive,
-                ]}>
-                  {userLocation
-                    ? `${t('geo.enableLocation')} ✓`
-                    : t('geo.enableLocation')}
+                <Ionicons
+                  name="location-outline"
+                  size={22}
+                  color="#808080"
+                />
+                <Text style={styles.geoButtonTextDisabled}>
+                  Localisation désactivée (temporairement)
                 </Text>
               </TouchableOpacity>
             </View>
@@ -333,6 +324,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                 <Text style={styles.filterLabel}>{t('search.maxDistance')}</Text>
                 <Text style={styles.sliderValue}>{filters.maxDistance} km</Text>
               </View>
+
               <View style={styles.distancePresets}>
                 {DISTANCE_PRESETS.map((preset) => (
                   <TouchableOpacity
@@ -352,6 +344,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                   </TouchableOpacity>
                 ))}
               </View>
+
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -363,6 +356,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                 maximumTrackTintColor="#E5E5E5"
                 thumbTintColor="#191919"
               />
+
               <View style={styles.sliderLabels}>
                 <Text style={styles.sliderLabel}>1 km</Text>
                 <Text style={styles.sliderLabel}>100 km</Text>
@@ -763,17 +757,10 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5E5',
     gap: 8,
   },
-  geoButtonActive: {
-    borderColor: '#22C55E',
-    backgroundColor: '#22C55E10',
-  },
-  geoButtonText: {
-    fontSize: 15,
+  geoButtonTextDisabled: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#191919',
-  },
-  geoButtonTextActive: {
-    color: '#22C55E',
+    color: '#808080',
   },
   distancePresets: {
     flexDirection: 'row',
