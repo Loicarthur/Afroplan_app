@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -24,6 +25,8 @@ import Animated, {
   SlideOutLeft,
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
+import { useLocation } from '@/hooks/use-location';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -70,15 +73,26 @@ interface SearchFilters {
   showAll: boolean;
 }
 
+// Distance presets for quick selection
+const DISTANCE_PRESETS = [
+  { value: 5, label: '5 km' },
+  { value: 10, label: '10 km' },
+  { value: 20, label: '20 km' },
+  { value: 50, label: '50 km' },
+  { value: 60, label: '60 km' },
+];
+
 export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFlowModalProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+  const { location: userLocation, getCurrentLocation, isLoading: locationLoading, formatDistance } = useLocation();
   const [step, setStep] = useState(1);
   const [filters, setFilters] = useState<SearchFilters>({
     hairstyle: null,
     hairType: [],
     location: null,
     maxBudget: 150,
-    maxDistance: 10,
+    maxDistance: 20,
     showAll: false,
   });
 
@@ -257,13 +271,43 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             exiting={SlideOutLeft.duration(300)}
             style={styles.stepContent}
           >
-            <Text style={styles.stepTitle}>Budget & Distance</Text>
-            <Text style={styles.stepSubtitle}>Optionnel - Derniers ajustements</Text>
+            <Text style={styles.stepTitle}>{t('search.budgetDistance')}</Text>
+            <Text style={styles.stepSubtitle}>{t('search.optional')}</Text>
+
+            {/* Geolocation button */}
+            <View style={styles.filterSection}>
+              <TouchableOpacity
+                style={[
+                  styles.geoButton,
+                  userLocation && styles.geoButtonActive,
+                ]}
+                onPress={getCurrentLocation}
+                disabled={locationLoading}
+              >
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color="#191919" />
+                ) : (
+                  <Ionicons
+                    name={userLocation ? 'location' : 'location-outline'}
+                    size={22}
+                    color={userLocation ? '#22C55E' : '#191919'}
+                  />
+                )}
+                <Text style={[
+                  styles.geoButtonText,
+                  userLocation && styles.geoButtonTextActive,
+                ]}>
+                  {userLocation
+                    ? `${t('geo.enableLocation')} ✓`
+                    : t('geo.enableLocation')}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Budget slider */}
             <View style={styles.filterSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.filterLabel}>Budget maximum</Text>
+                <Text style={styles.filterLabel}>{t('search.maxBudget')}</Text>
                 <Text style={styles.sliderValue}>{filters.maxBudget} €</Text>
               </View>
               <Slider
@@ -283,16 +327,35 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
               </View>
             </View>
 
-            {/* Distance slider */}
+            {/* Distance presets */}
             <View style={styles.filterSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.filterLabel}>Distance maximum</Text>
+                <Text style={styles.filterLabel}>{t('search.maxDistance')}</Text>
                 <Text style={styles.sliderValue}>{filters.maxDistance} km</Text>
+              </View>
+              <View style={styles.distancePresets}>
+                {DISTANCE_PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.value}
+                    style={[
+                      styles.distancePresetChip,
+                      filters.maxDistance === preset.value && styles.distancePresetChipActive,
+                    ]}
+                    onPress={() => setFilters({ ...filters, maxDistance: preset.value })}
+                  >
+                    <Text style={[
+                      styles.distancePresetText,
+                      filters.maxDistance === preset.value && styles.distancePresetTextActive,
+                    ]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
               <Slider
                 style={styles.slider}
                 minimumValue={1}
-                maximumValue={50}
+                maximumValue={100}
                 step={1}
                 value={filters.maxDistance}
                 onValueChange={(value) => setFilters({ ...filters, maxDistance: value })}
@@ -302,7 +365,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
               />
               <View style={styles.sliderLabels}>
                 <Text style={styles.sliderLabel}>1 km</Text>
-                <Text style={styles.sliderLabel}>50 km</Text>
+                <Text style={styles.sliderLabel}>100 km</Text>
               </View>
             </View>
 
@@ -323,7 +386,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                 )}
               </View>
               <Text style={styles.showAllText}>
-                Je veux voir tous les salons (ignorer les filtres)
+                {t('search.showAllSalons')}
               </Text>
             </TouchableOpacity>
 
@@ -331,7 +394,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             <View style={styles.paymentInfo}>
               <Ionicons name="information-circle" size={20} color="#7C3AED" />
               <Text style={styles.paymentInfoText}>
-                Tu pourras choisir de payer le montant total ou un acompte lors de la réservation.
+                {t('search.paymentInfo')}
               </Text>
             </View>
           </Animated.View>
@@ -688,6 +751,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4A4A4A',
     lineHeight: 18,
+  },
+  geoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    gap: 8,
+  },
+  geoButtonActive: {
+    borderColor: '#22C55E',
+    backgroundColor: '#22C55E10',
+  },
+  geoButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  geoButtonTextActive: {
+    color: '#22C55E',
+  },
+  distancePresets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  distancePresetChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  distancePresetChipActive: {
+    backgroundColor: '#191919',
+    borderColor: '#191919',
+  },
+  distancePresetText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  distancePresetTextActive: {
+    color: '#FFFFFF',
   },
   footer: {
     paddingHorizontal: 24,

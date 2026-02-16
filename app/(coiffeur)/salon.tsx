@@ -20,8 +20,11 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
+import { salonService } from '@/services/salon.service';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 // Liste des specialites de coiffure afro
 const AFRO_SPECIALTIES = [
@@ -44,10 +47,40 @@ const AFRO_SPECIALTIES = [
 
 const MAX_PHOTOS = 4;
 
+// Opening hours structure
+const DAYS_OF_WEEK = [
+  { key: 'monday', label: 'Lundi', labelEn: 'Monday' },
+  { key: 'tuesday', label: 'Mardi', labelEn: 'Tuesday' },
+  { key: 'wednesday', label: 'Mercredi', labelEn: 'Wednesday' },
+  { key: 'thursday', label: 'Jeudi', labelEn: 'Thursday' },
+  { key: 'friday', label: 'Vendredi', labelEn: 'Friday' },
+  { key: 'saturday', label: 'Samedi', labelEn: 'Saturday' },
+  { key: 'sunday', label: 'Dimanche', labelEn: 'Sunday' },
+];
+
+interface DayHours {
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+type OpeningHours = Record<string, DayHours>;
+
+const DEFAULT_HOURS: OpeningHours = {
+  monday: { open: '09:00', close: '19:00', closed: false },
+  tuesday: { open: '09:00', close: '19:00', closed: false },
+  wednesday: { open: '09:00', close: '19:00', closed: false },
+  thursday: { open: '09:00', close: '19:00', closed: false },
+  friday: { open: '09:00', close: '19:00', closed: false },
+  saturday: { open: '09:00', close: '18:00', closed: false },
+  sunday: { open: '09:00', close: '18:00', closed: true },
+};
+
 export default function SalonManagementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, isAuthenticated } = useAuth();
+  const { t, language } = useLanguage();
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -64,6 +97,13 @@ export default function SalonManagementScreen() {
 
   // Specialites selectionnees
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+
+  // Opening hours
+  const [openingHours, setOpeningHours] = useState<OpeningHours>(DEFAULT_HOURS);
+
+  // Home service
+  const [offersHomeService, setOffersHomeService] = useState(false);
+  const [homeServiceFee, setHomeServiceFee] = useState('');
 
   // Email par defaut (celui de l'inscription)
   const email = user?.email || '';
@@ -126,38 +166,96 @@ export default function SalonManagementScreen() {
     });
   };
 
+  const updateDayHours = (day: string, field: keyof DayHours, value: string | boolean) => {
+    setOpeningHours(prev => ({
+      ...prev,
+      [day]: { ...prev[day], [field]: value },
+    }));
+  };
+
   const handleSave = async () => {
     // Validation
     if (!salonName.trim()) {
-      Alert.alert('Erreur', 'Le nom du salon est obligatoire');
+      Alert.alert(t('common.error'), t('salon.name') + ' *');
       return;
     }
     if (!address.trim() || !city.trim() || !postalCode.trim()) {
-      Alert.alert('Erreur', 'L\'adresse complete est obligatoire');
+      Alert.alert(t('common.error'), t('salon.address') + ' *');
       return;
     }
     if (!phone.trim()) {
-      Alert.alert('Erreur', 'Le numero de telephone est obligatoire');
+      Alert.alert(t('common.error'), t('salon.phone') + ' *');
       return;
     }
     if (selectedSpecialties.length === 0) {
-      Alert.alert('Erreur', 'Veuillez selectionner au moins une specialite');
+      Alert.alert(t('common.error'), t('salon.specialties') + ' *');
       return;
     }
 
     setIsSaving(true);
 
     try {
-      // Simuler la sauvegarde (a remplacer par l'appel API reel)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (isSupabaseConfigured()) {
+        // Upload photos to Supabase Storage
+        const photoUrls: string[] = [];
+        for (const photoUri of photos) {
+          if (photoUri.startsWith('http')) {
+            photoUrls.push(photoUri);
+            continue;
+          }
+          // Upload local photo
+          const fileName = `salon_${user?.id}_${Date.now()}_${photoUrls.length}.jpg`;
+          const response = await fetch(photoUri);
+          const blob = await response.blob();
+          const { data, error } = await supabase.storage
+            .from('salon-photos')
+            .upload(fileName, blob, { contentType: 'image/jpeg' });
+
+          if (data) {
+            const { data: urlData } = supabase.storage
+              .from('salon-photos')
+              .getPublicUrl(data.path);
+            photoUrls.push(urlData.publicUrl);
+          }
+          if (error && __DEV__) console.warn('Photo upload error:', error);
+        }
+
+        // Save salon to database
+        const salonData = {
+          owner_id: user?.id,
+          name: salonName.trim(),
+          description: description.trim(),
+          phone: phone.trim(),
+          email: email,
+          address: address.trim(),
+          city: city.trim(),
+          postal_code: postalCode.trim(),
+          specialties: selectedSpecialties,
+          photos: photoUrls,
+          opening_hours: openingHours,
+          offers_home_service: offersHomeService,
+          home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0') * 100 : 0,
+          is_active: true,
+        };
+
+        const { error: salonError } = await supabase
+          .from('salons')
+          .upsert(salonData, { onConflict: 'owner_id' });
+
+        if (salonError) throw salonError;
+      } else {
+        // Demo mode - simulate save
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
       Alert.alert(
-        'Salon enregistre!',
-        'Les informations de votre salon ont ete sauvegardees avec succes.',
+        t('salon.saved'),
+        t('salon.savedDesc'),
         [{ text: 'OK' }]
       );
-    } catch {
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde');
+    } catch (err) {
+      Alert.alert(t('common.error'), t('common.errorOccurred'));
+      if (__DEV__) console.warn('Salon save error:', err);
     } finally {
       setIsSaving(false);
     }
@@ -391,10 +489,122 @@ export default function SalonManagementScreen() {
           </View>
         </View>
 
+        {/* Horaires d'ouverture */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('salon.openingHours')}
+          </Text>
+
+          {DAYS_OF_WEEK.map((day) => {
+            const hours = openingHours[day.key];
+            return (
+              <View key={day.key} style={[styles.dayRow, { borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={styles.dayToggle}
+                  onPress={() => updateDayHours(day.key, 'closed', !hours.closed)}
+                >
+                  <View style={[
+                    styles.dayCheckbox,
+                    !hours.closed && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    { borderColor: colors.border },
+                  ]}>
+                    {!hours.closed && (
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.dayLabel,
+                    { color: hours.closed ? colors.textMuted : colors.text },
+                  ]}>
+                    {language === 'en' ? day.labelEn : day.label}
+                  </Text>
+                </TouchableOpacity>
+                {!hours.closed ? (
+                  <View style={styles.hoursInputRow}>
+                    <TextInput
+                      style={[styles.hoursInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                      value={hours.open}
+                      onChangeText={(v) => updateDayHours(day.key, 'open', v)}
+                      placeholder="09:00"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                    <Text style={[styles.hoursSeparator, { color: colors.textSecondary }]}>-</Text>
+                    <TextInput
+                      style={[styles.hoursInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                      value={hours.close}
+                      onChangeText={(v) => updateDayHours(day.key, 'close', v)}
+                      placeholder="19:00"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                ) : (
+                  <Text style={[styles.closedText, { color: colors.textMuted }]}>
+                    {language === 'en' ? 'Closed' : 'Fermé'}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Service à domicile */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('salon.homeService')}
+          </Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            {t('salon.homeServiceDesc')}
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.homeServiceToggle,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              offersHomeService && { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+            ]}
+            onPress={() => setOffersHomeService(!offersHomeService)}
+          >
+            <View style={[
+              styles.dayCheckbox,
+              offersHomeService && { backgroundColor: colors.primary, borderColor: colors.primary },
+              { borderColor: colors.border },
+            ]}>
+              {offersHomeService && (
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              )}
+            </View>
+            <View style={styles.homeServiceText}>
+              <Text style={[styles.homeServiceLabel, { color: colors.text }]}>
+                {t('salon.homeService')}
+              </Text>
+              <Text style={[styles.homeServiceDesc, { color: colors.textSecondary }]}>
+                {language === 'en' ? 'I can travel to clients' : 'Je me déplace chez les clients'}
+              </Text>
+            </View>
+            <Ionicons name="home-outline" size={24} color={offersHomeService ? colors.primary : colors.textMuted} />
+          </TouchableOpacity>
+
+          {offersHomeService && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.homeServiceFee')} (€)</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                placeholder="Ex: 15"
+                placeholderTextColor={colors.textMuted}
+                value={homeServiceFee}
+                onChangeText={setHomeServiceFee}
+                keyboardType="numeric"
+              />
+            </View>
+          )}
+        </View>
+
         {/* Bouton de sauvegarde */}
         <View style={styles.saveSection}>
           <Button
-            title={isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            title={isSaving ? t('salon.saving') : t('salon.save')}
             onPress={handleSave}
             fullWidth
             loading={isSaving}
@@ -519,6 +729,73 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  dayToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  dayLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '500',
+  },
+  hoursInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hoursInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    fontSize: FontSizes.sm,
+    width: 60,
+    textAlign: 'center',
+  },
+  hoursSeparator: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  closedText: {
+    fontSize: FontSizes.sm,
+    fontStyle: 'italic',
+  },
+  homeServiceToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    marginBottom: Spacing.md,
+  },
+  homeServiceText: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  homeServiceLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  homeServiceDesc: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
   },
   saveSection: {
     paddingHorizontal: Spacing.md,
