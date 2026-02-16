@@ -8,13 +8,17 @@ import { supabase } from '@/lib/supabase';
 // Acompte fixe à la réservation (en centimes)
 export const BOOKING_DEPOSIT = 1000; // 10€ d'acompte
 
+// Commission fixe AfroPlan: 20% sur chaque transaction
+// S'applique sur l'acompte ou le paiement intégral
+export const AFROPLAN_COMMISSION_RATE = 0.20; // 20%
+
 // Configuration des taux de commission selon le plan d'abonnement
-// La commission est prise sur l'acompte de 10€
+// Les salons abonnés bénéficient de taux réduits
 export const COMMISSION_RATES = {
-  free: 0.15,      // 15% = 1.50€ sur l'acompte de 10€
-  starter: 0.10,   // 10% = 1€ sur l'acompte de 10€
-  pro: 0.08,       // 8% = 0.80€ sur l'acompte de 10€
-  premium: 0.05,   // 5% = 0.50€ sur l'acompte de 10€
+  free: 0.20,      // 20% commission standard
+  starter: 0.15,   // 15% avec abonnement Starter
+  pro: 0.12,       // 12% avec abonnement Pro
+  premium: 0.10,   // 10% avec abonnement Premium
 } as const;
 
 // Plans d'abonnement pour les salons
@@ -23,7 +27,7 @@ export const SUBSCRIPTION_PLANS = {
     id: 'free',
     name: 'Gratuit',
     price: 0,
-    commission: 15,
+    commission: 20,
     features: [
       'Visibilité sur la plateforme',
       'Gestion des réservations',
@@ -35,10 +39,10 @@ export const SUBSCRIPTION_PLANS = {
     name: 'Starter',
     price: 19,
     priceId: 'price_starter_monthly', // ID Stripe à configurer
-    commission: 10,
+    commission: 15,
     features: [
       'Tout du plan Gratuit',
-      'Commission réduite à 10%',
+      'Commission réduite à 15%',
       'Statistiques de base',
       'Support email',
     ],
@@ -48,10 +52,10 @@ export const SUBSCRIPTION_PLANS = {
     name: 'Pro',
     price: 39,
     priceId: 'price_pro_monthly', // ID Stripe à configurer
-    commission: 8,
+    commission: 12,
     features: [
       'Tout du plan Starter',
-      'Commission réduite à 8%',
+      'Commission réduite à 12%',
       'Statistiques avancées',
       'Mise en avant dans les recherches',
       'Support prioritaire',
@@ -62,10 +66,10 @@ export const SUBSCRIPTION_PLANS = {
     name: 'Premium',
     price: 79,
     priceId: 'price_premium_monthly', // ID Stripe à configurer
-    commission: 5,
+    commission: 10,
     features: [
       'Tout du plan Pro',
-      'Commission réduite à 5%',
+      'Commission réduite à 10%',
       'Badge "Salon Premium"',
       'Promotions personnalisées',
       'Analytics détaillés',
@@ -129,13 +133,40 @@ export const paymentService = {
   },
 
   /**
-   * Créer une intention de paiement pour l'acompte d'une réservation
-   * Le client paie 10€ d'acompte, le reste sera payé au salon directement
+   * Calculer la commission sur un montant
+   * Commission de 20% par défaut (réduite selon l'abonnement)
+   */
+  calculateCommission(
+    amount: number,
+    plan: SubscriptionPlan = 'free'
+  ): {
+    amount: number;
+    commission: number;
+    salonAmount: number;
+    commissionRate: number;
+  } {
+    const commissionRate = COMMISSION_RATES[plan];
+    const commission = Math.round(amount * commissionRate);
+    const salonAmount = amount - commission;
+
+    return {
+      amount,
+      commission,
+      salonAmount,
+      commissionRate,
+    };
+  },
+
+  /**
+   * Créer une intention de paiement pour une réservation
+   * Supporte le paiement d'acompte ou le paiement intégral
+   * Commission AfroPlan de 20% appliquée sur le montant payé
    */
   async createPaymentIntent(
     bookingId: string,
     totalServicePrice: number,
-    salonId: string
+    salonId: string,
+    paymentType: 'deposit' | 'full' = 'deposit'
   ): Promise<PaymentIntent> {
     // Récupérer le compte Stripe du salon
     const { data: stripeAccount } = await supabase
@@ -145,11 +176,24 @@ export const paymentService = {
       .single();
 
     const plan = stripeAccount?.subscription_plan || 'free';
-    const { depositAmount, commission, salonDepositAmount, commissionRate } =
-      this.calculateDepositCommission(plan);
+    const commissionRate = COMMISSION_RATES[plan];
 
-    // Calculer le reste à payer au salon
-    const remainingAmount = totalServicePrice - depositAmount;
+    let payAmount: number;
+    let remainingAmount: number;
+
+    if (paymentType === 'full') {
+      // Paiement intégral - le client paie tout en une fois
+      payAmount = totalServicePrice;
+      remainingAmount = 0;
+    } else {
+      // Acompte - le client paie 10€ maintenant, le reste au salon
+      payAmount = BOOKING_DEPOSIT;
+      remainingAmount = totalServicePrice - BOOKING_DEPOSIT;
+    }
+
+    // Commission AfroPlan sur le montant payé en ligne
+    const commission = Math.round(payAmount * commissionRate);
+    const salonPayAmount = payAmount - commission;
 
     // Enregistrer le paiement en base
     const { data: payment, error } = await supabase
@@ -157,15 +201,15 @@ export const paymentService = {
       .insert({
         booking_id: bookingId,
         salon_id: salonId,
-        amount: depositAmount,           // Acompte de 10€
+        amount: payAmount,
         total_service_price: totalServicePrice,
         remaining_amount: remainingAmount,
         commission,
-        salon_amount: salonDepositAmount,
+        salon_amount: salonPayAmount,
         commission_rate: commissionRate,
         currency: 'eur',
         status: 'pending',
-        payment_type: 'deposit',
+        payment_type: paymentType,
       })
       .select()
       .single();
@@ -174,16 +218,16 @@ export const paymentService = {
       throw new Error(`Erreur création paiement: ${error.message}`);
     }
 
-    // Note: L'appel à l'API Stripe serait fait via une Edge Function Supabase
-    // pour sécuriser les clés API. Ici on retourne les infos pour le frontend.
+    // L'appel à Stripe PaymentIntent sera fait via Supabase Edge Function
+    // pour sécuriser les clés secrètes. Le frontend utilise le clientSecret retourné.
     return {
       id: payment.id,
       bookingId,
-      depositAmount,
+      depositAmount: payAmount,
       totalServicePrice,
       remainingAmount,
       commission,
-      salonDepositAmount,
+      salonDepositAmount: salonPayAmount,
       currency: 'eur',
       status: 'pending',
     };

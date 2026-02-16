@@ -26,9 +26,12 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors } from '@/constants/theme';
 import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
+import LanguageSelector from '@/components/LanguageSelector';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
@@ -196,10 +199,16 @@ export default function HomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, profile } = useAuth();
   const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
+  const { t } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
+
+  const handleSwitchToCoiffeur = async () => {
+    await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur');
+    router.replace('/(coiffeur)');
+  };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -249,20 +258,27 @@ export default function HomeScreen() {
               />
             </View>
 
-            {/* Boutons Inscription/Connexion à droite */}
+            {/* Boutons à droite */}
             {!isAuthenticated ? (
               <View style={styles.authButtons}>
+                <LanguageSelector compact />
+                <TouchableOpacity
+                  style={styles.switchRoleButton}
+                  onPress={handleSwitchToCoiffeur}
+                >
+                  <Ionicons name="swap-horizontal" size={16} color="#191919" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.registerButton}
                   onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'client' } })}
                 >
-                  <Text style={styles.registerButtonText}>Inscription</Text>
+                  <Text style={styles.registerButtonText}>{t('auth.register')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.loginButton}
                   onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}
                 >
-                  <Text style={styles.loginButtonText}>Connexion</Text>
+                  <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -621,7 +637,16 @@ const styles = StyleSheet.create({
   },
   authButtons: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
+  },
+  switchRoleButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   registerButton: {
     backgroundColor: '#f9f8f8',

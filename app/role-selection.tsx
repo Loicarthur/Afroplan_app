@@ -24,6 +24,8 @@ import Animated, {
   FadeInUp,
   FadeInDown,
 } from 'react-native-reanimated';
+import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 
@@ -88,7 +90,7 @@ function RoleCard({
           {/* Bouton */}
           <View style={styles.cardButton}>
             <Text style={styles.cardButtonText}>
-              {role === 'client' ? 'Commencer' : 'Accéder'}
+              {label}
             </Text>
             <Ionicons name="arrow-forward" size={16} color="#191919" />
           </View>
@@ -100,6 +102,7 @@ function RoleCard({
 
 export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   const handleRoleSelect = async (role: UserRole) => {
     // Sauvegarder le rôle choisi puis accéder directement à l'app
@@ -118,6 +121,14 @@ export default function RoleSelectionScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Language selector at top-right */}
+        <Animated.View
+          entering={FadeInDown.delay(100).duration(400)}
+          style={styles.languageSelectorRow}
+        >
+          <LanguageSelector compact />
+        </Animated.View>
+
         {/* Header avec logo agrandi */}
         <Animated.View
           entering={FadeInDown.delay(200).duration(600)}
@@ -130,7 +141,7 @@ export default function RoleSelectionScreen() {
               contentFit="contain"
             />
           </View>
-          <Text style={styles.tagline}>La coiffure afro, réinventée.</Text>
+          <Text style={styles.tagline}>{t('role.tagline')}</Text>
         </Animated.View>
 
         {/* Question Section */}
@@ -138,7 +149,7 @@ export default function RoleSelectionScreen() {
           entering={FadeInUp.delay(300).duration(600)}
           style={styles.questionSection}
         >
-          <Text style={styles.questionTitle}>Choisissez votre espace</Text>
+          <Text style={styles.questionTitle}>{t('role.chooseSpace')}</Text>
         </Animated.View>
 
         {/* Role Cards - empilées verticalement */}
@@ -146,8 +157,8 @@ export default function RoleSelectionScreen() {
           <RoleCard
             role="client"
             icon="person-outline"
-            label="Espace Client"
-            subtitle="Trouve ton coiffeur afro et réserve en quelques clics"
+            label={t('role.clientSpace')}
+            subtitle={t('role.clientSubtitle')}
             imageSource={require('@/assets/images/espace_client.jpg')}
             onPress={() => handleRoleSelect('client')}
             delay={400}
@@ -156,8 +167,8 @@ export default function RoleSelectionScreen() {
           <RoleCard
             role="coiffeur"
             icon="cut-outline"
-            label="Espace Coiffeur"
-            subtitle="Gère tes rendez-vous et développe ton activité"
+            label={t('role.coiffeurSpace')}
+            subtitle={t('role.coiffeurSubtitle')}
             imageSource={require('@/assets/images/espace_coiffeur.jpg')}
             onPress={() => handleRoleSelect('coiffeur')}
             delay={500}
@@ -170,7 +181,7 @@ export default function RoleSelectionScreen() {
           style={styles.trustSection}
         >
           <Text style={styles.trustText}>
-            Déjà +100 coiffeurs nous font confiance.
+            {t('role.trust')}
           </Text>
           <View style={styles.starsContainer}>
             {[1, 2, 3, 4, 5].map((_, index) => (
@@ -191,6 +202,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+  },
+  languageSelectorRow: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
 
   // ── Header & Logo ──
