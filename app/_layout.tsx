@@ -10,7 +10,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import EnvironmentBanner from '@/components/EnvironmentBanner';
 import { Colors } from '@/constants/theme';
+import { logger } from '@/lib/config';
 
 // Empecher le splash screen de se cacher automatiquement
 SplashScreen.preventAutoHideAsync();
@@ -125,6 +127,7 @@ export default function RootLayout() {
             }}
           />
             </Stack>
+            <EnvironmentBanner />
             <StatusBar style="auto" />
           </ThemeProvider>
         </LanguageProvider>

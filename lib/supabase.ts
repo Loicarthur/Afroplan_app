@@ -1,15 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
+import { config, logger } from '@/lib/config';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = config.supabase.url;
+const supabaseAnonKey = config.supabase.anonKey;
 
 // Vérification des variables d'environnement
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '⚠️ Variables Supabase non configurées!\n' +
-    'Pour activer l\'authentification, créez un fichier .env à la racine du projet avec:\n' +
+  logger.warn(
+    'Variables Supabase non configurées!\n' +
+    `Environnement: ${config.env}\n` +
+    'Pour activer l\'authentification, configurez les fichiers .env avec:\n' +
     'EXPO_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co\n' +
     'EXPO_PUBLIC_SUPABASE_ANON_KEY=votre-cle-anon\n' +
     'Obtenez ces valeurs depuis https://app.supabase.com'
@@ -29,6 +31,7 @@ if (supabaseUrl && supabaseAnonKey) {
       detectSessionInUrl: false,
     },
   });
+  logger.info(`Supabase initialisé [${config.env}]`);
 } else {
   // Client factice pour éviter les crashs en dev sans Supabase
   const dummyUrl = 'https://placeholder.supabase.co';
@@ -42,6 +45,7 @@ if (supabaseUrl && supabaseAnonKey) {
       detectSessionInUrl: false,
     },
   });
+  logger.warn('Supabase en mode factice (pas de config)');
 }
 
 export { supabase };

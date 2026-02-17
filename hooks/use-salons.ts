@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { salonService } from '@/services';
 import { Salon, SalonWithDetails, SalonFilters, Category, PaginatedResponse } from '@/types';
+import { getMockSalonById, isMockSalonId } from '@/lib/mock-salons';
 
 export function useSalons(filters?: SalonFilters) {
   const [salons, setSalons] = useState<Salon[]>([]);
@@ -68,11 +69,35 @@ export function useSalon(id: string) {
       setIsLoading(true);
       setError(null);
 
+      // Check mock data first for known mock / demo IDs
+      if (isMockSalonId(id)) {
+        const mockData = getMockSalonById(id);
+        if (mockData) {
+          setSalon(mockData);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       try {
         const data = await salonService.getSalonById(id);
-        setSalon(data);
+
+        // If Supabase returned nothing, try mock data as fallback
+        if (!data) {
+          const fallback = getMockSalonById(id);
+          setSalon(fallback);
+        } else {
+          setSalon(data);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+        // On error (e.g. Supabase not configured), try mock data as fallback
+        const fallback = getMockSalonById(id);
+        if (fallback) {
+          setSalon(fallback);
+          setError(null);
+        } else {
+          setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+        }
       } finally {
         setIsLoading(false);
       }

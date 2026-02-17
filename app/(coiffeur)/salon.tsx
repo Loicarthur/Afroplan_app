@@ -1,5 +1,11 @@
 /**
  * Page de gestion du salon - Espace Coiffeur AfroPlan
+ *
+ * Fixes applied:
+ * 1. All hardcoded French strings replaced with t() translations
+ * 2. Photo picker now offers Camera / Gallery / Cancel via ActionSheet
+ * 3. Save uses correct DB columns (image_url, cover_image_url, gallery_images, coiffeur_details.specialties)
+ * 4. Day labels use translation keys t('day.monday'), etc.
  */
 
 import React, { useState } from 'react';
@@ -11,6 +17,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -25,6 +32,7 @@ import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { logger } from '@/lib/config';
 
 // Liste des specialites de coiffure afro
 const AFRO_SPECIALTIES = [
@@ -47,15 +55,15 @@ const AFRO_SPECIALTIES = [
 
 const MAX_PHOTOS = 4;
 
-// Opening hours structure
+// Opening hours structure - keys only, labels come from translations
 const DAYS_OF_WEEK = [
-  { key: 'monday', label: 'Lundi', labelEn: 'Monday' },
-  { key: 'tuesday', label: 'Mardi', labelEn: 'Tuesday' },
-  { key: 'wednesday', label: 'Mercredi', labelEn: 'Wednesday' },
-  { key: 'thursday', label: 'Jeudi', labelEn: 'Thursday' },
-  { key: 'friday', label: 'Vendredi', labelEn: 'Friday' },
-  { key: 'saturday', label: 'Samedi', labelEn: 'Saturday' },
-  { key: 'sunday', label: 'Dimanche', labelEn: 'Sunday' },
+  { key: 'monday' },
+  { key: 'tuesday' },
+  { key: 'wednesday' },
+  { key: 'thursday' },
+  { key: 'friday' },
+  { key: 'saturday' },
+  { key: 'sunday' },
 ];
 
 interface DayHours {
@@ -80,7 +88,7 @@ export default function SalonManagementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, isAuthenticated } = useAuth();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -108,16 +116,77 @@ export default function SalonManagementScreen() {
   // Email par defaut (celui de l'inscription)
   const email = user?.email || '';
 
+  // ---------------------------------------------------------------------------
+  // Photo picker with Camera / Gallery ActionSheet
+  // ---------------------------------------------------------------------------
+
   const pickImage = async (index?: number) => {
     if (photos.length >= MAX_PHOTOS && index === undefined) {
-      Alert.alert('Limite atteinte', `Vous ne pouvez ajouter que ${MAX_PHOTOS} photos maximum.`);
+      Alert.alert(
+        t('salon.limitReached'),
+        t('salon.maxPhotosMessage', { max: MAX_PHOTOS }),
+      );
       return;
     }
 
+    // Show ActionSheet: Take photo / Choose from gallery / Cancel
+    Alert.alert(
+      t('salon.photoChoice'),
+      undefined,
+      [
+        {
+          text: t('salon.takePhoto'),
+          onPress: () => launchCamera(index),
+        },
+        {
+          text: t('salon.chooseFromGallery'),
+          onPress: () => launchGallery(index),
+        },
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  const launchCamera = async (index?: number) => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert(
+        t('salon.permissionRequired'),
+        t('salon.cameraPermission'),
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const newPhotos = [...photos];
+      if (index !== undefined) {
+        newPhotos[index] = result.assets[0].uri;
+      } else {
+        newPhotos.push(result.assets[0].uri);
+      }
+      setPhotos(newPhotos);
+    }
+  };
+
+  const launchGallery = async (index?: number) => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (permissionResult.granted === false) {
-      Alert.alert('Permission requise', 'Vous devez autoriser l\'acces a la galerie pour ajouter des photos.');
+      Alert.alert(
+        t('salon.permissionRequired'),
+        t('salon.galleryPermission'),
+      );
       return;
     }
 
@@ -139,21 +208,25 @@ export default function SalonManagementScreen() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Remove photo
+  // ---------------------------------------------------------------------------
+
   const removePhoto = (index: number) => {
     Alert.alert(
-      'Supprimer la photo',
-      'Voulez-vous vraiment supprimer cette photo?',
+      t('salon.deletePhoto'),
+      t('salon.deletePhotoConfirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             const newPhotos = photos.filter((_, i) => i !== index);
             setPhotos(newPhotos);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -172,6 +245,10 @@ export default function SalonManagementScreen() {
       [day]: { ...prev[day], [field]: value },
     }));
   };
+
+  // ---------------------------------------------------------------------------
+  // Save handler - uses correct DB schema
+  // ---------------------------------------------------------------------------
 
   const handleSave = async () => {
     // Validation
@@ -217,11 +294,21 @@ export default function SalonManagementScreen() {
               .getPublicUrl(data.path);
             photoUrls.push(urlData.publicUrl);
           }
-          if (error && __DEV__) console.warn('Photo upload error:', error);
+          if (error) {
+            logger.warn('Photo upload error:', error);
+          }
         }
 
+        // ---------------------------------------------------------------
         // Save salon to database
-        const salonData = {
+        // The salons table has image_url and cover_image_url, NOT photos/specialties.
+        // - image_url  = first photo (main)
+        // - cover_image_url = second photo (cover)
+        // - Additional photos go to gallery_images table
+        // - Specialties are stored in coiffeur_details.specialties (TEXT[])
+        // ---------------------------------------------------------------
+
+        const salonData: Record<string, unknown> = {
           owner_id: user?.id,
           name: salonName.trim(),
           description: description.trim(),
@@ -230,38 +317,102 @@ export default function SalonManagementScreen() {
           address: address.trim(),
           city: city.trim(),
           postal_code: postalCode.trim(),
-          specialties: selectedSpecialties,
-          photos: photoUrls,
+          image_url: photoUrls[0] || null,
+          cover_image_url: photoUrls[1] || null,
           opening_hours: openingHours,
           offers_home_service: offersHomeService,
-          home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0') * 100 : 0,
+          home_service_description: offersHomeService ? t('salon.homeServiceTravel') : null,
+          min_home_service_amount: offersHomeService ? parseInt(homeServiceFee || '0', 10) : 0,
           is_active: true,
         };
 
-        const { error: salonError } = await supabase
-          .from('salons')
-          .upsert(salonData, { onConflict: 'owner_id' });
+        logger.debug('Saving salon data:', salonData);
 
-        if (salonError) throw salonError;
+        const { data: salonResult, error: salonError } = await supabase
+          .from('salons')
+          .upsert(salonData, { onConflict: 'owner_id' })
+          .select()
+          .single();
+
+        if (salonError) {
+          logger.error('Salon upsert error:', salonError);
+          throw salonError;
+        }
+
+        logger.debug('Salon saved successfully:', salonResult?.id);
+
+        // ---------------------------------------------------------------
+        // Save gallery images (3rd and 4th photos) to gallery_images table
+        // ---------------------------------------------------------------
+        if (salonResult?.id && photoUrls.length > 2) {
+          // Remove existing gallery images for this salon before re-inserting
+          const { error: deleteGalleryError } = await supabase
+            .from('gallery_images')
+            .delete()
+            .eq('salon_id', salonResult.id);
+
+          if (deleteGalleryError) {
+            logger.warn('Gallery cleanup error:', deleteGalleryError);
+          }
+
+          const galleryInserts = photoUrls.slice(2).map((url, idx) => ({
+            salon_id: salonResult.id,
+            image_url: url,
+            order: idx,
+          }));
+
+          const { error: galleryError } = await supabase
+            .from('gallery_images')
+            .insert(galleryInserts);
+
+          if (galleryError) {
+            logger.warn('Gallery images insert error:', galleryError);
+          }
+        }
+
+        // ---------------------------------------------------------------
+        // Save specialties to coiffeur_details table (TEXT[] column)
+        // ---------------------------------------------------------------
+        if (user?.id) {
+          const { error: detailsError } = await supabase
+            .from('coiffeur_details')
+            .upsert(
+              {
+                user_id: user.id,
+                specialties: selectedSpecialties,
+                offers_home_service: offersHomeService,
+                home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0', 10) : 0,
+              },
+              { onConflict: 'user_id' },
+            );
+
+          if (detailsError) {
+            logger.warn('Coiffeur details upsert error:', detailsError);
+          }
+        }
       } else {
         // Demo mode - simulate save
+        logger.info('Demo mode: simulating salon save');
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
       Alert.alert(
         t('salon.saved'),
         t('salon.savedDesc'),
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     } catch (err) {
+      logger.error('Salon save error:', err);
       Alert.alert(t('common.error'), t('common.errorOccurred'));
-      if (__DEV__) console.warn('Salon save error:', err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Si pas connecté → écran invitant à se connecter
+  // ---------------------------------------------------------------------------
+  // Not authenticated - prompt to log in
+  // ---------------------------------------------------------------------------
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -269,24 +420,32 @@ export default function SalonManagementScreen() {
           <View style={styles.authIconContainer}>
             <Ionicons name="storefront" size={48} color={colors.textMuted} />
           </View>
-          <Text style={[styles.authTitle, { color: colors.text }]}>Mon salon</Text>
+          <Text style={[styles.authTitle, { color: colors.text }]}>
+            {t('salon.mySalon')}
+          </Text>
           <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
-            Connectez-vous pour créer et gérer votre salon, ajouter vos photos et spécialités
+            {t('salon.loginMessage')}
           </Text>
           <TouchableOpacity
             style={styles.authButton}
             onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
             activeOpacity={0.8}
           >
-            <Text style={styles.authButtonText}>Se connecter</Text>
+            <Text style={styles.authButtonText}>{t('salon.connectLogin')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
-            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte Pro</Text>
+            <Text style={[styles.authLink, { color: colors.primary }]}>
+              {t('salon.createPro')}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Main salon form
+  // ---------------------------------------------------------------------------
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -294,10 +453,10 @@ export default function SalonManagementScreen() {
         {/* Photos du salon */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Photos du salon ({photos.length}/{MAX_PHOTOS})
+            {t('salon.photos')} ({photos.length}/{MAX_PHOTOS})
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Ajoutez jusqu&apos;a {MAX_PHOTOS} photos de votre salon
+            {t('salon.addPhotos', { max: MAX_PHOTOS })}
           </Text>
 
           <View style={styles.photosGrid}>
@@ -336,7 +495,7 @@ export default function SalonManagementScreen() {
                   <View style={styles.photoPlaceholder}>
                     <Ionicons name="add-circle-outline" size={32} color={colors.textMuted} />
                     <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>
-                      Ajouter
+                      {t('common.add')}
                     </Text>
                   </View>
                 )}
@@ -348,14 +507,14 @@ export default function SalonManagementScreen() {
         {/* Informations du salon */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Informations du salon
+            {t('salon.info')}
           </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Nom du salon *</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.name')} *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: Afro Beauty Paris"
+              placeholder={t('salon.namePlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={salonName}
               onChangeText={setSalonName}
@@ -363,10 +522,10 @@ export default function SalonManagementScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.description')}</Text>
             <TextInput
               style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Decrivez votre salon, vos specialites..."
+              placeholder={t('salon.descriptionPlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={description}
               onChangeText={setDescription}
@@ -376,10 +535,10 @@ export default function SalonManagementScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Telephone *</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.phone')} *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: +33 6 12 34 56 78"
+              placeholder={t('salon.phonePlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={phone}
               onChangeText={setPhone}
@@ -388,14 +547,14 @@ export default function SalonManagementScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.email')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.backgroundSecondary, color: colors.textSecondary, borderColor: colors.border }]}
               value={email}
               editable={false}
             />
             <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-              L&apos;email est celui de votre compte et ne peut pas etre modifie
+              {t('salon.emailHint')}
             </Text>
           </View>
         </View>
@@ -403,14 +562,14 @@ export default function SalonManagementScreen() {
         {/* Localisation */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Localisation
+            {t('salon.location')}
           </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Adresse *</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.address')} *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: 123 Rue de la Paix"
+              placeholder={t('salon.addressPlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={address}
               onChangeText={setAddress}
@@ -419,17 +578,17 @@ export default function SalonManagementScreen() {
 
           <View style={styles.inputRow}>
             <View style={[styles.inputGroup, { flex: 2 }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Ville *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.city')} *</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="Ex: Paris"
+                placeholder={t('salon.cityPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={city}
                 onChangeText={setCity}
               />
             </View>
             <View style={[styles.inputGroup, { flex: 1, marginLeft: Spacing.md }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Code postal *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.postalCode')} *</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                 placeholder="75001"
@@ -445,10 +604,10 @@ export default function SalonManagementScreen() {
         {/* Specialites */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Specialites de coiffure afro
+            {t('salon.specialties')}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Selectionnez vos specialites ({selectedSpecialties.length} selectionnees)
+            {t('salon.selectSpecialties', { count: selectedSpecialties.length })}
           </Text>
 
           <View style={styles.specialtiesGrid}>
@@ -516,7 +675,7 @@ export default function SalonManagementScreen() {
                     styles.dayLabel,
                     { color: hours.closed ? colors.textMuted : colors.text },
                   ]}>
-                    {language === 'en' ? day.labelEn : day.label}
+                    {t(`day.${day.key}`)}
                   </Text>
                 </TouchableOpacity>
                 {!hours.closed ? (
@@ -541,7 +700,7 @@ export default function SalonManagementScreen() {
                   </View>
                 ) : (
                   <Text style={[styles.closedText, { color: colors.textMuted }]}>
-                    {language === 'en' ? 'Closed' : 'Fermé'}
+                    {t('common.closed')}
                   </Text>
                 )}
               </View>
@@ -549,7 +708,7 @@ export default function SalonManagementScreen() {
           })}
         </View>
 
-        {/* Service à domicile */}
+        {/* Service a domicile */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('salon.homeService')}
@@ -580,7 +739,7 @@ export default function SalonManagementScreen() {
                 {t('salon.homeService')}
               </Text>
               <Text style={[styles.homeServiceDesc, { color: colors.textSecondary }]}>
-                {language === 'en' ? 'I can travel to clients' : 'Je me déplace chez les clients'}
+                {t('salon.homeServiceTravel')}
               </Text>
             </View>
             <Ionicons name="home-outline" size={24} color={offersHomeService ? colors.primary : colors.textMuted} />
@@ -588,7 +747,7 @@ export default function SalonManagementScreen() {
 
           {offersHomeService && (
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.homeServiceFee')} (€)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.homeServiceFee')} ({'\u20AC'})</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                 placeholder="Ex: 15"

@@ -2,10 +2,15 @@
  * Language Context - AfroPlan
  * Système de traduction multi-langues
  * Langues supportées: FR, EN, DE, ES
+ *
+ * - Détecte automatiquement la langue du téléphone au premier lancement
+ * - Persiste le choix via AsyncStorage
+ * - Fournit la fonction t() pour traduire toutes les chaînes de l'app
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform, NativeModules } from 'react-native';
 
 // Types
 export type Language = 'fr' | 'en' | 'de' | 'es';
@@ -13,8 +18,9 @@ export type Language = 'fr' | 'en' | 'de' | 'es';
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => Promise<void>;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   languages: { code: Language; name: string; flag: string }[];
+  isReady: boolean;
 }
 
 // Available languages
@@ -25,7 +31,35 @@ const LANGUAGES = [
   { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
 ];
 
-// Translations
+// ---------------------------------------------------------------------------
+// Détection de la langue du téléphone
+// ---------------------------------------------------------------------------
+function getDeviceLocale(): Language {
+  try {
+    let locale = 'fr';
+
+    if (Platform.OS === 'ios') {
+      locale =
+        NativeModules.SettingsManager?.settings?.AppleLocale ||
+        NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] ||
+        'fr';
+    } else if (Platform.OS === 'android') {
+      locale = NativeModules.I18nManager?.localeIdentifier || 'fr';
+    }
+
+    const lang = locale.substring(0, 2).toLowerCase();
+    if (['fr', 'en', 'de', 'es'].includes(lang)) {
+      return lang as Language;
+    }
+  } catch {
+    // Silencieux
+  }
+  return 'fr';
+}
+
+// ---------------------------------------------------------------------------
+// Traductions
+// ---------------------------------------------------------------------------
 const translations: Record<Language, Record<string, string>> = {
   fr: {
     // Common
@@ -42,7 +76,29 @@ const translations: Record<Language, Record<string, string>> = {
     'common.back': 'Retour',
     'common.search': 'Rechercher',
     'common.seeAll': 'Voir tout',
+    'common.seeLess': 'Voir moins',
     'common.seeResults': 'Voir les résultats',
+    'common.add': 'Ajouter',
+    'common.errorOccurred': 'Une erreur est survenue. Veuillez réessayer.',
+    'common.available': 'Dispo',
+    'common.open': 'Ouvert',
+    'common.closed': 'Fermé',
+    'common.verified': 'Vérifié',
+    'common.results': 'résultat(s)',
+    'common.found': 'trouvé(s)',
+    'common.both': 'Les deux',
+    'common.reset': 'Réinitialiser',
+    'common.support': 'Support',
+    'common.terms': 'CGU',
+    'common.privacy': 'Confidentialité',
+    'common.joinUs': 'Rejoignez-nous',
+    'common.copyright': '© 2025 AfroPlan. Tous droits réservés.',
+    'common.today': "Aujourd'hui",
+    'common.pending': 'En attente',
+    'common.confirmed': 'Confirmé',
+    'common.start': 'Commencer',
+    'common.newMessages': '{count} nouveaux',
+    'common.warning': 'Attention',
 
     // Auth
     'auth.login': 'Connexion',
@@ -55,10 +111,17 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.hasAccount': 'Déjà un compte ?',
     'auth.loginRequired': 'Connexion requise',
     'auth.loginRequiredMessage': 'Vous devez être connecté pour effectuer un paiement.',
-    'common.errorOccurred': 'Une erreur est survenue. Veuillez réessayer.',
+    'auth.loginRequiredBooking': 'Vous devez être connecté pour réserver.',
+    'auth.loginRequiredFavorite': 'Vous devez être connecté pour ajouter aux favoris.',
+    'auth.loginToSee': 'Connectez-vous pour voir les détails du salon et réserver',
+    'auth.createAccount': 'Créer un compte',
+    'auth.logoutConfirm': 'Êtes-vous sûr de vouloir vous déconnecter ?',
+    'auth.logoutAction': 'Déconnecter',
 
     // Home
     'home.welcome': 'Bienvenue sur AfroPlan',
+    'home.hello': 'Bonjour {name}',
+    'home.readyForHairstyle': 'Prêt(e) pour une nouvelle coiffure ?',
     'home.searchSalon': 'Rechercher mon salon / coiffeur',
     'home.searchSubtitle': 'Trouve le style qui te correspond',
     'home.promotions': 'Offres du moment',
@@ -90,6 +153,16 @@ const translations: Record<Language, Record<string, string>> = {
     'search.paymentInfo': 'Tu pourras choisir de payer le montant total ou un acompte lors de la réservation.',
     'search.canGoBack': 'Tu peux revenir en arrière à tout moment',
     'search.quickPay': 'Paiement rapide',
+    'search.placeholder': 'Salon, coiffeur, style...',
+    'search.title': 'Recherche',
+    'search.advancedFilters': 'Filtres avancés',
+    'search.maxDistanceLabel': 'Distance maximum',
+    'search.minRating': 'Note minimum',
+    'search.location': 'Lieu',
+    'search.onlyPromotions': 'Uniquement les promotions',
+    'search.seeResultsCount': 'Voir {count} résultats',
+    'search.searchStyle': 'Rechercher un style...',
+    'search.styleGallery': 'Galerie de Styles',
 
     // Booking
     'booking.book': 'Réserver',
@@ -100,6 +173,8 @@ const translations: Record<Language, Record<string, string>> = {
     'booking.yourBookings': 'Mes réservations',
     'booking.upcoming': 'À venir',
     'booking.past': 'Passées',
+    'booking.selectService': 'Veuillez sélectionner un service',
+    'booking.reservation': 'Réservation',
 
     // Chat
     'chat.writeMessage': 'Écrivez votre message...',
@@ -126,6 +201,22 @@ const translations: Record<Language, Record<string, string>> = {
     'coiffeur.createProAccount': 'Créer mon compte Pro',
     'coiffeur.needPhotoHelp': 'Besoin d\'aide pour vos photos ?',
     'coiffeur.photoHelpDesc': 'Si vous avez des difficultés pour des prises de photos professionnelles, contactez-nous et nous viendrons vous aider gratuitement !',
+    'coiffeur.space': 'Espace Coiffeur',
+    'coiffeur.launchActivity': 'Lancez votre activité',
+    'coiffeur.createSalonDesc': 'Créez votre salon en quelques clics et recevez des réservations',
+    'coiffeur.createMySalon': 'Créer mon salon',
+    'coiffeur.createSalonCTA': 'Configurez votre salon et commencez à recevoir des réservations dès maintenant',
+    'coiffeur.greeting.morning': 'Bonjour',
+    'coiffeur.greeting.afternoon': 'Bon après-midi',
+    'coiffeur.greeting.evening': 'Bonsoir',
+    'coiffeur.updateError': 'Impossible de mettre à jour votre profil. Réessayez.',
+    'coiffeur.monthlyRevenue': 'Revenus (mois)',
+    'coiffeur.quickActions': 'Actions rapides',
+    'coiffeur.manageMySalon': 'Gérer mon salon',
+    'coiffeur.manageMyServices': 'Gérer mes services',
+    'coiffeur.seeReservations': 'Voir les réservations',
+    'coiffeur.clientMessages': 'Messages clients',
+    'coiffeur.upcomingAppointments': 'Prochains rendez-vous',
 
     // Profile
     'profile.myProfile': 'Mon profil',
@@ -134,6 +225,20 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.notifications': 'Notifications',
     'profile.help': 'Aide',
     'profile.about': 'À propos',
+    'profile.loginMessage': 'Connectez-vous pour gérer votre profil, vos rendez-vous et vos messages',
+    'profile.coiffeurMode': 'Mode Coiffeur',
+    'profile.switchToCoiffeur': 'Basculer vers l\'espace coiffeur',
+    'profile.myAppointments': 'Mes rendez-vous',
+    'profile.messages': 'Messages',
+    'profile.account': 'Compte',
+    'profile.logoutButton': 'Se déconnecter',
+
+    // Favorites
+    'favorites.title': 'Favoris',
+    'favorites.yourFavorites': 'Vos favoris',
+    'favorites.loginMessage': 'Connectez-vous pour sauvegarder vos salons et styles préférés',
+    'favorites.subtitle': 'Vos salons et styles préférés',
+    'favorites.salons': 'Salons',
 
     // Hairstyles
     'hairstyle.tresses': 'Tresses',
@@ -202,9 +307,9 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.fullPayment': 'Paiement intégral',
     'checkout.commission': 'Commission AfroPlan',
 
-    // Salon Registration
+    // Salon Registration & Detail
     'salon.photos': 'Photos du salon',
-    'salon.addPhotos': 'Ajoutez jusqu\'à 4 photos de votre salon',
+    'salon.addPhotos': 'Ajoutez jusqu\'à {max} photos de votre salon',
     'salon.info': 'Informations du salon',
     'salon.name': 'Nom du salon',
     'salon.description': 'Description',
@@ -217,6 +322,7 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.postalCode': 'Code postal',
     'salon.specialties': 'Spécialités de coiffure afro',
     'salon.selectedSpecialties': 'sélectionnées',
+    'salon.selectSpecialties': 'Sélectionnez vos spécialités ({count} sélectionnées)',
     'salon.save': 'Enregistrer les modifications',
     'salon.saving': 'Enregistrement...',
     'salon.saved': 'Salon enregistré !',
@@ -225,12 +331,54 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.homeService': 'Service à domicile',
     'salon.homeServiceDesc': 'Proposez-vous un service à domicile ?',
     'salon.homeServiceFee': 'Frais de déplacement',
+    'salon.homeServiceTravel': 'Je me déplace chez les clients',
     'salon.connectLogin': 'Se connecter',
     'salon.createPro': 'Créer un compte Pro',
+    'salon.mySalon': 'Mon salon',
+    'salon.loginMessage': 'Connectez-vous pour créer et gérer votre salon, ajouter vos photos et spécialités',
+    'salon.limitReached': 'Limite atteinte',
+    'salon.maxPhotosMessage': 'Vous ne pouvez ajouter que {max} photos maximum.',
+    'salon.permissionRequired': 'Permission requise',
+    'salon.galleryPermission': 'Vous devez autoriser l\'accès à la galerie pour ajouter des photos.',
+    'salon.cameraPermission': 'Vous devez autoriser l\'accès à la caméra pour prendre des photos.',
+    'salon.deletePhoto': 'Supprimer la photo',
+    'salon.deletePhotoConfirm': 'Voulez-vous vraiment supprimer cette photo ?',
+    'salon.notFound': 'Salon introuvable',
+    'salon.notFoundDesc': 'Ce salon n\'existe pas ou a été supprimé.',
+    'salon.about': 'À propos',
+    'salon.services': 'Services',
+    'salon.gallery': 'Galerie',
+    'salon.noServices': 'Aucun service disponible',
+    'salon.selectServiceHint': 'Sélectionnez un service',
+    'salon.call': 'Appeler',
+    'salon.directions': 'Itinéraire',
+    'salon.photoChoice': 'Ajouter une photo',
+    'salon.takePhoto': 'Prendre une photo',
+    'salon.chooseFromGallery': 'Choisir depuis la galerie',
+    'salon.namePlaceholder': 'Ex: Afro Beauty Paris',
+    'salon.descriptionPlaceholder': 'Décrivez votre salon, vos spécialités...',
+    'salon.phonePlaceholder': 'Ex: +33 6 12 34 56 78',
+    'salon.addressPlaceholder': 'Ex: 123 Rue de la Paix',
+    'salon.cityPlaceholder': 'Ex: Paris',
+
+    // Tabs
+    'tab.home': 'Accueil',
+    'tab.styles': 'Styles',
+    'tab.search': 'Recherche',
+    'tab.favorites': 'Favoris',
+    'tab.profile': 'Profil',
+
+    // Days
+    'day.monday': 'Lundi',
+    'day.tuesday': 'Mardi',
+    'day.wednesday': 'Mercredi',
+    'day.thursday': 'Jeudi',
+    'day.friday': 'Vendredi',
+    'day.saturday': 'Samedi',
+    'day.sunday': 'Dimanche',
   },
 
   en: {
-    // Common
     'common.loading': 'Loading...',
     'common.error': 'Error',
     'common.success': 'Success',
@@ -244,11 +392,29 @@ const translations: Record<Language, Record<string, string>> = {
     'common.back': 'Back',
     'common.search': 'Search',
     'common.seeAll': 'See all',
+    'common.seeLess': 'See less',
     'common.seeResults': 'See results',
-
+    'common.add': 'Add',
     'common.errorOccurred': 'An error occurred. Please try again.',
-
-    // Auth
+    'common.available': 'Available',
+    'common.open': 'Open',
+    'common.closed': 'Closed',
+    'common.verified': 'Verified',
+    'common.results': 'result(s)',
+    'common.found': 'found',
+    'common.both': 'Both',
+    'common.reset': 'Reset',
+    'common.support': 'Support',
+    'common.terms': 'Terms',
+    'common.privacy': 'Privacy',
+    'common.joinUs': 'Join us',
+    'common.copyright': '© 2025 AfroPlan. All rights reserved.',
+    'common.today': 'Today',
+    'common.pending': 'Pending',
+    'common.confirmed': 'Confirmed',
+    'common.start': 'Get started',
+    'common.newMessages': '{count} new',
+    'common.warning': 'Warning',
     'auth.login': 'Login',
     'auth.register': 'Sign up',
     'auth.logout': 'Logout',
@@ -256,12 +422,18 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.password': 'Password',
     'auth.loginRequired': 'Login required',
     'auth.loginRequiredMessage': 'You must be logged in to make a payment.',
+    'auth.loginRequiredBooking': 'You must be logged in to book.',
+    'auth.loginRequiredFavorite': 'You must be logged in to add to favorites.',
+    'auth.loginToSee': 'Log in to see salon details and book',
+    'auth.createAccount': 'Create account',
     'auth.forgotPassword': 'Forgot password?',
     'auth.noAccount': 'No account?',
     'auth.hasAccount': 'Already have an account?',
-
-    // Home
+    'auth.logoutConfirm': 'Are you sure you want to log out?',
+    'auth.logoutAction': 'Log out',
     'home.welcome': 'Welcome to AfroPlan',
+    'home.hello': 'Hello {name}',
+    'home.readyForHairstyle': 'Ready for a new hairstyle?',
     'home.searchSalon': 'Search my salon / hairstylist',
     'home.searchSubtitle': 'Find the style that suits you',
     'home.promotions': 'Current offers',
@@ -272,8 +444,6 @@ const translations: Record<Language, Record<string, string>> = {
     'home.areYouCoiffeur': 'Are you a hairstylist?',
     'home.joinAfroPlanPro': 'Join AfroPlan Pro and grow your business',
     'home.discoverPro': 'Discover AfroPlan Pro',
-
-    // Search Flow
     'search.findCoiffeur': 'Easily find your afro hairstylist',
     'search.quickQuestions': 'A few quick questions to suggest the best salons for your needs.',
     'search.chooseStyle': 'Choose your hairstyle',
@@ -293,8 +463,16 @@ const translations: Record<Language, Record<string, string>> = {
     'search.paymentInfo': 'You can choose to pay the full amount or a deposit when booking.',
     'search.canGoBack': 'You can go back at any time',
     'search.quickPay': 'Quick pay',
-
-    // Booking
+    'search.placeholder': 'Salon, hairstylist, style...',
+    'search.title': 'Search',
+    'search.advancedFilters': 'Advanced filters',
+    'search.maxDistanceLabel': 'Maximum distance',
+    'search.minRating': 'Minimum rating',
+    'search.location': 'Location',
+    'search.onlyPromotions': 'Promotions only',
+    'search.seeResultsCount': 'See {count} results',
+    'search.searchStyle': 'Search a style...',
+    'search.styleGallery': 'Style Gallery',
     'booking.book': 'Book',
     'booking.confirmed': 'Confirmed',
     'booking.pending': 'Pending',
@@ -303,8 +481,8 @@ const translations: Record<Language, Record<string, string>> = {
     'booking.yourBookings': 'My bookings',
     'booking.upcoming': 'Upcoming',
     'booking.past': 'Past',
-
-    // Chat
+    'booking.selectService': 'Please select a service',
+    'booking.reservation': 'Reservation',
     'chat.writeMessage': 'Write your message...',
     'chat.online': 'Online',
     'chat.reservationConfirmed': 'Booking confirmed! You can now chat.',
@@ -312,8 +490,6 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.onMyWay': "I'm on my way",
     'chat.whatTime': 'What time exactly?',
     'chat.sendAddress': 'Can you send me the address?',
-
-    // Coiffeur Dashboard
     'coiffeur.developActivity': 'Grow your business',
     'coiffeur.joinCommunity': 'Join the AfroPlan Pro community and boost your salon',
     'coiffeur.rdvManagement': 'Booking management',
@@ -329,16 +505,40 @@ const translations: Record<Language, Record<string, string>> = {
     'coiffeur.createProAccount': 'Create my Pro account',
     'coiffeur.needPhotoHelp': 'Need help with your photos?',
     'coiffeur.photoHelpDesc': 'If you have trouble taking professional photos, contact us and we\'ll come help you for free!',
-
-    // Profile
+    'coiffeur.space': 'Hairstylist Space',
+    'coiffeur.launchActivity': 'Launch your business',
+    'coiffeur.createSalonDesc': 'Create your salon in a few clicks and start receiving bookings',
+    'coiffeur.createMySalon': 'Create my salon',
+    'coiffeur.createSalonCTA': 'Set up your salon and start receiving bookings now',
+    'coiffeur.greeting.morning': 'Good morning',
+    'coiffeur.greeting.afternoon': 'Good afternoon',
+    'coiffeur.greeting.evening': 'Good evening',
+    'coiffeur.updateError': 'Unable to update your profile. Please try again.',
+    'coiffeur.monthlyRevenue': 'Revenue (month)',
+    'coiffeur.quickActions': 'Quick actions',
+    'coiffeur.manageMySalon': 'Manage my salon',
+    'coiffeur.manageMyServices': 'Manage my services',
+    'coiffeur.seeReservations': 'See reservations',
+    'coiffeur.clientMessages': 'Client messages',
+    'coiffeur.upcomingAppointments': 'Upcoming appointments',
     'profile.myProfile': 'My profile',
     'profile.settings': 'Settings',
     'profile.language': 'Language',
     'profile.notifications': 'Notifications',
     'profile.help': 'Help',
     'profile.about': 'About',
-
-    // Hairstyles
+    'profile.loginMessage': 'Log in to manage your profile, appointments and messages',
+    'profile.coiffeurMode': 'Hairstylist Mode',
+    'profile.switchToCoiffeur': 'Switch to hairstylist space',
+    'profile.myAppointments': 'My appointments',
+    'profile.messages': 'Messages',
+    'profile.account': 'Account',
+    'profile.logoutButton': 'Log out',
+    'favorites.title': 'Favorites',
+    'favorites.yourFavorites': 'Your favorites',
+    'favorites.loginMessage': 'Log in to save your favorite salons and styles',
+    'favorites.subtitle': 'Your favorite salons and styles',
+    'favorites.salons': 'Salons',
     'hairstyle.tresses': 'Braids',
     'hairstyle.locks': 'Locs',
     'hairstyle.coupe': 'Cut',
@@ -347,8 +547,6 @@ const translations: Record<Language, Record<string, string>> = {
     'hairstyle.tissage': 'Weave',
     'hairstyle.cornrows': 'Cornrows',
     'hairstyle.afro': 'Afro',
-
-    // Role selection
     'role.chooseSpace': 'Choose your space',
     'role.clientSpace': 'Client Space',
     'role.clientSubtitle': 'Find your afro hairstylist and book in a few clicks',
@@ -361,8 +559,6 @@ const translations: Record<Language, Record<string, string>> = {
     'role.switchRole': 'Switch path',
     'role.switchToClient': 'Switch to Client mode',
     'role.switchToCoiffeur': 'Switch to Hairstylist mode',
-
-    // Onboarding
     'onboarding.slide1Title': 'Passionate hairstylists',
     'onboarding.slide1Subtitle': 'Afro hair specialists near you',
     'onboarding.slide2Title': 'Find your perfect style',
@@ -370,15 +566,11 @@ const translations: Record<Language, Record<string, string>> = {
     'onboarding.slide3Title': 'Book in a few clicks',
     'onboarding.slide3Subtitle': 'Simple, fast and stress-free',
     'onboarding.touchToContinue': 'Tap to continue',
-
-    // Geolocation
     'geo.enableLocation': 'Enable location',
     'geo.locationDesc': 'To find salons near you',
     'geo.permissionDenied': 'Location permission denied',
     'geo.maxDistance': 'Maximum distance',
     'geo.nearbyRadius': 'Search radius',
-
-    // Checkout & Payment
     'checkout.title': 'Payment',
     'checkout.secure': 'Secure',
     'checkout.yourBooking': 'Your booking',
@@ -404,10 +596,8 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.depositOnly': 'Deposit only',
     'checkout.fullPayment': 'Full payment',
     'checkout.commission': 'AfroPlan commission',
-
-    // Salon Registration
     'salon.photos': 'Salon photos',
-    'salon.addPhotos': 'Add up to 4 photos of your salon',
+    'salon.addPhotos': 'Add up to {max} photos of your salon',
     'salon.info': 'Salon information',
     'salon.name': 'Salon name',
     'salon.description': 'Description',
@@ -420,6 +610,7 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.postalCode': 'Postal code',
     'salon.specialties': 'Afro hairstyling specialties',
     'salon.selectedSpecialties': 'selected',
+    'salon.selectSpecialties': 'Select your specialties ({count} selected)',
     'salon.save': 'Save changes',
     'salon.saving': 'Saving...',
     'salon.saved': 'Salon saved!',
@@ -428,12 +619,50 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.homeService': 'Home service',
     'salon.homeServiceDesc': 'Do you offer home service?',
     'salon.homeServiceFee': 'Travel fee',
+    'salon.homeServiceTravel': 'I travel to clients',
     'salon.connectLogin': 'Log in',
     'salon.createPro': 'Create Pro account',
+    'salon.mySalon': 'My salon',
+    'salon.loginMessage': 'Log in to create and manage your salon, add photos and specialties',
+    'salon.limitReached': 'Limit reached',
+    'salon.maxPhotosMessage': 'You can add up to {max} photos.',
+    'salon.permissionRequired': 'Permission required',
+    'salon.galleryPermission': 'You must allow gallery access to add photos.',
+    'salon.cameraPermission': 'You must allow camera access to take photos.',
+    'salon.deletePhoto': 'Delete photo',
+    'salon.deletePhotoConfirm': 'Do you really want to delete this photo?',
+    'salon.notFound': 'Salon not found',
+    'salon.notFoundDesc': 'This salon does not exist or has been deleted.',
+    'salon.about': 'About',
+    'salon.services': 'Services',
+    'salon.gallery': 'Gallery',
+    'salon.noServices': 'No services available',
+    'salon.selectServiceHint': 'Select a service',
+    'salon.call': 'Call',
+    'salon.directions': 'Directions',
+    'salon.photoChoice': 'Add a photo',
+    'salon.takePhoto': 'Take a photo',
+    'salon.chooseFromGallery': 'Choose from gallery',
+    'salon.namePlaceholder': 'E.g.: Afro Beauty Paris',
+    'salon.descriptionPlaceholder': 'Describe your salon, specialties...',
+    'salon.phonePlaceholder': 'E.g.: +33 6 12 34 56 78',
+    'salon.addressPlaceholder': 'E.g.: 123 Main Street',
+    'salon.cityPlaceholder': 'E.g.: Paris',
+    'tab.home': 'Home',
+    'tab.styles': 'Styles',
+    'tab.search': 'Search',
+    'tab.favorites': 'Favorites',
+    'tab.profile': 'Profile',
+    'day.monday': 'Monday',
+    'day.tuesday': 'Tuesday',
+    'day.wednesday': 'Wednesday',
+    'day.thursday': 'Thursday',
+    'day.friday': 'Friday',
+    'day.saturday': 'Saturday',
+    'day.sunday': 'Sunday',
   },
 
   de: {
-    // Common
     'common.loading': 'Laden...',
     'common.error': 'Fehler',
     'common.success': 'Erfolg',
@@ -447,9 +676,15 @@ const translations: Record<Language, Record<string, string>> = {
     'common.back': 'Zurück',
     'common.search': 'Suchen',
     'common.seeAll': 'Alle anzeigen',
+    'common.seeLess': 'Weniger anzeigen',
     'common.seeResults': 'Ergebnisse anzeigen',
-
-    // Auth
+    'common.add': 'Hinzufügen',
+    'common.errorOccurred': 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.',
+    'common.available': 'Verfügbar',
+    'common.open': 'Geöffnet',
+    'common.closed': 'Geschlossen',
+    'common.verified': 'Verifiziert',
+    'common.copyright': '© 2025 AfroPlan. Alle Rechte vorbehalten.',
     'auth.login': 'Anmelden',
     'auth.register': 'Registrieren',
     'auth.logout': 'Abmelden',
@@ -458,9 +693,10 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.forgotPassword': 'Passwort vergessen?',
     'auth.noAccount': 'Kein Konto?',
     'auth.hasAccount': 'Bereits ein Konto?',
-
-    // Home
+    'auth.loginRequired': 'Anmeldung erforderlich',
     'home.welcome': 'Willkommen bei AfroPlan',
+    'home.hello': 'Hallo {name}',
+    'home.readyForHairstyle': 'Bereit für eine neue Frisur?',
     'home.searchSalon': 'Meinen Salon / Friseur suchen',
     'home.searchSubtitle': 'Finde den Stil, der zu dir passt',
     'home.promotions': 'Aktuelle Angebote',
@@ -471,72 +707,6 @@ const translations: Record<Language, Record<string, string>> = {
     'home.areYouCoiffeur': 'Bist du Friseur(in)?',
     'home.joinAfroPlanPro': 'Tritt AfroPlan Pro bei und entwickle dein Geschäft',
     'home.discoverPro': 'AfroPlan Pro entdecken',
-
-    // Search Flow
-    'search.findCoiffeur': 'Finde einfach deinen Afro-Friseur',
-    'search.quickQuestions': 'Ein paar schnelle Fragen, um dir die besten Salons vorzuschlagen.',
-    'search.chooseStyle': 'Wähle deine Frisur',
-    'search.whatStyle': 'Welchen Stil möchtest du?',
-    'search.quickFilter': 'Schnellfilter',
-    'search.optional': 'Optional - Suche verfeinern',
-    'search.hairType': 'Haartyp',
-    'search.whereCoiffeur': 'Wo möchtest du frisiert werden?',
-    'search.inSalon': 'Im Salon',
-    'search.atHome': 'Zu Hause',
-    'search.goToSalon': 'Zum Salon gehen',
-    'search.coiffeurComesHome': 'Der Friseur kommt zu dir',
-    'search.budgetDistance': 'Budget & Entfernung',
-    'search.maxBudget': 'Maximales Budget',
-    'search.maxDistance': 'Maximale Entfernung',
-    'search.showAllSalons': 'Ich möchte alle Salons sehen (Filter ignorieren)',
-    'search.paymentInfo': 'Du kannst bei der Buchung wählen, ob du den vollen Betrag oder eine Anzahlung bezahlen möchtest.',
-    'search.canGoBack': 'Du kannst jederzeit zurückgehen',
-
-    // Booking
-    'booking.book': 'Buchen',
-    'booking.confirmed': 'Bestätigt',
-    'booking.pending': 'Ausstehend',
-    'booking.cancelled': 'Storniert',
-    'booking.completed': 'Abgeschlossen',
-    'booking.yourBookings': 'Meine Buchungen',
-    'booking.upcoming': 'Bevorstehend',
-    'booking.past': 'Vergangen',
-
-    // Chat
-    'chat.writeMessage': 'Schreibe deine Nachricht...',
-    'chat.online': 'Online',
-    'chat.reservationConfirmed': 'Buchung bestätigt! Ihr könnt jetzt chatten.',
-    'chat.willBeLate': 'Ich werde etwas später sein',
-    'chat.onMyWay': 'Ich bin unterwegs',
-    'chat.whatTime': 'Um wie viel Uhr genau?',
-    'chat.sendAddress': 'Kannst du mir die Adresse schicken?',
-
-    // Coiffeur Dashboard
-    'coiffeur.developActivity': 'Entwickle dein Geschäft',
-    'coiffeur.joinCommunity': 'Tritt der AfroPlan Pro Community bei und steigere deinen Salon',
-    'coiffeur.rdvManagement': 'Terminverwaltung',
-    'coiffeur.manageReservations': 'Verwalte deine Buchungen einfach',
-    'coiffeur.moreClients': 'Mehr Kunden',
-    'coiffeur.increaseVisibility': 'Steigere deine Sichtbarkeit',
-    'coiffeur.statistics': 'Statistiken',
-    'coiffeur.trackPerformance': 'Verfolge deine Leistung',
-    'coiffeur.payments': 'Zahlungen',
-    'coiffeur.securePayment': 'Sicher bezahlt werden',
-    'coiffeur.readyToStart': 'Bereit loszulegen?',
-    'coiffeur.registerFree': 'Registriere dich kostenlos und beginne Buchungen zu erhalten',
-    'coiffeur.createProAccount': 'Mein Pro-Konto erstellen',
-    'coiffeur.needPhotoHelp': 'Brauchst du Hilfe mit deinen Fotos?',
-    'coiffeur.photoHelpDesc': 'Wenn du Schwierigkeiten hast, professionelle Fotos zu machen, kontaktiere uns und wir kommen kostenlos helfen!',
-
-    // Profile
-    'profile.myProfile': 'Mein Profil',
-    'profile.settings': 'Einstellungen',
-    'profile.language': 'Sprache',
-    'profile.notifications': 'Benachrichtigungen',
-    'profile.help': 'Hilfe',
-    'profile.about': 'Über',
-
-    // Hairstyles
     'hairstyle.tresses': 'Zöpfe',
     'hairstyle.locks': 'Locks',
     'hairstyle.coupe': 'Schnitt',
@@ -545,10 +715,25 @@ const translations: Record<Language, Record<string, string>> = {
     'hairstyle.tissage': 'Weave',
     'hairstyle.cornrows': 'Cornrows',
     'hairstyle.afro': 'Afro',
+    'salon.openingHours': 'Öffnungszeiten',
+    'salon.homeService': 'Hausbesuch',
+    'salon.homeServiceDesc': 'Bieten Sie Hausbesuche an?',
+    'salon.homeServiceTravel': 'Ich fahre zu Kunden',
+    'tab.home': 'Startseite',
+    'tab.styles': 'Stile',
+    'tab.search': 'Suche',
+    'tab.favorites': 'Favoriten',
+    'tab.profile': 'Profil',
+    'day.monday': 'Montag',
+    'day.tuesday': 'Dienstag',
+    'day.wednesday': 'Mittwoch',
+    'day.thursday': 'Donnerstag',
+    'day.friday': 'Freitag',
+    'day.saturday': 'Samstag',
+    'day.sunday': 'Sonntag',
   },
 
   es: {
-    // Common
     'common.loading': 'Cargando...',
     'common.error': 'Error',
     'common.success': 'Éxito',
@@ -562,9 +747,15 @@ const translations: Record<Language, Record<string, string>> = {
     'common.back': 'Atrás',
     'common.search': 'Buscar',
     'common.seeAll': 'Ver todo',
+    'common.seeLess': 'Ver menos',
     'common.seeResults': 'Ver resultados',
-
-    // Auth
+    'common.add': 'Añadir',
+    'common.errorOccurred': 'Ha ocurrido un error. Inténtelo de nuevo.',
+    'common.available': 'Disponible',
+    'common.open': 'Abierto',
+    'common.closed': 'Cerrado',
+    'common.verified': 'Verificado',
+    'common.copyright': '© 2025 AfroPlan. Todos los derechos reservados.',
     'auth.login': 'Iniciar sesión',
     'auth.register': 'Registrarse',
     'auth.logout': 'Cerrar sesión',
@@ -573,9 +764,10 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.forgotPassword': '¿Olvidaste tu contraseña?',
     'auth.noAccount': '¿No tienes cuenta?',
     'auth.hasAccount': '¿Ya tienes cuenta?',
-
-    // Home
+    'auth.loginRequired': 'Inicio de sesión requerido',
     'home.welcome': 'Bienvenido a AfroPlan',
+    'home.hello': 'Hola {name}',
+    'home.readyForHairstyle': '¿Listo para un nuevo peinado?',
     'home.searchSalon': 'Buscar mi salón / estilista',
     'home.searchSubtitle': 'Encuentra el estilo que te queda',
     'home.promotions': 'Ofertas actuales',
@@ -586,72 +778,6 @@ const translations: Record<Language, Record<string, string>> = {
     'home.areYouCoiffeur': '¿Eres estilista?',
     'home.joinAfroPlanPro': 'Únete a AfroPlan Pro y haz crecer tu negocio',
     'home.discoverPro': 'Descubrir AfroPlan Pro',
-
-    // Search Flow
-    'search.findCoiffeur': 'Encuentra fácilmente tu estilista afro',
-    'search.quickQuestions': 'Algunas preguntas rápidas para sugerirte los mejores salones.',
-    'search.chooseStyle': 'Elige tu peinado',
-    'search.whatStyle': '¿Qué estilo te gustaría?',
-    'search.quickFilter': 'Filtro rápido',
-    'search.optional': 'Opcional - Refina tu búsqueda',
-    'search.hairType': 'Tipo de cabello',
-    'search.whereCoiffeur': '¿Dónde te gustaría peinarte?',
-    'search.inSalon': 'En el salón',
-    'search.atHome': 'A domicilio',
-    'search.goToSalon': 'Ir al salón',
-    'search.coiffeurComesHome': 'El estilista viene a ti',
-    'search.budgetDistance': 'Presupuesto y Distancia',
-    'search.maxBudget': 'Presupuesto máximo',
-    'search.maxDistance': 'Distancia máxima',
-    'search.showAllSalons': 'Quiero ver todos los salones (ignorar filtros)',
-    'search.paymentInfo': 'Puedes elegir pagar el monto total o un anticipo al reservar.',
-    'search.canGoBack': 'Puedes volver atrás en cualquier momento',
-
-    // Booking
-    'booking.book': 'Reservar',
-    'booking.confirmed': 'Confirmado',
-    'booking.pending': 'Pendiente',
-    'booking.cancelled': 'Cancelado',
-    'booking.completed': 'Completado',
-    'booking.yourBookings': 'Mis reservas',
-    'booking.upcoming': 'Próximas',
-    'booking.past': 'Pasadas',
-
-    // Chat
-    'chat.writeMessage': 'Escribe tu mensaje...',
-    'chat.online': 'En línea',
-    'chat.reservationConfirmed': '¡Reserva confirmada! Ya pueden chatear.',
-    'chat.willBeLate': 'Llegaré un poco tarde',
-    'chat.onMyWay': 'Estoy en camino',
-    'chat.whatTime': '¿A qué hora exactamente?',
-    'chat.sendAddress': '¿Puedes enviarme la dirección?',
-
-    // Coiffeur Dashboard
-    'coiffeur.developActivity': 'Haz crecer tu negocio',
-    'coiffeur.joinCommunity': 'Únete a la comunidad AfroPlan Pro y potencia tu salón',
-    'coiffeur.rdvManagement': 'Gestión de citas',
-    'coiffeur.manageReservations': 'Gestiona fácilmente tus reservas',
-    'coiffeur.moreClients': 'Más clientes',
-    'coiffeur.increaseVisibility': 'Aumenta tu visibilidad',
-    'coiffeur.statistics': 'Estadísticas',
-    'coiffeur.trackPerformance': 'Sigue tu rendimiento',
-    'coiffeur.payments': 'Pagos',
-    'coiffeur.securePayment': 'Cobra de forma segura',
-    'coiffeur.readyToStart': '¿Listo para empezar?',
-    'coiffeur.registerFree': 'Regístrate gratis y empieza a recibir reservas',
-    'coiffeur.createProAccount': 'Crear mi cuenta Pro',
-    'coiffeur.needPhotoHelp': '¿Necesitas ayuda con tus fotos?',
-    'coiffeur.photoHelpDesc': 'Si tienes dificultades para tomar fotos profesionales, ¡contáctanos y te ayudaremos gratis!',
-
-    // Profile
-    'profile.myProfile': 'Mi perfil',
-    'profile.settings': 'Configuración',
-    'profile.language': 'Idioma',
-    'profile.notifications': 'Notificaciones',
-    'profile.help': 'Ayuda',
-    'profile.about': 'Acerca de',
-
-    // Hairstyles
     'hairstyle.tresses': 'Trenzas',
     'hairstyle.locks': 'Locks',
     'hairstyle.coupe': 'Corte',
@@ -660,6 +786,22 @@ const translations: Record<Language, Record<string, string>> = {
     'hairstyle.tissage': 'Tejido',
     'hairstyle.cornrows': 'Cornrows',
     'hairstyle.afro': 'Afro',
+    'salon.openingHours': 'Horario de apertura',
+    'salon.homeService': 'Servicio a domicilio',
+    'salon.homeServiceDesc': '¿Ofreces servicio a domicilio?',
+    'salon.homeServiceTravel': 'Me desplazo a los clientes',
+    'tab.home': 'Inicio',
+    'tab.styles': 'Estilos',
+    'tab.search': 'Búsqueda',
+    'tab.favorites': 'Favoritos',
+    'tab.profile': 'Perfil',
+    'day.monday': 'Lunes',
+    'day.tuesday': 'Martes',
+    'day.wednesday': 'Miércoles',
+    'day.thursday': 'Jueves',
+    'day.friday': 'Viernes',
+    'day.saturday': 'Sábado',
+    'day.sunday': 'Domingo',
   },
 };
 
@@ -669,8 +811,9 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>('fr');
+  const [isReady, setIsReady] = useState(false);
 
-  // Load saved language on mount
+  // Load saved language on mount, or detect device locale
   useEffect(() => {
     loadSavedLanguage();
   }, []);
@@ -680,9 +823,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (savedLanguage && ['fr', 'en', 'de', 'es'].includes(savedLanguage)) {
         setLanguageState(savedLanguage as Language);
+      } else {
+        // Premier lancement : détecter la langue du téléphone
+        const deviceLang = getDeviceLocale();
+        setLanguageState(deviceLang);
+        await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, deviceLang);
       }
-    } catch (error) {
-      console.error('Error loading language:', error);
+    } catch {
+      // Fallback silencieux
+    } finally {
+      setIsReady(true);
     }
   };
 
@@ -690,15 +840,21 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     try {
       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
       setLanguageState(lang);
-    } catch (error) {
-      console.error('Error saving language:', error);
+    } catch {
+      // Fallback silencieux
     }
   };
 
-  // Translation function
-  const t = (key: string): string => {
-    return translations[language][key] || key;
-  };
+  // Translation function with parameter interpolation
+  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
+    let text = translations[language][key] || translations['fr'][key] || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      });
+    }
+    return text;
+  }, [language]);
 
   return (
     <LanguageContext.Provider
@@ -707,6 +863,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         setLanguage,
         t,
         languages: LANGUAGES,
+        isReady,
       }}
     >
       {children}

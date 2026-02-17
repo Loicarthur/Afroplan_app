@@ -179,13 +179,14 @@ const TIPS_AND_INSPIRATION = [
 function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { t } = useLanguage();
 
   return (
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll}>
-          <Text style={[styles.seeAll, { color: '#191919' }]}>Voir tout</Text>
+          <Text style={[styles.seeAll, { color: '#191919' }]}>{t('common.seeAll')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -303,10 +304,10 @@ export default function HomeScreen() {
           {isAuthenticated && profile && (
             <View style={styles.welcomeMessage}>
               <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-                Bonjour {profile.full_name?.split(' ')[0] || 'toi'} 👋
+                {t('home.hello', { name: profile.full_name?.split(' ')[0] || 'toi' })} 👋
               </Text>
               <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                Prêt(e) pour une nouvelle coiffure ?
+                {t('home.readyForHairstyle')}
               </Text>
             </View>
           )}
@@ -326,8 +327,8 @@ export default function HomeScreen() {
                 <Ionicons name="search" size={24} color="#FFFFFF" />
               </View>
               <View style={styles.searchTextContainer}>
-                <Text style={styles.searchButtonTitle}>Rechercher mon salon / coiffeur</Text>
-                <Text style={styles.searchButtonSubtitle}>Trouve le style qui te correspond</Text>
+                <Text style={styles.searchButtonTitle}>{t('home.searchSalon')}</Text>
+                <Text style={styles.searchButtonSubtitle}>{t('home.searchSubtitle')}</Text>
               </View>
             </View>
             <Ionicons name="arrow-forward-circle" size={32} color="#191919" />
@@ -339,7 +340,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(300).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Offres du moment" />
+          <SectionHeader title={t('home.promotions')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -365,7 +366,7 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <SectionHeader
-            title="Styles de coiffure"
+            title={t('home.hairstyles')}
             onSeeAll={() => setShowAllStyles(!showAllStyles)}
           />
           <View style={styles.stylesGrid}>
@@ -387,7 +388,7 @@ export default function HomeScreen() {
               style={styles.showLessButton}
               onPress={() => setShowAllStyles(false)}
             >
-              <Text style={[styles.showLessText, { color: '#191919' }]}>Voir moins</Text>
+              <Text style={[styles.showLessText, { color: '#191919' }]}>{t('common.seeLess')}</Text>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -397,7 +398,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(400).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Coiffeurs à proximité" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -413,7 +414,7 @@ export default function HomeScreen() {
                   <Image source={{ uri: coiffeur.image }} style={styles.coiffeurImage} contentFit="cover" />
                   {coiffeur.available && (
                     <View style={styles.availableBadge}>
-                      <Text style={styles.availableText}>Dispo</Text>
+                      <Text style={styles.availableText}>{t('common.available')}</Text>
                     </View>
                   )}
                 </View>
@@ -443,7 +444,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(450).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Salons populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
           {POPULAR_SALONS.map((salon) => (
             <TouchableOpacity
               key={salon.id}
@@ -456,7 +457,7 @@ export default function HomeScreen() {
                   <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
                   {salon.openNow && (
                     <View style={styles.openBadge}>
-                      <Text style={styles.openBadgeText}>Ouvert</Text>
+                      <Text style={styles.openBadgeText}>{t('common.open')}</Text>
                     </View>
                   )}
                 </View>
@@ -484,7 +485,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(500).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Conseils & Inspiration" />
+          <SectionHeader title={t('home.tipsAndInspiration')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -518,15 +519,15 @@ export default function HomeScreen() {
           <View style={styles.ctaCard}>
             <View style={styles.ctaContent}>
               <Ionicons name="cut" size={32} color="#FFFFFF" />
-              <Text style={styles.ctaTitle}>Tu es coiffeur(se) ?</Text>
+              <Text style={styles.ctaTitle}>{t('home.areYouCoiffeur')}</Text>
               <Text style={styles.ctaSubtitle}>
-                Rejoins AfroPlan Pro et développe ton activité
+                {t('home.joinAfroPlanPro')}
               </Text>
               <TouchableOpacity
                 style={styles.ctaButton}
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
               >
-                <Text style={styles.ctaButtonText}>Découvrir AfroPlan Pro</Text>
+                <Text style={styles.ctaButtonText}>{t('home.discoverPro')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#191919" />
               </TouchableOpacity>
             </View>
@@ -538,21 +539,21 @@ export default function HomeScreen() {
           <View style={styles.footerTop}>
             <View style={styles.footerLinks}>
               <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>Support</Text>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>{t('common.support')}</Text>
               </TouchableOpacity>
               <Text style={styles.footerDot}>•</Text>
               <TouchableOpacity onPress={() => router.push('/terms')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>CGU</Text>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>{t('common.terms')}</Text>
               </TouchableOpacity>
               <Text style={styles.footerDot}>•</Text>
               <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>Confidentialité</Text>
+                <Text style={[styles.footerLink, { color: '#191919' }]}>{t('common.privacy')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.socialSection}>
-            <Text style={styles.socialTitle}>Rejoignez-nous</Text>
+            <Text style={styles.socialTitle}>{t('common.joinUs')}</Text>
             <View style={styles.socialLinks}>
               <TouchableOpacity
                 style={styles.socialButton}
@@ -576,7 +577,7 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.copyright}>
-            © 2024 AfroPlan. Tous droits réservés.
+            {t('common.copyright')}
           </Text>
         </View>
 
@@ -587,7 +588,7 @@ export default function HomeScreen() {
       <AuthGuardModal
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        message="Connectez-vous pour voir les détails du salon et réserver"
+        message={t('auth.loginToSee')}
       />
     </SafeAreaView>
   );
