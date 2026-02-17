@@ -176,76 +176,87 @@ export default function SalonManagementScreen() {
   const handleSave = async () => {
     // Validation
     if (!salonName.trim()) {
-      Alert.alert(t('common.error'), t('salon.name') + ' *');
+      Alert.alert(t('common.error'), 'Le nom du salon est requis');
       return;
     }
     if (!address.trim() || !city.trim() || !postalCode.trim()) {
-      Alert.alert(t('common.error'), t('salon.address') + ' *');
+      Alert.alert(t('common.error'), 'L\'adresse complete est requise');
       return;
     }
     if (!phone.trim()) {
-      Alert.alert(t('common.error'), t('salon.phone') + ' *');
+      Alert.alert(t('common.error'), 'Le telephone est requis');
       return;
     }
     if (selectedSpecialties.length === 0) {
-      Alert.alert(t('common.error'), t('salon.specialties') + ' *');
+      Alert.alert(t('common.error'), 'Selectionnez au moins une specialite');
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        'Configuration requise',
+        'La connexion au serveur n\'est pas configuree. Verifiez votre fichier .env.'
+      );
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert(t('common.error'), 'Vous devez etre connecte pour creer un salon.');
       return;
     }
 
     setIsSaving(true);
 
     try {
-      if (isSupabaseConfigured()) {
-        // Upload photos to Supabase Storage
-        const photoUrls: string[] = [];
-        for (const photoUri of photos) {
-          if (photoUri.startsWith('http')) {
-            photoUrls.push(photoUri);
-            continue;
-          }
-          // Upload local photo
-          const fileName = `salon_${user?.id}_${Date.now()}_${photoUrls.length}.jpg`;
-          const response = await fetch(photoUri);
-          const blob = await response.blob();
-          const { data, error } = await supabase.storage
-            .from('salon-photos')
-            .upload(fileName, blob, { contentType: 'image/jpeg' });
-
-          if (data) {
-            const { data: urlData } = supabase.storage
-              .from('salon-photos')
-              .getPublicUrl(data.path);
-            photoUrls.push(urlData.publicUrl);
-          }
-          if (error && __DEV__) console.warn('Photo upload error:', error);
+      // Upload photos to Supabase Storage
+      const photoUrls: string[] = [];
+      for (const photoUri of photos) {
+        if (photoUri.startsWith('http')) {
+          photoUrls.push(photoUri);
+          continue;
         }
+        const fileName = `salon_${user.id}_${Date.now()}_${photoUrls.length}.jpg`;
+        const response = await fetch(photoUri);
+        const blob = await response.blob();
+        const { data, error } = await supabase.storage
+          .from('salon-photos')
+          .upload(fileName, blob, { contentType: 'image/jpeg' });
 
-        // Save salon to database
-        const salonData = {
-          owner_id: user?.id,
-          name: salonName.trim(),
-          description: description.trim(),
-          phone: phone.trim(),
-          email: email,
-          address: address.trim(),
-          city: city.trim(),
-          postal_code: postalCode.trim(),
-          specialties: selectedSpecialties,
-          photos: photoUrls,
-          opening_hours: openingHours,
-          offers_home_service: offersHomeService,
-          home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0') * 100 : 0,
-          is_active: true,
-        };
+        if (data) {
+          const { data: urlData } = supabase.storage
+            .from('salon-photos')
+            .getPublicUrl(data.path);
+          photoUrls.push(urlData.publicUrl);
+        }
+        if (error && __DEV__) console.warn('Photo upload error:', error);
+      }
 
-        const { error: salonError } = await supabase
-          .from('salons')
-          .upsert(salonData, { onConflict: 'owner_id' });
+      const salonPayload = {
+        name: salonName.trim(),
+        description: description.trim(),
+        phone: phone.trim(),
+        email: email,
+        address: address.trim(),
+        city: city.trim(),
+        postal_code: postalCode.trim(),
+        specialties: selectedSpecialties,
+        photos: photoUrls,
+        opening_hours: openingHours,
+        offers_home_service: offersHomeService,
+        home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0') * 100 : 0,
+        is_active: true,
+      };
 
-        if (salonError) throw salonError;
+      // Check if a salon already exists for this user
+      const existingSalon = await salonService.getSalonByOwnerId(user.id);
+
+      if (existingSalon) {
+        await salonService.updateSalon(existingSalon.id, salonPayload as any);
       } else {
-        // Demo mode - simulate save
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await salonService.createSalon({
+          ...salonPayload,
+          owner_id: user.id,
+        } as any);
       }
 
       Alert.alert(
@@ -253,8 +264,9 @@ export default function SalonManagementScreen() {
         t('salon.savedDesc'),
         [{ text: 'OK' }]
       );
-    } catch (err) {
-      Alert.alert(t('common.error'), t('common.errorOccurred'));
+    } catch (err: any) {
+      const errorMessage = err?.message || t('common.errorOccurred');
+      Alert.alert(t('common.error'), errorMessage);
       if (__DEV__) console.warn('Salon save error:', err);
     } finally {
       setIsSaving(false);
