@@ -1,66 +1,81 @@
-import { ExpoConfig, ConfigContext } from 'expo/config';
+import { ExpoConfig, ConfigContext } from "expo/config";
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const appEnv = process.env.EXPO_PUBLIC_APP_ENV ?? 'development';
+  // 1) EAS fournit EXPO_PUBLIC_APP_ENV via eas.json
+  const appEnv = process.env.EXPO_PUBLIC_APP_ENV ?? "development";
+
+  // 2) Charge automatiquement .env.preview / .env.production etc.
+  const envFile = `.env.${appEnv}`;
+  const envPath = path.resolve(__dirname, envFile);
+
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    console.log(`Loaded env file: ${envFile}`);
+  } else {
+    console.warn(`Env file not found: ${envFile}`);
+  }
 
   return {
     ...config,
-    name: appEnv === 'production' ? 'AfroPlan' : `AfroPlan (${appEnv})`,
-    slug: 'afroplan',
-    version: '1.0.0',
-    orientation: 'portrait',
-    icon: './assets/images/icon.png',
-    scheme: 'afroplan',
-    userInterfaceStyle: 'automatic',
+    name: appEnv === "production" ? "AfroPlan" : `AfroPlan (${appEnv})`,
+    slug: "afroplan",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "afroplan",
+    userInterfaceStyle: "automatic",
     newArchEnabled: true,
     splash: {
-      image: './assets/images/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#191919',
+      image: "./assets/images/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#191919",
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.afroplan.app',
+      bundleIdentifier: "com.afroplan.app",
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/images/android-icon-foreground.png',
-        backgroundImage: './assets/images/android-icon-background.png',
-        monochromeImage: './assets/images/android-icon-monochrome.png',
+        foregroundImage: "./assets/images/android-icon-foreground.png",
+        backgroundImage: "./assets/images/android-icon-background.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
-      package: 'com.afroplan.app',
+      package: "com.afroplan.app",
       versionCode: 1,
       permissions: [
-        'android.permission.INTERNET',
-        'android.permission.CAMERA',
-        'android.permission.READ_EXTERNAL_STORAGE',
-        'android.permission.RECORD_AUDIO',
-        'android.permission.ACCESS_FINE_LOCATION',
-        'android.permission.ACCESS_COARSE_LOCATION',
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
       ],
     },
     web: {
-      bundler: 'metro',
-      output: 'static',
-      favicon: './assets/images/favicon.png',
+      bundler: "metro",
+      output: "static",
+      favicon: "./assets/images/favicon.png",
     },
     plugins: [
-      'expo-router',
-      'expo-secure-store',
-      'expo-image-picker',
+      "expo-router",
+      "expo-secure-store",
+      "expo-image-picker",
       [
-        'expo-location',
+        "expo-location",
         {
           locationAlwaysAndWhenInUsePermission:
-            'AfroPlan utilise votre position pour trouver les salons de coiffure près de chez vous.',
+            "AfroPlan utilise votre position pour trouver les salons de coiffure près de chez vous.",
           locationWhenInUsePermission:
-            'AfroPlan utilise votre position pour trouver les salons de coiffure près de chez vous.',
+            "AfroPlan utilise votre position pour trouver les salons de coiffure près de chez vous.",
         },
       ],
       [
-        '@stripe/stripe-react-native',
+        "@stripe/stripe-react-native",
         {
-          merchantIdentifier: 'merchant.com.afroplan.app',
+          merchantIdentifier: "merchant.com.afroplan.app",
           enableGooglePay: true,
         },
       ],
@@ -73,7 +88,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         origin: false,
       },
       eas: {
-        projectId: 'b133bcbd-6f4e-465b-99d8-66efa944eaa9',
+        projectId: "b133bcbd-6f4e-465b-99d8-66efa944eaa9",
       },
       appEnv,
     },
