@@ -71,7 +71,7 @@ export default function CoiffeurProfilScreen() {
   // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.authPrompt}>
           <View style={styles.authIconContainer}>
             <Ionicons name="person" size={48} color={colors.textMuted} />
@@ -122,7 +122,7 @@ export default function CoiffeurProfilScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
