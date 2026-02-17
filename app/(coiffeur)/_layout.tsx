@@ -74,6 +74,14 @@ export default function CoiffeurLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          headerShown: false,
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
