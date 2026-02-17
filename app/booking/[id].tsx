@@ -149,16 +149,25 @@ export default function BookingScreen() {
 
     try {
       // Simuler la creation de reservation
-      // En production, cela appellerait le service de booking
+      // En production, cela appellerait le service de booking et retournerait un bookingId
       await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const bookingId = `booking-${Date.now()}`;
 
       Alert.alert(
         'Reservation confirmee!',
-        `Votre reservation a ete confirmee.\n\nDate: ${formatDate(selectedDate).day} ${formatDate(selectedDate).date} ${formatDate(selectedDate).month}\nHeure: ${selectedSlot.start}\nService: ${serviceName}\n\nMontant paye: ${paymentDetails.amountNow} EUR\nReste a payer: ${paymentDetails.amountLater} EUR`,
+        `Votre reservation a ete confirmee.\n\nDate: ${formatDate(selectedDate).day} ${formatDate(selectedDate).date} ${formatDate(selectedDate).month}\nHeure: ${selectedSlot.start}\nService: ${serviceName}\n\nMontant paye: ${paymentDetails.amountNow} EUR\nReste a payer: ${paymentDetails.amountLater} EUR\n\nVous pouvez desormais echanger avec votre coiffeur.`,
         [
           {
-            text: 'OK',
-            onPress: () => router.replace('/(tabs)/bookings'),
+            text: 'Envoyer un message',
+            onPress: () => router.replace({
+              pathname: '/chat/[bookingId]',
+              params: { bookingId },
+            }),
+          },
+          {
+            text: 'Mes reservations',
+            onPress: () => router.replace('/(tabs)/reservations'),
           },
         ]
       );

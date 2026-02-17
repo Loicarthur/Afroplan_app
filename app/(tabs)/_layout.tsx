@@ -45,13 +45,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookings"
+        name="reservations"
         options={{
-          title: 'Styles',
+          title: 'Rendez-vous',
           headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'grid' : 'grid-outline'}
+              name={focused ? 'calendar' : 'calendar-outline'}
               size={24}
               color={color}
             />
@@ -98,6 +98,14 @@ export default function TabLayout() {
               color={color}
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'Styles',
+          headerShown: false,
+          href: null,
         }}
       />
     </Tabs>
