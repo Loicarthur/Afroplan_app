@@ -562,12 +562,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => openLink('https://tiktok.com/@afroplan')}
-              >
-                <Ionicons name="logo-tiktok" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
                 onPress={() => openLink('https://www.linkedin.com/company/afro-plan/')}
               >
                 <Ionicons name="logo-linkedin" size={20} color="#FFFFFF" />
