@@ -1,0 +1,412 @@
+/**
+ * Page Reservations Client - AfroPlan
+ * Liste des rendez-vous du client avec statuts et acces au chat
+ */
+
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Image } from 'expo-image';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+
+interface Booking {
+  id: string;
+  salonName: string;
+  salonImage: string;
+  service: string;
+  date: string;
+  time: string;
+  price: number;
+  status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
+  coiffeurName: string;
+}
+
+const MOCK_BOOKINGS: Booking[] = [
+  {
+    id: 'booking-1',
+    salonName: 'Bella Coiffure',
+    salonImage: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200',
+    service: 'Tresses africaines',
+    date: 'Aujourd\'hui',
+    time: '14h00',
+    price: 65,
+    status: 'confirmed',
+    coiffeurName: 'Marie Kone',
+  },
+  {
+    id: 'booking-2',
+    salonName: 'Afro Style Studio',
+    salonImage: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200',
+    service: 'Locks entretien',
+    date: 'Demain',
+    time: '10h00',
+    price: 45,
+    status: 'pending',
+    coiffeurName: 'Fatou Diallo',
+  },
+  {
+    id: 'booking-3',
+    salonName: 'Natural Beauty',
+    salonImage: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
+    service: 'Coupe + Coloration',
+    date: '15 Jan 2025',
+    time: '11h00',
+    price: 80,
+    status: 'completed',
+    coiffeurName: 'Aminata Bamba',
+  },
+];
+
+export default function ClientReservationsScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const { isAuthenticated } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.emptyState}>
+          <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Mes reservations</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Connectez-vous pour voir vos rendez-vous
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={styles.loginButtonText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const getStatusColor = (status: Booking['status']) => {
+    switch (status) {
+      case 'confirmed': return colors.success;
+      case 'pending': return colors.accent;
+      case 'completed': return colors.textMuted;
+      case 'cancelled': return colors.error;
+    }
+  };
+
+  const getStatusLabel = (status: Booking['status']) => {
+    switch (status) {
+      case 'confirmed': return 'Confirme';
+      case 'pending': return 'En attente';
+      case 'completed': return 'Termine';
+      case 'cancelled': return 'Annule';
+    }
+  };
+
+  const getStatusIcon = (status: Booking['status']) => {
+    switch (status) {
+      case 'confirmed': return 'checkmark-circle';
+      case 'pending': return 'time';
+      case 'completed': return 'checkmark-done-circle';
+      case 'cancelled': return 'close-circle';
+    }
+  };
+
+  const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'confirmed' || b.status === 'pending');
+  const pastBookings = MOCK_BOOKINGS.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  const displayedBookings = filter === 'upcoming' ? upcomingBookings : pastBookings;
+
+  const renderBooking = ({ item }: { item: Booking }) => (
+    <TouchableOpacity
+      style={[styles.bookingCard, { backgroundColor: colors.card }, Shadows.sm]}
+      onPress={() => router.push({
+        pathname: '/chat/[bookingId]',
+        params: { bookingId: item.id },
+      })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.bookingHeader}>
+        <Image source={{ uri: item.salonImage }} style={styles.salonImage} contentFit="cover" />
+        <View style={styles.bookingInfo}>
+          <Text style={[styles.salonName, { color: colors.text }]} numberOfLines={1}>
+            {item.salonName}
+          </Text>
+          <Text style={[styles.serviceName, { color: colors.textSecondary }]} numberOfLines={1}>
+            {item.service}
+          </Text>
+          <Text style={[styles.coiffeurName, { color: colors.textMuted }]}>
+            avec {item.coiffeurName}
+          </Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+          <Ionicons name={getStatusIcon(item.status) as any} size={14} color={getStatusColor(item.status)} />
+          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+            {getStatusLabel(item.status)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.bookingFooter, { borderTopColor: colors.border }]}>
+        <View style={styles.dateTimeRow}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+          <Text style={[styles.dateText, { color: colors.text }]}>{item.date}</Text>
+          <Ionicons name="time-outline" size={16} color={colors.primary} />
+          <Text style={[styles.dateText, { color: colors.text }]}>{item.time}</Text>
+        </View>
+        <Text style={[styles.priceText, { color: colors.primary }]}>{item.price} EUR</Text>
+      </View>
+
+      {(item.status === 'confirmed' || item.status === 'pending') && (
+        <TouchableOpacity
+          style={[styles.chatButton, { backgroundColor: colors.primary + '15' }]}
+          onPress={() => router.push({
+            pathname: '/chat/[bookingId]',
+            params: { bookingId: item.id },
+          })}
+        >
+          <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+          <Text style={[styles.chatButtonText, { color: colors.primary }]}>
+            Envoyer un message
+          </Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Mes reservations</Text>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === 'upcoming' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+          ]}
+          onPress={() => setFilter('upcoming')}
+        >
+          <Text style={[
+            styles.filterTabText,
+            { color: filter === 'upcoming' ? colors.primary : colors.textMuted },
+          ]}>
+            A venir ({upcomingBookings.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === 'past' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+          ]}
+          onPress={() => setFilter('past')}
+        >
+          <Text style={[
+            styles.filterTabText,
+            { color: filter === 'past' ? colors.primary : colors.textMuted },
+          ]}>
+            Passees ({pastBookings.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {displayedBookings.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {filter === 'upcoming' ? 'Aucun rendez-vous a venir' : 'Aucun rendez-vous passe'}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Decouvrez nos salons et prenez rendez-vous !
+          </Text>
+          {filter === 'upcoming' && (
+            <TouchableOpacity
+              style={styles.exploreButton}
+              onPress={() => router.push('/(tabs)/explore')}
+            >
+              <Text style={styles.exploreButtonText}>Explorer les salons</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={displayedBookings}
+          keyExtractor={(item) => item.id}
+          renderItem={renderBooking}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  headerTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+  filterTabText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  listContent: {
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  bookingCard: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  salonImage: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
+  },
+  bookingInfo: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  salonName: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  serviceName: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  coiffeurName: {
+    fontSize: FontSizes.xs,
+    marginTop: 2,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    gap: 4,
+  },
+  statusText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+  },
+  bookingFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dateText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '500',
+    marginRight: Spacing.sm,
+  },
+  priceText: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  chatButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    marginTop: Spacing.md,
+  },
+  emptyText: {
+    fontSize: FontSizes.md,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: Spacing.sm,
+  },
+  loginButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.lg,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  exploreButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.lg,
+  },
+  exploreButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+});
