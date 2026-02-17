@@ -5,8 +5,8 @@
 
 import { supabase } from '@/lib/supabase';
 
-// Acompte fixe à la réservation (en centimes)
-export const BOOKING_DEPOSIT = 1000; // 10€ d'acompte
+// Taux d'acompte à la réservation (20% du prix du service)
+export const DEPOSIT_RATE = 0.20; // 20% du prix du service
 
 // Commission fixe AfroPlan: 20% sur chaque transaction
 // S'applique sur l'acompte ou le paiement intégral
@@ -84,7 +84,7 @@ export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 
 export interface PaymentIntent {
   id: string;
   bookingId: string;
-  depositAmount: number;      // Acompte payé par le client (10€)
+  depositAmount: number;      // Acompte payé par le client (20% du service)
   totalServicePrice: number;  // Prix total du service
   remainingAmount: number;    // Reste à payer au salon
   commission: number;         // Commission AfroPlan sur l'acompte
@@ -108,10 +108,18 @@ export interface StripeAccount {
 
 export const paymentService = {
   /**
+   * Calculer le montant de l'acompte (20% du prix du service)
+   */
+  calculateDeposit(totalServicePrice: number): number {
+    return Math.round(totalServicePrice * DEPOSIT_RATE);
+  },
+
+  /**
    * Calculer la commission sur l'acompte
-   * L'acompte est toujours de 10€, la commission est prise dessus
+   * L'acompte est de 20% du prix du service, la commission est prise dessus
    */
   calculateDepositCommission(
+    totalServicePrice: number,
     plan: SubscriptionPlan = 'free'
   ): {
     depositAmount: number;
@@ -119,7 +127,7 @@ export const paymentService = {
     salonDepositAmount: number;
     commissionRate: number;
   } {
-    const depositAmount = BOOKING_DEPOSIT; // 10€ = 1000 centimes
+    const depositAmount = Math.round(totalServicePrice * DEPOSIT_RATE);
     const commissionRate = COMMISSION_RATES[plan];
     const commission = Math.round(depositAmount * commissionRate);
     const salonDepositAmount = depositAmount - commission;
@@ -186,9 +194,9 @@ export const paymentService = {
       payAmount = totalServicePrice;
       remainingAmount = 0;
     } else {
-      // Acompte - le client paie 10€ maintenant, le reste au salon
-      payAmount = BOOKING_DEPOSIT;
-      remainingAmount = totalServicePrice - BOOKING_DEPOSIT;
+      // Acompte de 20% - le client paie 20% maintenant, le reste au salon
+      payAmount = Math.round(totalServicePrice * DEPOSIT_RATE);
+      remainingAmount = totalServicePrice - payAmount;
     }
 
     // Commission AfroPlan sur le montant payé en ligne

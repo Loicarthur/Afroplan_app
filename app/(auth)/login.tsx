@@ -3,7 +3,7 @@
  * Design responsive amélioré
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { Button, Input, SuccessModal } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -44,7 +44,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
-  const [showSuccess, setShowSuccess] = useState(false);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
@@ -81,8 +80,8 @@ export default function LoginScreen() {
 
     try {
       await signIn(email, password);
-      // Afficher la modale de succès — la redirection se fait via le useEffect sur profile
-      setShowSuccess(true);
+      // Redirection directe vers la page d'accueil sans modal
+      redirectToApp();
     } catch (error) {
       Alert.alert(
         'Erreur de connexion',
@@ -91,29 +90,23 @@ export default function LoginScreen() {
     }
   };
 
-  // Rediriger quand le profil se charge (si modale déjà fermée)
-  useEffect(() => {
-    if (profile?.role && !showSuccess && hasRedirected.current === false && showSuccess === false) {
-      // Le profil vient de se charger après la modale — on redirige
-    }
-  }, [profile, showSuccess]);
-
-  const redirectToApp = () => {
+  const redirectToApp = useCallback(() => {
     if (hasRedirected.current) return;
     hasRedirected.current = true;
-    // Utiliser le rôle du profil si dispo, sinon le rôle sélectionné
     const role = profile?.role || selectedRole;
     if (role === 'coiffeur') {
       router.replace('/(coiffeur)');
     } else {
       router.replace('/(tabs)');
     }
-  };
+  }, [profile?.role, selectedRole]);
 
-  const handleSuccessDismiss = () => {
-    setShowSuccess(false);
-    redirectToApp();
-  };
+  // Rediriger quand le profil se charge après connexion
+  useEffect(() => {
+    if (profile?.role && hasRedirected.current === false) {
+      redirectToApp();
+    }
+  }, [profile, redirectToApp]);
 
   const isClient = selectedRole === 'client';
   const roleColor = '#191919';
@@ -236,15 +229,17 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-              onPress={() => Alert.alert('Info', 'Connexion Apple à venir')}
-            >
-              <Ionicons name="logo-apple" size={20} color={colors.text} />
-              <Text style={[styles.socialButtonText, { color: colors.text }]}>
-                Apple
-              </Text>
-            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                onPress={() => Alert.alert('Info', 'Connexion Apple à venir')}
+              >
+                <Ionicons name="logo-apple" size={20} color={colors.text} />
+                <Text style={[styles.socialButtonText, { color: colors.text }]}>
+                  Apple
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Register Link */}
@@ -275,13 +270,6 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modale de succès */}
-      <SuccessModal
-        visible={showSuccess}
-        title="Connexion réussie"
-        message="Bienvenue sur AfroPlan !"
-        onDismiss={handleSuccessDismiss}
-      />
     </SafeAreaView>
   );
 }

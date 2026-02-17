@@ -17,7 +17,6 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -29,8 +28,6 @@ import * as Location from 'expo-location';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Types de coiffure pour filtres
 const HAIRSTYLE_FILTERS = [
@@ -206,6 +203,7 @@ export default function SearchScreen() {
     if (viewMode === 'map' && !userLocation) {
       requestLocationPermission();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode]);
 
   const openDirections = (latitude: number, longitude: number, name: string) => {
@@ -397,10 +395,10 @@ export default function SearchScreen() {
             {/* Salon markers */}
             {filteredSalons.map((salon, index) => {
               const positions = [
-                { top: '25%', left: '30%' },
-                { top: '35%', left: '65%' },
-                { top: '60%', left: '20%' },
-                { top: '55%', left: '75%' },
+                { top: '25%' as const, left: '30%' as const },
+                { top: '35%' as const, left: '65%' as const },
+                { top: '60%' as const, left: '20%' as const },
+                { top: '55%' as const, left: '75%' as const },
               ];
               const pos = positions[index % positions.length];
 
@@ -409,7 +407,7 @@ export default function SearchScreen() {
                   key={salon.id}
                   style={[
                     styles.mapMarker,
-                    { top: pos.top, left: pos.left },
+                    { top: pos.top as `${number}%`, left: pos.left as `${number}%` },
                     selectedMapSalon === salon.id && styles.mapMarkerSelected,
                   ]}
                   onPress={() => setSelectedMapSalon(selectedMapSalon === salon.id ? null : salon.id)}

@@ -84,9 +84,11 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
 
-  // 🔥 Localisation désactivée (temporairement)
+  // Localisation desactivee (temporairement)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const userLocation = null;
   const getCurrentLocation = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const locationLoading = false;
 
   const [step, setStep] = useState(1);

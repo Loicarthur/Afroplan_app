@@ -26,7 +26,7 @@ const COMMISSION_RATES: Record<string, number> = {
   premium: 0.10,  // 10% with Premium plan
 };
 
-const BOOKING_DEPOSIT = 1000; // 10€ in cents
+const DEPOSIT_RATE = 0.20; // 20% of service price as deposit
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,7 +93,8 @@ serve(async (req) => {
     // Calculate commission
     const plan = stripeAccount.subscription_plan || 'free';
     const commissionRate = COMMISSION_RATES[plan] || 0.20;
-    const payAmount = paymentType === 'full' ? amount : BOOKING_DEPOSIT;
+    const depositAmount = Math.round(amount * DEPOSIT_RATE);
+    const payAmount = paymentType === 'full' ? amount : depositAmount;
     const applicationFee = Math.round(payAmount * commissionRate);
 
     // Create Stripe PaymentIntent with application_fee_amount
@@ -127,7 +128,7 @@ serve(async (req) => {
         client_id: user.id,
         amount: payAmount,
         total_service_price: amount,
-        remaining_amount: paymentType === 'full' ? 0 : amount - BOOKING_DEPOSIT,
+        remaining_amount: paymentType === 'full' ? 0 : amount - depositAmount,
         commission: applicationFee,
         salon_amount: payAmount - applicationFee,
         commission_rate: commissionRate,

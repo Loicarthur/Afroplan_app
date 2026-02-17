@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,8 +25,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Shadows } from '@/constants/theme';
-import { BOOKING_DEPOSIT, AFROPLAN_COMMISSION_RATE, paymentService } from '@/services/payment.service';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { DEPOSIT_RATE, AFROPLAN_COMMISSION_RATE, paymentService } from '@/services/payment.service';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface BookingDetails {
   salonName: string;
@@ -64,13 +65,12 @@ export default function CheckoutScreen() {
   };
 
   // Calcul des montants
-  const depositAmount = BOOKING_DEPOSIT; // 1000 centimes = 10€
+  const depositAmount = Math.round(bookingDetails.servicePrice * DEPOSIT_RATE); // 20% du prix
   const commissionRate = AFROPLAN_COMMISSION_RATE; // 20%
 
   const isFullPayment = paymentType === 'full';
   const payAmount = isFullPayment ? bookingDetails.servicePrice : depositAmount;
   const commission = Math.round(payAmount * commissionRate);
-  const salonReceives = payAmount - commission;
   const remainingAmount = isFullPayment ? 0 : bookingDetails.servicePrice - depositAmount;
 
   const formatAmount = (cents: number) => {
@@ -245,7 +245,7 @@ export default function CheckoutScreen() {
                   {t('checkout.depositOnly')}
                 </Text>
                 <Text style={[styles.paymentTypeSubtitle, { color: colors.textSecondary }]}>
-                  {formatAmount(depositAmount)} {t('checkout.depositNow').toLowerCase()}
+                  20% = {formatAmount(depositAmount)}
                 </Text>
               </View>
             </View>
@@ -317,31 +317,33 @@ export default function CheckoutScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              paymentMethod === 'apple' && styles.paymentOptionSelected,
-              paymentMethod === 'apple' && { borderColor: colors.primary },
-            ]}
-            onPress={() => setPaymentMethod('apple')}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.cardIcon, { backgroundColor: '#1A1A1A' }]}>
-                <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[
+                styles.paymentOption,
+                paymentMethod === 'apple' && styles.paymentOptionSelected,
+                paymentMethod === 'apple' && { borderColor: colors.primary },
+              ]}
+              onPress={() => setPaymentMethod('apple')}
+            >
+              <View style={styles.paymentOptionLeft}>
+                <View style={[styles.cardIcon, { backgroundColor: '#1A1A1A' }]}>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>Apple Pay</Text>
+                  <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
+                    {t('search.quickPay')}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>Apple Pay</Text>
-                <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
-                  {t('search.quickPay')}
-                </Text>
+              <View style={[styles.radioButton, paymentMethod === 'apple' && { borderColor: colors.primary }]}>
+                {paymentMethod === 'apple' && (
+                  <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
+                )}
               </View>
-            </View>
-            <View style={[styles.radioButton, paymentMethod === 'apple' && { borderColor: colors.primary }]}>
-              {paymentMethod === 'apple' && (
-                <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
-              )}
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[
@@ -467,7 +469,7 @@ export default function CheckoutScreen() {
           disabled={isLoading}
         >
           <LinearGradient
-            colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#8B5CF6', '#7C3AED']}
+            colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#191919', '#4A4A4A']}
             style={styles.payButtonGradient}
           >
             {isLoading ? (
@@ -580,7 +582,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   paymentTypeOptionSelected: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: '#F0F0F0',
   },
   paymentTypeLeft: {
     flexDirection: 'row',
@@ -612,7 +614,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   paymentOptionSelected: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: '#F0F0F0',
   },
   paymentOptionLeft: {
     flexDirection: 'row',

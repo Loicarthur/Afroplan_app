@@ -20,7 +20,7 @@ import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 
 interface Conversation {
   id: string;
@@ -178,7 +178,7 @@ export default function CoiffeurMessagesScreen() {
           <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>Pas de messages</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Les conversations avec vos clients apparaitront ici une fois qu'ils auront pris rendez-vous
+            Les conversations avec vos clients apparaitront ici une fois qu&apos;ils auront pris rendez-vous
           </Text>
         </View>
       ) : (

@@ -4,7 +4,7 @@
 
 import {
   paymentService,
-  BOOKING_DEPOSIT,
+  DEPOSIT_RATE,
   COMMISSION_RATES,
   SUBSCRIPTION_PLANS,
 } from '@/services/payment.service';
@@ -37,24 +37,24 @@ describe('paymentService', () => {
   // =============================================
 
   describe('constants', () => {
-    it('BOOKING_DEPOSIT is 1000 centimes (10 EUR)', () => {
-      expect(BOOKING_DEPOSIT).toBe(1000);
+    it('DEPOSIT_RATE is 0.20 (20%)', () => {
+      expect(DEPOSIT_RATE).toBe(0.20);
     });
 
     it('COMMISSION_RATES has correct values for each plan', () => {
-      expect(COMMISSION_RATES.free).toBe(0.15);
-      expect(COMMISSION_RATES.starter).toBe(0.10);
-      expect(COMMISSION_RATES.pro).toBe(0.08);
-      expect(COMMISSION_RATES.premium).toBe(0.05);
+      expect(COMMISSION_RATES.free).toBe(0.20);
+      expect(COMMISSION_RATES.starter).toBe(0.15);
+      expect(COMMISSION_RATES.pro).toBe(0.12);
+      expect(COMMISSION_RATES.premium).toBe(0.10);
     });
 
     it('SUBSCRIPTION_PLANS has all four plans', () => {
       expect(Object.keys(SUBSCRIPTION_PLANS)).toEqual(['free', 'starter', 'pro', 'premium']);
     });
 
-    it('free plan has price 0 and 15% commission', () => {
+    it('free plan has price 0 and 20% commission', () => {
       expect(SUBSCRIPTION_PLANS.free.price).toBe(0);
-      expect(SUBSCRIPTION_PLANS.free.commission).toBe(15);
+      expect(SUBSCRIPTION_PLANS.free.commission).toBe(20);
     });
 
     it('plans have increasing prices', () => {
@@ -71,45 +71,60 @@ describe('paymentService', () => {
   });
 
   // =============================================
+  // DEPOSIT CALCULATION TESTS
+  // =============================================
+
+  describe('calculateDeposit', () => {
+    it('calculates 20% of total service price', () => {
+      expect(paymentService.calculateDeposit(10000)).toBe(2000); // 20% of 100€
+      expect(paymentService.calculateDeposit(5000)).toBe(1000);  // 20% of 50€
+      expect(paymentService.calculateDeposit(12000)).toBe(2400); // 20% of 120€
+    });
+  });
+
+  // =============================================
   // COMMISSION CALCULATION TESTS
   // =============================================
 
   describe('calculateDepositCommission', () => {
-    it('calculates free plan commission (15%)', () => {
-      const result = paymentService.calculateDepositCommission('free');
-      expect(result.depositAmount).toBe(1000);
-      expect(result.commission).toBe(150); // 15% of 1000
-      expect(result.salonDepositAmount).toBe(850); // 1000 - 150
-      expect(result.commissionRate).toBe(0.15);
+    it('calculates free plan commission (20%) on 20% deposit', () => {
+      const result = paymentService.calculateDepositCommission(10000, 'free');
+      expect(result.depositAmount).toBe(2000); // 20% of 10000
+      expect(result.commission).toBe(400);     // 20% of 2000
+      expect(result.salonDepositAmount).toBe(1600); // 2000 - 400
+      expect(result.commissionRate).toBe(0.20);
     });
 
-    it('calculates starter plan commission (10%)', () => {
-      const result = paymentService.calculateDepositCommission('starter');
-      expect(result.commission).toBe(100);
-      expect(result.salonDepositAmount).toBe(900);
+    it('calculates starter plan commission (15%) on 20% deposit', () => {
+      const result = paymentService.calculateDepositCommission(10000, 'starter');
+      expect(result.depositAmount).toBe(2000);
+      expect(result.commission).toBe(300); // 15% of 2000
+      expect(result.salonDepositAmount).toBe(1700);
     });
 
-    it('calculates pro plan commission (8%)', () => {
-      const result = paymentService.calculateDepositCommission('pro');
-      expect(result.commission).toBe(80);
-      expect(result.salonDepositAmount).toBe(920);
+    it('calculates pro plan commission (12%) on 20% deposit', () => {
+      const result = paymentService.calculateDepositCommission(10000, 'pro');
+      expect(result.depositAmount).toBe(2000);
+      expect(result.commission).toBe(240); // 12% of 2000
+      expect(result.salonDepositAmount).toBe(1760);
     });
 
-    it('calculates premium plan commission (5%)', () => {
-      const result = paymentService.calculateDepositCommission('premium');
-      expect(result.commission).toBe(50);
-      expect(result.salonDepositAmount).toBe(950);
+    it('calculates premium plan commission (10%) on 20% deposit', () => {
+      const result = paymentService.calculateDepositCommission(10000, 'premium');
+      expect(result.depositAmount).toBe(2000);
+      expect(result.commission).toBe(200); // 10% of 2000
+      expect(result.salonDepositAmount).toBe(1800);
     });
 
     it('defaults to free plan when no plan specified', () => {
-      const result = paymentService.calculateDepositCommission();
-      expect(result.commissionRate).toBe(0.15);
+      const result = paymentService.calculateDepositCommission(10000);
+      expect(result.commissionRate).toBe(0.20);
     });
 
     it('deposit + commission = salonDepositAmount + commission always', () => {
       const plans = ['free', 'starter', 'pro', 'premium'] as const;
       plans.forEach(plan => {
-        const result = paymentService.calculateDepositCommission(plan);
+        const result = paymentService.calculateDepositCommission(10000, plan);
         expect(result.commission + result.salonDepositAmount).toBe(result.depositAmount);
       });
     });
@@ -120,8 +135,7 @@ describe('paymentService', () => {
   // =============================================
 
   describe('createPaymentIntent', () => {
-    it('creates a payment intent with correct amounts', async () => {
-      // Mock: get stripe account
+    it('creates a deposit payment intent with 20% of service price', async () => {
       const stripeAccountChain = {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
@@ -131,7 +145,6 @@ describe('paymentService', () => {
         }),
       };
 
-      // Mock: insert payment
       const paymentInsertChain = {
         insert: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -150,11 +163,11 @@ describe('paymentService', () => {
       const result = await paymentService.createPaymentIntent('b1', 5000, 's1');
 
       expect(result.id).toBe('pay-1');
-      expect(result.depositAmount).toBe(1000);
+      expect(result.depositAmount).toBe(1000);  // 20% of 5000
       expect(result.totalServicePrice).toBe(5000);
-      expect(result.remainingAmount).toBe(4000);
-      expect(result.commission).toBe(80); // 8% pro
-      expect(result.salonDepositAmount).toBe(920);
+      expect(result.remainingAmount).toBe(4000); // 5000 - 1000
+      expect(result.commission).toBe(120);        // 12% pro of 1000
+      expect(result.salonDepositAmount).toBe(880); // 1000 - 120
       expect(result.currency).toBe('eur');
       expect(result.status).toBe('pending');
     });
@@ -219,8 +232,8 @@ describe('paymentService', () => {
         eq: jest.fn().mockReturnThis(),
         gte: jest.fn().mockResolvedValue({
           data: [
-            { amount: 1000, commission: 150, salon_amount: 850 },
-            { amount: 1000, commission: 150, salon_amount: 850 },
+            { amount: 1000, commission: 200, salon_amount: 800 },
+            { amount: 1000, commission: 200, salon_amount: 800 },
           ],
           error: null,
         }),
@@ -229,8 +242,8 @@ describe('paymentService', () => {
 
       const result = await paymentService.getSalonPaymentStats('s1', 'month');
       expect(result.totalRevenue).toBe(2000);
-      expect(result.totalCommission).toBe(300);
-      expect(result.netRevenue).toBe(1700);
+      expect(result.totalCommission).toBe(400);
+      expect(result.netRevenue).toBe(1600);
       expect(result.transactionCount).toBe(2);
       expect(result.averageTransaction).toBe(1000);
     });
@@ -301,18 +314,17 @@ describe('paymentService', () => {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
       };
-      // Chain: eq(salon_id) -> eq(status) -> eq(is_paid_out) resolves
       mockChain.eq
         .mockReturnValueOnce(mockChain)
         .mockReturnValueOnce(mockChain)
         .mockResolvedValueOnce({
-          data: [{ salon_amount: 850 }, { salon_amount: 920 }],
+          data: [{ salon_amount: 800 }, { salon_amount: 880 }],
           error: null,
         });
       (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
       const result = await paymentService.getSalonBalance('s1');
-      expect(result.availableBalance).toBe(1770);
+      expect(result.availableBalance).toBe(1680);
       expect(result.currency).toBe('eur');
     });
   });

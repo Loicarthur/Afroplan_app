@@ -101,7 +101,7 @@ export default function SalonReservationsScreen() {
     r => filter === 'all' || r.status === filter
   );
 
-  const filters: Array<{ key: typeof filter; label: string }> = [
+  const filters: { key: typeof filter; label: string }[] = [
     { key: 'all', label: 'Toutes' },
     { key: 'pending', label: 'En attente' },
     { key: 'confirmed', label: 'Confirmees' },

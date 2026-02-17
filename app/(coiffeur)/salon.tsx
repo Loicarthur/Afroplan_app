@@ -83,6 +83,9 @@ export default function SalonManagementScreen() {
   const { t, language } = useLanguage();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [existingSalonId, setExistingSalonId] = useState<string | null>(null);
 
   // Informations du salon
   const [salonName, setSalonName] = useState('');
@@ -107,6 +110,33 @@ export default function SalonManagementScreen() {
 
   // Email par defaut (celui de l'inscription)
   const email = user?.email || '';
+
+  // Charger le salon existant si disponible
+  React.useEffect(() => {
+    const loadExistingSalon = async () => {
+      if (!user?.id || !isSupabaseConfigured()) return;
+      try {
+        const salon = await salonService.getSalonByOwnerId(user.id);
+        if (salon) {
+          setExistingSalonId(salon.id);
+          setSalonName(salon.name || '');
+          setDescription(salon.description || '');
+          setPhone(salon.phone || '');
+          setAddress(salon.address || '');
+          setCity(salon.city || '');
+          setPostalCode(salon.postal_code || '');
+          setIsPublished(salon.is_active === true);
+          setOffersHomeService(salon.offers_home_service || false);
+          if (salon.opening_hours) {
+            setOpeningHours(salon.opening_hours as unknown as OpeningHours);
+          }
+        }
+      } catch {
+        // Pas de salon existant
+      }
+    };
+    loadExistingSalon();
+  }, [user?.id]);
 
   const pickImage = async (index?: number) => {
     if (photos.length >= MAX_PHOTOS && index === undefined) {
@@ -243,20 +273,18 @@ export default function SalonManagementScreen() {
         photos: photoUrls,
         opening_hours: openingHours,
         offers_home_service: offersHomeService,
-        home_service_fee: offersHomeService ? parseInt(homeServiceFee || '0') * 100 : 0,
-        is_active: true,
+        min_home_service_amount: offersHomeService ? parseFloat(homeServiceFee || '0') : 0,
+        is_active: isPublished,
       };
 
-      // Check if a salon already exists for this user
-      const existingSalon = await salonService.getSalonByOwnerId(user.id);
-
-      if (existingSalon) {
-        await salonService.updateSalon(existingSalon.id, salonPayload as any);
+      if (existingSalonId) {
+        await salonService.updateSalon(existingSalonId, salonPayload as any);
       } else {
-        await salonService.createSalon({
+        const newSalon = await salonService.createSalon({
           ...salonPayload,
           owner_id: user.id,
         } as any);
+        setExistingSalonId(newSalon.id);
       }
 
       Alert.alert(
@@ -270,6 +298,52 @@ export default function SalonManagementScreen() {
       if (__DEV__) console.warn('Salon save error:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    // Validation complète avant publication
+    if (!salonName.trim() || !address.trim() || !city.trim() || !postalCode.trim() || !phone.trim()) {
+      Alert.alert(
+        t('common.error'),
+        language === 'en'
+          ? 'Please fill in all required fields before publishing.'
+          : 'Veuillez remplir tous les champs obligatoires avant de publier.'
+      );
+      return;
+    }
+    if (selectedSpecialties.length === 0) {
+      Alert.alert(
+        t('common.error'),
+        language === 'en'
+          ? 'Select at least one specialty before publishing.'
+          : 'Sélectionnez au moins une spécialité avant de publier.'
+      );
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      // Sauvegarder d'abord, puis publier
+      await handleSave();
+
+      if (existingSalonId) {
+        await salonService.updateSalon(existingSalonId, { is_active: true } as any);
+      }
+
+      setIsPublished(true);
+      Alert.alert(
+        language === 'en' ? 'Salon Published!' : 'Salon publié !',
+        language === 'en'
+          ? 'Your salon is now visible to clients. They can find you using search and filters.'
+          : 'Votre salon est maintenant visible par les clients. Ils peuvent vous trouver via la recherche et les filtres.',
+        [{ text: 'OK' }]
+      );
+    } catch (err: any) {
+      const errorMessage = err?.message || t('common.errorOccurred');
+      Alert.alert(t('common.error'), errorMessage);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -613,15 +687,48 @@ export default function SalonManagementScreen() {
           )}
         </View>
 
-        {/* Bouton de sauvegarde */}
+        {/* Statut de publication */}
+        {isPublished && (
+          <View style={[styles.publishedBanner, { backgroundColor: '#F0FDF4' }]}>
+            <Ionicons name="checkmark-circle" size={22} color="#22C55E" />
+            <View style={styles.publishedBannerContent}>
+              <Text style={styles.publishedBannerTitle}>
+                {language === 'en' ? 'Salon Published' : 'Salon publié'}
+              </Text>
+              <Text style={styles.publishedBannerDesc}>
+                {language === 'en'
+                  ? 'Your salon is visible to clients'
+                  : 'Votre salon est visible par les clients'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Boutons de sauvegarde et publication */}
         <View style={styles.saveSection}>
           <Button
             title={isSaving ? t('salon.saving') : t('salon.save')}
             onPress={handleSave}
             fullWidth
             loading={isSaving}
-            disabled={isSaving}
+            disabled={isSaving || isPublishing}
           />
+
+          {!isPublished && (
+            <TouchableOpacity
+              style={[styles.publishButton, (isPublishing) && styles.publishButtonDisabled]}
+              onPress={handlePublish}
+              disabled={isPublishing || isSaving}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.publishButtonText}>
+                {isPublishing
+                  ? (language === 'en' ? 'Publishing...' : 'Publication...')
+                  : (language === 'en' ? 'Publish my salon' : 'Publier mon salon')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ height: Spacing.xxl }} />
@@ -808,6 +915,46 @@ const styles = StyleSheet.create({
   homeServiceDesc: {
     fontSize: FontSizes.sm,
     marginTop: 2,
+  },
+  publishedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+  },
+  publishedBannerContent: {
+    flex: 1,
+  },
+  publishedBannerTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  publishedBannerDesc: {
+    fontSize: FontSizes.sm,
+    color: '#15803D',
+    marginTop: 2,
+  },
+  publishButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  publishButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  publishButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
   },
   saveSection: {
     paddingHorizontal: Spacing.md,

@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { Button, Input, SuccessModal } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -47,7 +47,6 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showSuccess, setShowSuccess] = useState(false);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
@@ -99,7 +98,8 @@ export default function RegisterScreen() {
       // 2. Connexion automatique après inscription
       try {
         await signIn(email, password);
-        setShowSuccess(true);
+        // Redirection directe sans modal
+        redirectToApp();
       } catch {
         // Si la connexion auto échoue (ex: confirmation email requise),
         // rediriger vers login
@@ -123,16 +123,14 @@ export default function RegisterScreen() {
     }
   };
 
-  const handleSuccessDismiss = () => {
-    setShowSuccess(false);
-    if (!hasRedirected.current) {
-      hasRedirected.current = true;
-      const role = profile?.role || selectedRole;
-      if (role === 'coiffeur') {
-        router.replace('/(coiffeur)');
-      } else {
-        router.replace('/(tabs)');
-      }
+  const redirectToApp = () => {
+    if (hasRedirected.current) return;
+    hasRedirected.current = true;
+    const role = profile?.role || selectedRole;
+    if (role === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
     }
   };
 
@@ -296,13 +294,6 @@ export default function RegisterScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modale de succès */}
-      <SuccessModal
-        visible={showSuccess}
-        title="Inscription réussie"
-        message={`Bienvenue sur AfroPlan, ${fullName} !`}
-        onDismiss={handleSuccessDismiss}
-      />
     </SafeAreaView>
   );
 }
