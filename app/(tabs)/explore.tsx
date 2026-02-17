@@ -4,7 +4,7 @@
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import {
   StatusBar,
   Modal,
   Platform,
+  Linking,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -22,9 +25,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
+import * as Location from 'expo-location';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Types de coiffure pour filtres
 const HAIRSTYLE_FILTERS = [
@@ -61,6 +67,8 @@ const SALONS_DATA = [
     minPrice: 45,
     hasPromo: true,
     promoText: '-20%',
+    latitude: 48.8825,
+    longitude: 2.3383,
   },
   {
     id: '2',
@@ -77,6 +85,8 @@ const SALONS_DATA = [
     minPrice: 30,
     hasPromo: false,
     promoText: '',
+    latitude: 48.8619,
+    longitude: 2.3700,
   },
   {
     id: '3',
@@ -93,6 +103,8 @@ const SALONS_DATA = [
     minPrice: 35,
     hasPromo: true,
     promoText: '-15%',
+    latitude: 48.8322,
+    longitude: 2.3561,
   },
   {
     id: '4',
@@ -109,6 +121,8 @@ const SALONS_DATA = [
     minPrice: 50,
     hasPromo: false,
     promoText: '',
+    latitude: 48.8566,
+    longitude: 2.3988,
   },
 ];
 
@@ -129,6 +143,9 @@ export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedQuickFilters, setSelectedQuickFilters] = useState<string[]>(['nearby']);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [selectedMapSalon, setSelectedMapSalon] = useState<string | null>(null);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
@@ -163,6 +180,41 @@ export default function SearchScreen() {
 
   const handleSalonPress = (salonId: string) => {
     router.push(`/salon/${salonId}`);
+  };
+
+  const requestLocationPermission = async () => {
+    setLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      }
+    } catch (error) {
+      if (__DEV__) console.warn('Location error:', error);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'map' && !userLocation) {
+      requestLocationPermission();
+    }
+  }, [viewMode]);
+
+  const openDirections = (latitude: number, longitude: number, name: string) => {
+    const url = Platform.select({
+      ios: `maps:0,0?q=${name}@${latitude},${longitude}`,
+      android: `geo:0,0?q=${latitude},${longitude}(${name})`,
+      default: `https://maps.google.com/?q=${latitude},${longitude}`,
+    });
+    if (url) Linking.openURL(url);
   };
 
   const resetFilters = () => {
@@ -308,14 +360,134 @@ export default function SearchScreen() {
 
       {/* Map placeholder or List */}
       {viewMode === 'map' ? (
-        <View style={[styles.mapPlaceholder, { backgroundColor: colors.card }]}>
-          <Ionicons name="map" size={48} color={colors.textMuted} />
-          <Text style={[styles.mapPlaceholderText, { color: colors.textSecondary }]}>
-            Carte Google Maps
-          </Text>
-          <Text style={[styles.mapPlaceholderSubtext, { color: colors.textMuted }]}>
-            Intégration en cours...
-          </Text>
+        <View style={styles.mapContainer}>
+          {/* Map Background */}
+          <View style={[styles.mapBackground, { backgroundColor: colorScheme === 'dark' ? '#1a2332' : '#e8eedb' }]}>
+            {/* Grid lines for map feel */}
+            {[...Array(8)].map((_, i) => (
+              <View
+                key={`h-${i}`}
+                style={[styles.mapGridLine, styles.mapGridHorizontal, { top: `${(i + 1) * 12.5}%`, backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}
+              />
+            ))}
+            {[...Array(6)].map((_, i) => (
+              <View
+                key={`v-${i}`}
+                style={[styles.mapGridLine, styles.mapGridVertical, { left: `${(i + 1) * 16.6}%`, backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}
+              />
+            ))}
+
+            {/* User location marker */}
+            {userLocation && (
+              <View style={[styles.userMarker, { top: '50%', left: '50%' }]}>
+                <View style={styles.userMarkerPulse} />
+                <View style={styles.userMarkerDot} />
+              </View>
+            )}
+
+            {locationLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.mapLoadingText, { color: colors.text }]}>
+                  Localisation...
+                </Text>
+              </View>
+            )}
+
+            {/* Salon markers */}
+            {filteredSalons.map((salon, index) => {
+              const positions = [
+                { top: '25%', left: '30%' },
+                { top: '35%', left: '65%' },
+                { top: '60%', left: '20%' },
+                { top: '55%', left: '75%' },
+              ];
+              const pos = positions[index % positions.length];
+
+              return (
+                <TouchableOpacity
+                  key={salon.id}
+                  style={[
+                    styles.mapMarker,
+                    { top: pos.top, left: pos.left },
+                    selectedMapSalon === salon.id && styles.mapMarkerSelected,
+                  ]}
+                  onPress={() => setSelectedMapSalon(selectedMapSalon === salon.id ? null : salon.id)}
+                >
+                  <View style={[
+                    styles.mapMarkerPin,
+                    { backgroundColor: selectedMapSalon === salon.id ? colors.primary : '#191919' },
+                  ]}>
+                    <Ionicons name="cut" size={14} color="#FFFFFF" />
+                  </View>
+                  <View style={[
+                    styles.mapMarkerLabel,
+                    { backgroundColor: selectedMapSalon === salon.id ? colors.primary : colors.card },
+                  ]}>
+                    <Text style={[
+                      styles.mapMarkerPrice,
+                      { color: selectedMapSalon === salon.id ? '#FFFFFF' : colors.text },
+                    ]} numberOfLines={1}>
+                      {salon.minPrice} EUR
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Selected salon card */}
+          {selectedMapSalon && (() => {
+            const salon = filteredSalons.find(s => s.id === selectedMapSalon);
+            if (!salon) return null;
+            return (
+              <Animated.View
+                entering={FadeInUp.duration(300)}
+                style={[styles.mapSalonCard, { backgroundColor: colors.card }]}
+              >
+                <TouchableOpacity
+                  style={styles.mapSalonCardContent}
+                  onPress={() => handleSalonPress(salon.id)}
+                >
+                  <Image source={{ uri: salon.image }} style={styles.mapSalonImage} contentFit="cover" />
+                  <View style={styles.mapSalonInfo}>
+                    <Text style={[styles.mapSalonName, { color: colors.text }]} numberOfLines={1}>
+                      {salon.name}
+                    </Text>
+                    <View style={styles.mapSalonRating}>
+                      <Ionicons name="star" size={14} color="#F59E0B" />
+                      <Text style={[styles.mapSalonRatingText, { color: colors.text }]}>
+                        {salon.rating}
+                      </Text>
+                      <Text style={[styles.mapSalonReviews, { color: colors.textMuted }]}>
+                        ({salon.reviews_count})
+                      </Text>
+                    </View>
+                    <Text style={[styles.mapSalonAddress, { color: colors.textMuted }]} numberOfLines={1}>
+                      {salon.address}
+                    </Text>
+                    <Text style={[styles.mapSalonDistance, { color: colors.primary }]}>
+                      {salon.distance}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.mapDirectionsButton, { backgroundColor: colors.primary }]}
+                    onPress={() => openDirections(salon.latitude, salon.longitude, salon.name)}
+                  >
+                    <Ionicons name="navigate" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })()}
+
+          {/* Recenter button */}
+          <TouchableOpacity
+            style={[styles.mapRecenterButton, { backgroundColor: colors.card }]}
+            onPress={requestLocationPermission}
+          >
+            <Ionicons name="locate" size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
@@ -657,22 +829,171 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  mapPlaceholder: {
+  mapContainer: {
     flex: 1,
-    marginHorizontal: 20,
-    marginBottom: 20,
+    position: 'relative',
+  },
+  mapBackground: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  mapGridLine: {
+    position: 'absolute',
+  },
+  mapGridHorizontal: {
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+  mapGridVertical: {
+    top: 0,
+    bottom: 0,
+    width: 1,
+  },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  mapLoadingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  userMarker: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -12,
+    marginTop: -12,
+    zIndex: 10,
+  },
+  userMarkerPulse: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  userMarkerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#3B82F6',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  mapMarker: {
+    position: 'absolute',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  mapMarkerSelected: {
+    zIndex: 15,
+  },
+  mapMarkerPin: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  mapPlaceholderText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-  },
-  mapPlaceholderSubtext: {
-    fontSize: 13,
+  mapMarkerLabel: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
     marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  mapMarkerPrice: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  mapSalonCard: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  mapSalonCardContent: {
+    flexDirection: 'row',
+    padding: 12,
+    alignItems: 'center',
+  },
+  mapSalonImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+  },
+  mapSalonInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  mapSalonName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mapSalonRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  mapSalonRatingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  mapSalonReviews: {
+    fontSize: 12,
+  },
+  mapSalonAddress: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mapSalonDistance: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  mapDirectionsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  mapRecenterButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   listContainer: {
     paddingHorizontal: 20,
