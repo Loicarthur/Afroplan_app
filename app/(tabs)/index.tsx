@@ -1,6 +1,6 @@
 /**
  * Page d'accueil AfroPlan - Client
- * Enrichie avec flow de recherche, promotions, et plus de contenu
+ * Enrichie avec flow de recherche et plus de contenu
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
@@ -50,30 +50,6 @@ const ALL_STYLES = [
   { id: '8', name: 'Afro', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
 ];
 
-// Promotions
-const PROMOTIONS = [
-  {
-    id: '1',
-    title: '-20% sur les tresses',
-    subtitle: 'Valable ce weekend',
-    salon: 'Bella Coiffure',
-    color: '#7C3AED',
-  },
-  {
-    id: '2',
-    title: 'Première visite offerte',
-    subtitle: 'Consultation gratuite',
-    salon: 'Afro Style Studio',
-    color: '#22C55E',
-  },
-  {
-    id: '3',
-    title: '-15% pour les étudiants',
-    subtitle: 'Sur présentation carte',
-    salon: 'Natural Beauty',
-    color: '#F59E0B',
-  },
-];
 
 // Coiffeurs à proximité
 const NEARBY_COIFFEURS = [
@@ -334,30 +310,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ---------------- Promotions ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(300).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader title="Offres du moment" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {PROMOTIONS.map((promo) => (
-              <TouchableOpacity
-                key={promo.id}
-                style={[styles.promoCard, { backgroundColor: promo.color }]}
-              >
-                <Ionicons name="pricetag" size={20} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.promoTitle}>{promo.title}</Text>
-                <Text style={styles.promoSubtitle}>{promo.subtitle}</Text>
-                <Text style={styles.promoSalon}>{promo.salon}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
 
         {/* ---------------- Quick Categories ---------------- */}
         <Animated.View
@@ -776,33 +728,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Promotions
+  // Horizontal scroll
   horizontalScroll: {
     paddingRight: 16,
     gap: 12,
   },
-  promoCard: {
-    width: 180,
-    padding: 16,
-    borderRadius: 16,
-  },
-  promoTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 12,
-  },
-  promoSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 4,
-  },
-  promoSalon: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 8,
-  },
-
   // Styles grid
   stylesGrid: {
     flexDirection: 'row',

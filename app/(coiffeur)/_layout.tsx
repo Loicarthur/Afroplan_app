@@ -68,6 +68,7 @@ export default function CoiffeurLayout() {
         name="profil"
         options={{
           title: 'Profil',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
