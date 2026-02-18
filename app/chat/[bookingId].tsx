@@ -35,6 +35,7 @@ interface Message {
   timestamp: Date;
   isMe: boolean;
   type: 'text' | 'system';
+  isAutomatic?: boolean;
 }
 
 interface BookingInfo {
@@ -62,10 +63,14 @@ const MOCK_BOOKING: BookingInfo = {
   coiffeurImage: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
 };
 
-const MOCK_MESSAGES: Message[] = [
+// Message de remerciement automatique envoyé par le coiffeur dès la réservation
+const AUTOMATIC_THANK_YOU = (coiffeurName: string, service: string): string =>
+  `Bonjour ! Merci pour votre réservation pour "${service}" 🙏\n\nJe suis ravie de vous accueillir prochainement. N'hésitez pas à me contacter si vous avez des questions ou des précisions sur votre coiffure.\n\nÀ très bientôt !\n${coiffeurName}`;
+
+const buildInitialMessages = (booking: BookingInfo, isCoiffeur: boolean): Message[] => [
   {
-    id: '0',
-    text: 'Réservation confirmée ! Vous pouvez maintenant discuter avec votre coiffeuse.',
+    id: 'sys-0',
+    text: 'Réservation confirmée ! Vous pouvez maintenant échanger avec votre coiffeuse.',
     senderId: 'system',
     senderName: 'Système',
     timestamp: new Date(Date.now() - 3600000 * 2),
@@ -73,40 +78,33 @@ const MOCK_MESSAGES: Message[] = [
     type: 'system',
   },
   {
-    id: '1',
-    text: 'Bonjour ! Je suis ravie de vous coiffer samedi. Avez-vous des références de tresses que vous aimez ?',
+    id: 'auto-1',
+    text: AUTOMATIC_THANK_YOU(booking.coiffeurName, booking.service),
     senderId: 'coiffeur',
-    senderName: 'Fatou',
-    timestamp: new Date(Date.now() - 3600000),
-    isMe: false,
+    senderName: booking.coiffeurName,
+    timestamp: new Date(Date.now() - 3600000 * 2 + 5000),
+    isMe: isCoiffeur,
     type: 'text',
-  },
-  {
-    id: '2',
-    text: 'Bonjour Fatou ! Oui j\'aimerais des box braids mi-longues. Je vous enverrai des photos.',
-    senderId: 'client',
-    senderName: 'Marie',
-    timestamp: new Date(Date.now() - 1800000),
-    isMe: true,
-    type: 'text',
-  },
-  {
-    id: '3',
-    text: 'Parfait ! N\'hésitez pas. Aussi, souhaitez-vous une couleur particulière ?',
-    senderId: 'coiffeur',
-    senderName: 'Fatou',
-    timestamp: new Date(Date.now() - 900000),
-    isMe: false,
-    type: 'text',
+    isAutomatic: true,
   },
 ];
 
-// Quick message suggestions
-const QUICK_MESSAGES = [
+
+// Suggestions de messages rapides selon le rôle
+const QUICK_MESSAGES_CLIENT = [
+  "Merci beaucoup !",
   "J'aurai un peu de retard",
   "Je suis en route",
-  "À quelle heure exactement ?",
   "Pouvez-vous m'envoyer l'adresse ?",
+  "Avez-vous des disponibilités ?",
+];
+
+const QUICK_MESSAGES_COIFFEUR = [
+  "À votre service !",
+  "Envoyez-moi vos références",
+  "Quel type de tresses souhaitez-vous ?",
+  "N'oubliez pas de venir avec les cheveux propres",
+  "Je suis disponible si vous avez des questions",
 ];
 
 function MessageBubble({ message }: { message: Message }) {
@@ -134,12 +132,19 @@ function MessageBubble({ message }: { message: Message }) {
         message.isMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
       ]}
     >
+      {message.isAutomatic && !message.isMe && (
+        <View style={styles.automaticTag}>
+          <Ionicons name="flash" size={10} color="#7C3AED" />
+          <Text style={styles.automaticTagText}>Message automatique</Text>
+        </View>
+      )}
       <View
         style={[
           styles.messageBubble,
           message.isMe
             ? styles.messageBubbleMe
             : [styles.messageBubbleOther, { backgroundColor: colors.card }],
+          message.isAutomatic && !message.isMe && styles.messageBubbleAutomatic,
         ]}
       >
         <Text
@@ -172,14 +177,15 @@ export default function ChatScreen() {
   const { profile } = useAuth();
   useLocalSearchParams<{ bookingId: string }>();
 
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [inputText, setInputText] = useState('');
   const [booking] = useState<BookingInfo>(MOCK_BOOKING);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
   const isCoiffeur = profile?.role === 'coiffeur';
   const otherPersonName = isCoiffeur ? booking.clientName : booking.coiffeurName;
   const otherPersonImage = isCoiffeur ? booking.clientImage : booking.coiffeurImage;
+  const quickMessages = isCoiffeur ? QUICK_MESSAGES_COIFFEUR : QUICK_MESSAGES_CLIENT;
 
   const sendMessage = () => {
     if (!inputText.trim()) return;
@@ -208,10 +214,12 @@ export default function ChatScreen() {
   };
 
   useEffect(() => {
-    // Scroll to bottom on mount
+    // Initialiser avec le message automatique de remerciement du coiffeur
+    setMessages(buildInitialMessages(booking, isCoiffeur));
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: false });
     }, 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -286,7 +294,7 @@ export default function ChatScreen() {
       <View style={styles.quickMessagesContainer}>
         <FlatList
           horizontal
-          data={QUICK_MESSAGES}
+          data={quickMessages}
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.quickMessagesList}
@@ -481,6 +489,21 @@ const styles = StyleSheet.create({
   },
   messageBubbleOther: {
     borderBottomLeftRadius: 4,
+  },
+  messageBubbleAutomatic: {
+    borderWidth: 1,
+    borderColor: '#7C3AED30',
+  },
+  automaticTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 3,
+  },
+  automaticTagText: {
+    fontSize: 10,
+    color: '#7C3AED',
+    fontStyle: 'italic',
   },
   messageText: {
     fontSize: 15,
