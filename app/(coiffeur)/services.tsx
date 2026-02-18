@@ -22,165 +22,162 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
-// ─── CATALOGUE DES STYLES AFRO PRÉDÉFINIS ───────────────────────────────────
-
-type StyleEntry = {
+type ServiceItem = {
   id: string;
   name: string;
+  description: string;
+  price: number;
+  duration: number;
+  category: string;
+  subStyle: string;
+  isActive: boolean;
 };
 
-type StyleCategory = {
-  id: string;
-  label: string;
-  emoji: string;
-  styles: StyleEntry[];
+// Catégorie "Autre" additionnelle
+const EXTRA_CATEGORY = {
+  id: 'autre',
+  number: '',
+  emoji: '✏️',
+  title: 'Autre',
+  color: '#808080',
+  styles: [{ id: 'autre-service', name: 'Autre prestation', image: '' }],
 };
 
-const STYLE_CATALOG: StyleCategory[] = [
+const ALL_SERVICE_CATEGORIES = [...HAIRSTYLE_CATEGORIES, EXTRA_CATEGORY];
+
+// Mock data
+const MOCK_SERVICES: ServiceItem[] = [
   {
-    id: 'naturels',
-    label: 'Naturels / Cheveux libres',
-    emoji: '🌿',
-    styles: [
-      { id: 'wash_go', name: 'Wash & Go' },
-    ],
+    id: '1',
+    name: 'Tresses africaines',
+    description: 'Tresses traditionnelles africaines, style au choix',
+    price: 80,
+    duration: 120,
+    category: 'Tresses et Nattes',
+    subStyle: 'Cornrows / Nattes collées',
+    isActive: true,
   },
   {
-    id: 'tresses',
-    label: 'Tresses et Nattes',
-    emoji: '🪮',
-    styles: [
-      { id: 'box_braids', name: 'Box Braids' },
-      { id: 'knotless_braids', name: 'Knotless Braids' },
-      { id: 'boho_braids', name: 'Boho Braids' },
-      { id: 'cornrows', name: 'Cornrows / Nattes collées' },
-      { id: 'fulani_braids', name: 'Fulani Braids' },
-      { id: 'micro_braids', name: 'Micro Braids' },
-      { id: 'crochet_braids', name: 'Crochet Braids' },
-    ],
+    id: '2',
+    name: 'Box Braids',
+    description: 'Box braids de toutes tailles',
+    price: 150,
+    duration: 240,
+    category: 'Tresses et Nattes',
+    subStyle: 'Box Braids',
+    isActive: true,
   },
   {
-    id: 'vanilles',
-    label: 'Vanilles & Twists',
-    emoji: '🔄',
-    styles: [
-      { id: 'vanilles', name: 'Vanilles' },
-      { id: 'barrel_twist', name: 'Barrel Twist' },
-    ],
+    id: '3',
+    name: 'Coupe femme / homme',
+    description: 'Coupe + finitions, tous types de cheveux',
+    price: 25,
+    duration: 45,
+    category: 'Coupe & Restructuration',
+    subStyle: 'Coupe',
+    isActive: true,
   },
   {
-    id: 'locs',
-    label: 'Locs',
-    emoji: '🔒',
-    styles: [
-      { id: 'locks', name: 'Locks (création / entretien)' },
-      { id: 'faux_locs', name: 'Faux Locs' },
-      { id: 'dreadlocks', name: 'Dreadlocks naturelles' },
-      { id: 'sisterlocks', name: 'Sisterlocks' },
-    ],
-  },
-  {
-    id: 'boucles',
-    label: 'Boucles et Ondulations',
-    emoji: '🌸',
-    styles: [
-      { id: 'bantu_knots', name: 'Bantu Knots' },
-    ],
-  },
-  {
-    id: 'tissages',
-    label: 'Tissages & Perruques',
-    emoji: '💇🏽‍♀️',
-    styles: [
-      { id: 'tissage', name: 'Tissage' },
-      { id: 'perruque', name: 'Pose de Perruque' },
-      { id: 'flip_over', name: 'Flip Over' },
-      { id: 'tape_in', name: 'Tape-in' },
-    ],
-  },
-  {
-    id: 'ponytail',
-    label: 'Ponytail',
-    emoji: '🎀',
-    styles: [
-      { id: 'ponytail', name: 'Ponytail' },
-    ],
-  },
-  {
-    id: 'coupe',
-    label: 'Coupe & Restructuration',
-    emoji: '✂️',
-    styles: [
-      { id: 'coupe', name: 'Coupe' },
-      { id: 'restructuration', name: 'Restructuration' },
-    ],
-  },
-  {
-    id: 'soins',
-    label: 'Soins, Lissage & Coloration',
-    emoji: '✨',
-    styles: [
-      { id: 'lissage', name: 'Lissage' },
-      { id: 'soin', name: 'Soin' },
-      { id: 'couleur', name: 'Couleur' },
-      { id: 'balayage', name: 'Balayage' },
-    ],
+    id: '4',
+    name: 'Entretien locks',
+    description: 'Reprise des racines et soins',
+    price: 60,
+    duration: 90,
+    category: 'Locs',
+    subStyle: 'Locks (création / entretien)',
+    isActive: true,
   },
 ];
-
-// ─── TYPES ────────────────────────────────────────────────────────────────────
-
-type ServiceLocation = 'salon' | 'domicile' | 'both';
-
-type ConfiguredStyle = {
-  styleId: string;
-  styleName: string;
-  categoryLabel: string;
-  price: string;
-  duration: string;
-  location: ServiceLocation;
-};
-
-// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
 
 export default function CoiffeurServicesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
 
-  // Styles sélectionnés et configurés
-  const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>(MOCK_SERVICES);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
 
-  // Modal de configuration d'un style
-  const [configModal, setConfigModal] = useState(false);
-  const [pendingStyle, setPendingStyle] = useState<StyleEntry & { categoryLabel: string } | null>(null);
-  const [configPrice, setConfigPrice] = useState('');
-  const [configDuration, setConfigDuration] = useState('');
-  const [configLocation, setConfigLocation] = useState<ServiceLocation>('salon');
+  // Form state
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [duration, setDuration] = useState('');
+  const [category, setCategory] = useState('');
+  const [subStyle, setSubStyle] = useState('');
 
-  // Vue catalogue ou vue "mes styles"
-  const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setPrice('');
+    setDuration('');
+    setCategory('');
+    setSubStyle('');
+    setEditingService(null);
+  };
 
-  const isStyleConfigured = (styleId: string) =>
-    configuredStyles.some((s) => s.styleId === styleId);
+  const openAddModal = () => {
+    resetForm();
+    setModalVisible(true);
+  };
 
-  const getConfiguredStyle = (styleId: string) =>
-    configuredStyles.find((s) => s.styleId === styleId);
+  const openEditModal = (service: ServiceItem) => {
+    setEditingService(service);
+    setName(service.name);
+    setDescription(service.description);
+    setPrice(service.price.toString());
+    setDuration(service.duration.toString());
+    setCategory(service.category);
+    setSubStyle(service.subStyle ?? '');
+    setModalVisible(true);
+  };
 
-  const openConfigModal = (style: StyleEntry, categoryLabel: string) => {
-    const existing = getConfiguredStyle(style.id);
-    if (existing) {
-      setConfigPrice(existing.price);
-      setConfigDuration(existing.duration);
-      setConfigLocation(existing.location);
-    } else {
-      setConfigPrice('');
-      setConfigDuration('');
-      setConfigLocation('salon');
+  // Sub-styles available for the selected main category
+  const availableSubStyles =
+    ALL_SERVICE_CATEGORIES.find((c) => c.title === category)?.styles ?? [];
+
+  const handleSave = () => {
+    if (!name.trim() || !price.trim() || !duration.trim() || !category) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+      return;
     }
-    setPendingStyle({ ...style, categoryLabel });
-    setConfigModal(true);
+
+    if (editingService) {
+      // Update existing service
+      setServices(prev =>
+        prev.map(s =>
+          s.id === editingService.id
+            ? {
+                ...s,
+                name,
+                description,
+                price: parseFloat(price),
+                duration: parseInt(duration, 10),
+                category,
+                subStyle,
+              }
+            : s
+        )
+      );
+    } else {
+      // Add new service
+      const newService: ServiceItem = {
+        id: Date.now().toString(),
+        name,
+        description,
+        price: parseFloat(price),
+        duration: parseInt(duration, 10),
+        category,
+        subStyle,
+        isActive: true,
+      };
+      setServices(prev => [...prev, newService]);
+    }
+
+    setModalVisible(false);
+    resetForm();
   };
 
   const handleRemoveStyle = (styleId: string) => {
@@ -310,100 +307,52 @@ export default function CoiffeurServicesScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-
-        {/* ─── ONGLET CATALOGUE ─────────────────────────────────────────────── */}
-        {activeTab === 'catalog' && (
-          <View style={styles.catalogContainer}>
-            <Text style={[styles.catalogHint, { color: colors.textSecondary }]}>
-              Appuyez sur un style pour l&apos;ajouter à vos prestations et configurer votre tarif.
-            </Text>
-
-            {STYLE_CATALOG.map((category) => (
-              <View key={category.id} style={styles.categorySection}>
-                <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                  <Text style={[styles.categoryLabel, { color: colors.text }]}>{category.label}</Text>
-                </View>
-
-                <View style={styles.stylesGrid}>
-                  {category.styles.map((style) => {
-                    const configured = isStyleConfigured(style.id);
-                    const config = getConfiguredStyle(style.id);
-                    return (
-                      <TouchableOpacity
-                        key={style.id}
-                        style={[
-                          styles.styleChip,
-                          { backgroundColor: colors.card, borderColor: colors.border },
-                          configured && { backgroundColor: colors.primary + '15', borderColor: colors.primary },
-                        ]}
-                        onPress={() => openConfigModal(style, category.label)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.styleChipTop}>
-                          {configured && (
-                            <View style={[styles.styleCheck, { backgroundColor: colors.primary }]}>
-                              <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                            </View>
-                          )}
-                          <Text
-                            style={[
-                              styles.styleChipName,
-                              { color: configured ? colors.primary : colors.text },
-                            ]}
-                            numberOfLines={2}
-                          >
-                            {style.name}
+        {/* Services List */}
+        <View style={styles.servicesList}>
+          {services.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="cut-outline" size={64} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                Aucun service
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                Ajoutez vos services pour que les clients puissent les reserver
+              </Text>
+              <Button
+                title="Ajouter un service"
+                onPress={openAddModal}
+                style={{ marginTop: Spacing.lg }}
+              />
+            </View>
+          ) : (
+            services.map((service) => (
+              <View
+                key={service.id}
+                style={[
+                  styles.serviceCard,
+                  { backgroundColor: colors.card },
+                  !service.isActive && styles.serviceCardInactive,
+                  Shadows.sm,
+                ]}
+              >
+                <View style={styles.serviceHeader}>
+                  <View style={styles.serviceInfo}>
+                    <Text style={[styles.serviceName, { color: colors.text }]}>
+                      {service.name}
+                    </Text>
+                    <View style={styles.categoryBadgeRow}>
+                      <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
+                        <Text style={[styles.categoryText, { color: colors.primary }]}>
+                          {service.category}
+                        </Text>
+                      </View>
+                      {service.subStyle ? (
+                        <View style={[styles.subStyleBadge, { backgroundColor: '#191919' + '12' }]}>
+                          <Text style={[styles.subStyleText, { color: colors.textSecondary }]}>
+                            {service.subStyle}
                           </Text>
                         </View>
-                        {configured && config && (
-                          <View style={styles.styleChipMeta}>
-                            <Text style={[styles.styleChipMetaText, { color: colors.primary }]}>
-                              {config.price}€ · {formatDuration(config.duration)}
-                            </Text>
-                            <View style={styles.styleChipLocBadge}>
-                              <Ionicons name={locationIcon(config.location)} size={11} color={colors.primary} />
-                            </View>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-
-            <View style={{ height: Spacing.xxl }} />
-          </View>
-        )}
-
-        {/* ─── ONGLET MES STYLES ────────────────────────────────────────────── */}
-        {activeTab === 'my_styles' && (
-          <View style={styles.myStylesContainer}>
-            {configuredStyles.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="cut-outline" size={64} color={colors.textMuted} />
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>Aucun style ajouté</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Allez dans le catalogue et sélectionnez les styles que vous proposez
-                </Text>
-                <Button
-                  title="Voir le catalogue"
-                  onPress={() => setActiveTab('catalog')}
-                  style={{ marginTop: Spacing.lg }}
-                />
-              </View>
-            ) : (
-              configuredStyles.map((cs) => (
-                <View
-                  key={cs.styleId}
-                  style={[styles.myStyleCard, { backgroundColor: colors.card }, Shadows.sm]}
-                >
-                  <View style={styles.myStyleCardHeader}>
-                    <View style={styles.myStyleInfo}>
-                      <Text style={[styles.myStyleName, { color: colors.text }]}>{cs.styleName}</Text>
-                      <Text style={[styles.myStyleCategory, { color: colors.textMuted }]}>{cs.categoryLabel}</Text>
+                      ) : null}
                     </View>
                     <View style={styles.myStyleActions}>
                       <TouchableOpacity
@@ -498,47 +447,93 @@ export default function CoiffeurServicesScreen() {
               </Text>
             </View>
 
-            {/* Lieu de prestation */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Lieu de prestation *</Text>
-              <View style={styles.locationPicker}>
-                {(
-                  [
-                    { value: 'salon', label: 'En salon', desc: 'Le client vient chez vous', icon: 'storefront-outline' },
-                    { value: 'domicile', label: 'À domicile', desc: 'Vous vous déplacez chez le client', icon: 'home-outline' },
-                    { value: 'both', label: 'Les deux', desc: 'Salon ou domicile', icon: 'swap-horizontal-outline' },
-                  ] as { value: ServiceLocation; label: string; desc: string; icon: string }[]
-                ).map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.locationOption,
-                      { backgroundColor: colors.card, borderColor: colors.border },
-                      configLocation === opt.value && { backgroundColor: colors.primary + '15', borderColor: colors.primary },
-                    ]}
-                    onPress={() => setConfigLocation(opt.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name={opt.icon as any}
-                      size={22}
-                      color={configLocation === opt.value ? colors.primary : colors.textSecondary}
-                    />
-                    <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                      <Text style={[styles.locationOptionLabel, { color: configLocation === opt.value ? colors.primary : colors.text }]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={[styles.locationOptionDesc, { color: colors.textMuted }]}>
-                        {opt.desc}
-                      </Text>
-                    </View>
-                    {configLocation === opt.value && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                ))}
+            <View style={styles.formRow}>
+              <View style={[styles.formGroup, { flex: 1 }]}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Prix (EUR) *</Text>
+                <TextInput
+                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={[styles.formGroup, { flex: 1, marginLeft: Spacing.md }]}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Duree (min) *</Text>
+                <TextInput
+                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                  placeholder="60"
+                  placeholderTextColor={colors.textMuted}
+                  value={duration}
+                  onChangeText={setDuration}
+                  keyboardType="numeric"
+                />
               </View>
             </View>
+
+            {/* Catégorie principale */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Catégorie principale *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                <View style={styles.categoriesGrid}>
+                  {ALL_SERVICE_CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[
+                        styles.categoryOption,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                        category === cat.title && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                      onPress={() => {
+                        setCategory(cat.title);
+                        setSubStyle('');
+                      }}
+                    >
+                      <Text style={styles.categoryOptionEmoji}>{cat.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.categoryOptionText,
+                          { color: category === cat.title ? '#FFFFFF' : colors.text },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {cat.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            {/* Sous-style (affiché après sélection de la catégorie) */}
+            {category && availableSubStyles.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Style spécifique</Text>
+                <View style={styles.subStylesGrid}>
+                  {availableSubStyles.map((s) => (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[
+                        styles.subStyleOption,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                        subStyle === s.name && { backgroundColor: '#191919', borderColor: '#191919' },
+                      ]}
+                      onPress={() => setSubStyle(subStyle === s.name ? '' : s.name)}
+                    >
+                      <Text
+                        style={[
+                          styles.subStyleOptionText,
+                          { color: subStyle === s.name ? '#FFFFFF' : colors.text },
+                        ]}
+                      >
+                        {s.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -665,7 +660,36 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.lg,
     fontWeight: '700',
   },
-  myStyleCategory: {
+  categoryBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+  },
+  categoryText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+  },
+  subStyleBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+  },
+  subStyleText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '500',
+  },
+  toggleButton: {
+    padding: Spacing.xs,
+  },
+  serviceDescription: {
     fontSize: FontSizes.sm,
     marginTop: 2,
   },
@@ -771,18 +795,40 @@ const styles = StyleSheet.create({
   locationPicker: {
     gap: Spacing.sm,
   },
-  locationOption: {
+  categoriesGrid: {
     flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  categoryOption: {
+    width: 100,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
   },
-  locationOptionLabel: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
+  categoryOptionEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
   },
-  locationOptionDesc: {
+  categoryOptionText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  subStylesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  subStyleOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  subStyleOptionText: {
     fontSize: FontSizes.sm,
     marginTop: 2,
   },

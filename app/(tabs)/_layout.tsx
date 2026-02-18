@@ -105,7 +105,13 @@ export default function TabLayout() {
         options={{
           title: 'Styles',
           headerShown: false,
-          href: null,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'cut' : 'cut-outline'}
+              size={24}
+              color={color}
+            />
+          ),
         }}
       />
     </Tabs>

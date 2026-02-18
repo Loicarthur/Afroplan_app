@@ -1,5 +1,7 @@
 /**
- * Galerie de Styles AfroPlan - Design z2/z3
+ * Styles de Coiffure AfroPlan
+ * Hierarchie: Grand titre = catégorie / Sous-titre = style spécifique
+ * Cliquer sur un style → coiffeurs à proximité spécialisés
  */
 
 import React, { useState } from 'react';
@@ -10,115 +12,39 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  TextInput,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Shadows } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { HAIRSTYLE_CATEGORIES, HairstyleCategory } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 60) / 2;
-
-// Categories de styles
-const STYLE_CATEGORIES = [
-  { id: 'all', name: 'Tous' },
-  { id: 'braids', name: 'Braids' },
-  { id: 'twists', name: 'Twists' },
-  { id: 'locs', name: 'Locs' },
-  { id: 'natural', name: 'Natural' },
-  { id: 'weave', name: 'Weave' },
-];
-
-// Donnees de test pour les styles
-const STYLES_DATA = [
-  {
-    id: '1',
-    name: 'Box Braids Longues',
-    category: 'braids',
-    duration: '4-6h',
-    price: '150-200€',
-    likes: 342,
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
-    badgeColor: '#8B5CF6',
-  },
-  {
-    id: '2',
-    name: 'Natural Afro',
-    category: 'natural',
-    duration: '2-3h',
-    price: '80-120€',
-    likes: 289,
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
-    badgeColor: '#F97316',
-  },
-  {
-    id: '3',
-    name: 'Passion Twists',
-    category: 'twists',
-    duration: '3-5h',
-    price: '120-180€',
-    likes: 256,
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
-    badgeColor: '#EC4899',
-  },
-  {
-    id: '4',
-    name: 'Cornrows Design',
-    category: 'braids',
-    duration: '2-4h',
-    price: '90-150€',
-    likes: 198,
-    image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
-    badgeColor: '#8B5CF6',
-  },
-  {
-    id: '5',
-    name: 'Faux Locs',
-    category: 'locs',
-    duration: '5-7h',
-    price: '180-250€',
-    likes: 312,
-    image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
-    badgeColor: '#22C55E',
-  },
-  {
-    id: '6',
-    name: 'Fulani Braids',
-    category: 'braids',
-    duration: '3-5h',
-    price: '130-180€',
-    likes: 267,
-    image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
-    badgeColor: '#8B5CF6',
-  },
-];
+const STYLE_CARD_WIDTH = (width - 52) / 2;
 
 export default function StylesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(
+    HAIRSTYLE_CATEGORIES[0]?.id ?? null
+  );
 
-  const filteredStyles = STYLES_DATA.filter((style) => {
-    const matchesCategory = selectedCategory === 'all' || style.category === selectedCategory;
-    const matchesSearch = style.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategory((prev) => (prev === categoryId ? null : categoryId));
+  };
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      braids: 'Braids',
-      natural: 'Natural',
-      twists: 'Twists',
-      locs: 'Locs',
-      weave: 'Weave',
-    };
-    return labels[category] || category;
+  const handleStylePress = (styleId: string, styleName: string) => {
+    router.push({
+      pathname: '/style-salons/[styleId]',
+      params: { styleId, styleName },
+    });
   };
 
   return (
@@ -126,120 +52,147 @@ export default function StylesScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Galerie de Styles</Text>
-      </View>
+      <Animated.View entering={FadeInDown.delay(50).duration(400)} style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>Styles de coiffure</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Choisissez un style pour trouver le bon coiffeur
+        </Text>
+      </Animated.View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
-          <Ionicons name="search" size={20} color={colors.textMuted} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Rechercher un style..."
-            placeholderTextColor={colors.placeholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary }]}>
-          <Ionicons name="options" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {HAIRSTYLE_CATEGORIES.map((category, catIndex) => {
+          const isExpanded = expandedCategory === category.id;
 
-      {/* Category Filters */}
-      <View style={styles.categoriesWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-        >
-          {STYLE_CATEGORIES.map((category) => (
-            <TouchableOpacity
+          return (
+            <Animated.View
               key={category.id}
-              style={[
-                styles.categoryChip,
-                {
-                  backgroundColor: selectedCategory === category.id ? colors.primary : colors.background,
-                  borderColor: selectedCategory === category.id ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => setSelectedCategory(category.id)}
+              entering={FadeInUp.delay(catIndex * 60).duration(400)}
+              style={[styles.categorySection, { backgroundColor: colors.card }]}
             >
-              <Text
-                style={[
-                  styles.categoryText,
-                  {
-                    color: selectedCategory === category.id ? '#FFFFFF' : colors.text,
-                  },
-                ]}
+              {/* Category header — tap to expand/collapse */}
+              <TouchableOpacity
+                style={styles.categoryHeader}
+                onPress={() => toggleCategory(category.id)}
+                activeOpacity={0.7}
               >
-                {category.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {/* Progress indicator */}
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View style={[styles.progressBar, { backgroundColor: colors.primary }]} />
-          </View>
-        </View>
-      </View>
-
-      {/* Styles Grid */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.gridContainer}
-      >
-        <View style={styles.grid}>
-          {filteredStyles.map((style) => (
-            <TouchableOpacity
-              key={style.id}
-              style={[styles.styleCard, { backgroundColor: colors.card }, Shadows.md]}
-            >
-              <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: style.image }}
-                  style={styles.styleImage}
-                  contentFit="cover"
+                <View style={styles.categoryLeft}>
+                  <View
+                    style={[
+                      styles.categoryColorDot,
+                      { backgroundColor: category.color + '22' },
+                    ]}
+                  >
+                    <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+                  </View>
+                  <View style={styles.categoryTitleBlock}>
+                    <Text style={[styles.categoryNumber, { color: colors.textMuted }]}>
+                      {category.number}
+                    </Text>
+                    <Text
+                      style={[styles.categoryTitle, { color: colors.text }]}
+                      numberOfLines={2}
+                    >
+                      {category.title}
+                    </Text>
+                    <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
+                      {category.styles.length} style{category.styles.length > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={colors.textMuted}
                 />
-                {/* Save button */}
-                <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="bookmark-outline" size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-                {/* Like button */}
-                <TouchableOpacity style={styles.likeButton}>
-                  <Ionicons name="heart-outline" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
-                {/* Category badge */}
-                <View style={[styles.categoryBadge, { backgroundColor: style.badgeColor }]}>
-                  <Text style={styles.badgeText}>{getCategoryLabel(style.category)}</Text>
+              </TouchableOpacity>
+
+              {/* Sub-styles grid — visible when expanded */}
+              {isExpanded && (
+                <View style={styles.stylesGrid}>
+                  {category.styles.map((style) => (
+                    <TouchableOpacity
+                      key={style.id}
+                      style={[styles.styleCard, { backgroundColor: colors.background }]}
+                      onPress={() => handleStylePress(style.id, style.name)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.styleImageWrapper}>
+                        <Image
+                          source={{ uri: style.image }}
+                          style={styles.styleImage}
+                          contentFit="cover"
+                        />
+                        {/* Colored overlay stripe */}
+                        <View
+                          style={[styles.styleColorBar, { backgroundColor: category.color }]}
+                        />
+                        {/* Arrow CTA */}
+                        <View style={[styles.styleArrow, { backgroundColor: category.color }]}>
+                          <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={styles.styleInfo}>
+                        <Text
+                          style={[styles.styleName, { color: colors.text }]}
+                          numberOfLines={2}
+                        >
+                          {style.name}
+                        </Text>
+                        {style.priceRange && (
+                          <Text style={[styles.stylePrice, { color: category.color }]}>
+                            {style.priceRange}
+                          </Text>
+                        )}
+                        {style.duration && (
+                          <View style={styles.styleDurationRow}>
+                            <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+                            <Text style={[styles.styleDuration, { color: colors.textMuted }]}>
+                              {style.duration}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </View>
-              <View style={styles.styleInfo}>
-                <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={1}>
-                  {style.name}
-                </Text>
-                <View style={styles.styleDetails}>
-                  <Text style={[styles.duration, { color: colors.textSecondary }]}>
-                    {style.duration}
-                  </Text>
-                  <Text style={[styles.price, { color: colors.primary }]}>
-                    {style.price}
-                  </Text>
+              )}
+
+              {/* Collapsed preview — show 3 style names */}
+              {!isExpanded && (
+                <View style={styles.collapsedPreview}>
+                  {category.styles.slice(0, 3).map((s, i) => (
+                    <View
+                      key={s.id}
+                      style={[
+                        styles.collapsedTag,
+                        { backgroundColor: category.color + '15', borderColor: category.color + '40' },
+                      ]}
+                    >
+                      <Text style={[styles.collapsedTagText, { color: category.color }]}>
+                        {s.name}
+                      </Text>
+                    </View>
+                  ))}
+                  {category.styles.length > 3 && (
+                    <View
+                      style={[
+                        styles.collapsedTag,
+                        { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                      ]}
+                    >
+                      <Text style={[styles.collapsedTagText, { color: colors.textMuted }]}>
+                        +{category.styles.length - 3}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                <View style={styles.likesContainer}>
-                  <Ionicons name="heart" size={12} color="#EF4444" />
-                  <Text style={[styles.likesCount, { color: colors.textMuted }]}>
-                    {style.likes}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={{ height: 100 }} />
+              )}
+            </Animated.View>
+          );
+        })}
+
+        {/* Bottom padding */}
+        <View style={{ height: 110 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -251,151 +204,162 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
+    marginBottom: 4,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+  subtitle: {
+    fontSize: 13,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
     gap: 12,
   },
-  searchBar: {
-    flex: 1,
+
+  // Category card
+  categorySection: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    justifyContent: 'space-between',
+    padding: 16,
   },
-  searchInput: {
+  categoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
+    gap: 12,
   },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+  categoryColorDot: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoriesWrapper: {
-    marginBottom: 16,
+  categoryEmoji: {
+    fontSize: 26,
   },
-  categoriesContainer: {
-    paddingHorizontal: 20,
-    gap: 10,
+  categoryTitleBlock: {
+    flex: 1,
   },
-  categoryChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
+  categoryNumber: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 1,
   },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '500',
+  categoryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  progressContainer: {
-    paddingHorizontal: 20,
-    marginTop: 12,
+  categoryCount: {
+    fontSize: 11,
+    marginTop: 2,
   },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-  },
-  progressBar: {
-    width: '40%',
-    height: '100%',
-    borderRadius: 2,
-  },
-  gridContainer: {
-    paddingHorizontal: 20,
-  },
-  grid: {
+
+  // Collapsed preview tags
+  collapsedPreview: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    gap: 6,
+  },
+  collapsedTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  collapsedTagText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Style cards grid
+  stylesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    gap: 10,
   },
   styleCard: {
-    width: CARD_WIDTH,
-    borderRadius: 16,
-    marginBottom: 16,
+    width: STYLE_CARD_WIDTH,
+    borderRadius: 12,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: { elevation: 1 },
+    }),
   },
-  imageContainer: {
+  styleImageWrapper: {
     position: 'relative',
+    height: 130,
   },
   styleImage: {
     width: '100%',
-    height: 180,
+    height: '100%',
   },
-  saveButton: {
+  styleColorBar: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  styleArrow: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  likeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   styleInfo: {
-    padding: 12,
+    padding: 10,
   },
   styleName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 4,
+    lineHeight: 17,
   },
-  styleDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  duration: {
+  stylePrice: {
     fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 3,
   },
-  price: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  likesContainer: {
+  styleDurationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
-  likesCount: {
+  styleDuration: {
     fontSize: 11,
   },
 });

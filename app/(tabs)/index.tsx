@@ -32,23 +32,23 @@ import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 import LanguageSelector from '@/components/LanguageSelector';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
 
 /* -------------------- Données mock -------------------- */
 
-// Tous les styles de coiffure
-const ALL_STYLES = [
-  { id: '1', name: 'Tresses', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: '2', name: 'Twists', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: '3', name: 'Natural', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: '4', name: 'Locs', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-  { id: '5', name: 'Weave', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: '6', name: 'Braids', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: '7', name: 'Cornrows', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: '8', name: 'Afro', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-];
+// Catégories de styles de coiffure (depuis la source unique)
+const ALL_STYLES = HAIRSTYLE_CATEGORIES.map((cat) => ({
+  id: cat.id,
+  name: cat.title,
+  emoji: cat.emoji,
+  color: cat.color,
+  // use first sub-style image as preview
+  image: cat.styles[0]?.image ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200',
+  firstStyleId: cat.styles[0]?.id,
+}));
 
 
 // Coiffeurs à proximité
@@ -318,18 +318,28 @@ export default function HomeScreen() {
         >
           <SectionHeader
             title="Styles de coiffure"
-            onSeeAll={() => setShowAllStyles(!showAllStyles)}
+            onSeeAll={() => router.push('/(tabs)/bookings')}
           />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
               <TouchableOpacity
                 key={style.id}
                 style={styles.styleCard}
-                onPress={() => router.push('/(tabs)/explore')}
+                onPress={() => {
+                  if (style.firstStyleId) {
+                    router.push({
+                      pathname: '/style-salons/[styleId]',
+                      params: { styleId: style.firstStyleId, styleName: style.name },
+                    });
+                  } else {
+                    router.push('/(tabs)/bookings');
+                  }
+                }}
               >
                 <Image source={{ uri: style.image }} style={styles.styleImage} contentFit="cover" />
-                <View style={styles.styleOverlay}>
-                  <Text style={styles.styleName}>{style.name}</Text>
+                <View style={[styles.styleOverlay, { backgroundColor: (style.color ?? '#191919') + '99' }]}>
+                  <Text style={styles.styleEmoji}>{style.emoji}</Text>
+                  <Text style={styles.styleName} numberOfLines={2}>{style.name}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -751,14 +761,18 @@ const styles = StyleSheet.create({
   },
   styleOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(25, 25, 25, 0.4)',
     justifyContent: 'flex-end',
-    padding: 12,
+    padding: 10,
+  },
+  styleEmoji: {
+    fontSize: 18,
+    marginBottom: 2,
   },
   styleName: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   showLessButton: {
     alignItems: 'center',

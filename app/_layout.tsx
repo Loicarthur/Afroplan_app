@@ -111,6 +111,13 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="style-salons/[styleId]"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
             name="privacy-policy"
             options={{
               headerShown: false,
