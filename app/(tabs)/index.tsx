@@ -152,7 +152,7 @@ const TIPS_AND_INSPIRATION = [
 
 /* -------------------- Composants -------------------- */
 
-function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeAll?: () => void; seeAllLabel?: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -161,7 +161,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll}>
-          <Text style={[styles.seeAll, { color: '#191919' }]}>Voir tout</Text>
+          <Text style={[styles.seeAll, { color: '#191919' }]}>{seeAllLabel ?? 'Voir tout'}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -200,7 +200,7 @@ export default function HomeScreen() {
     router.push('/(tabs)/explore');
   };
 
-  const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 4);
+  const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -318,7 +318,8 @@ export default function HomeScreen() {
         >
           <SectionHeader
             title="Styles de coiffure"
-            onSeeAll={() => router.push('/(tabs)/bookings')}
+            onSeeAll={() => setShowAllStyles(!showAllStyles)}
+            seeAllLabel={showAllStyles ? 'Voir moins' : 'Voir tout'}
           />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
@@ -344,14 +345,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {showAllStyles && (
-            <TouchableOpacity
-              style={styles.showLessButton}
-              onPress={() => setShowAllStyles(false)}
-            >
-              <Text style={[styles.showLessText, { color: '#191919' }]}>Voir moins</Text>
-            </TouchableOpacity>
-          )}
         </Animated.View>
 
         {/* ---------------- Coiffeurs à proximité ---------------- */}
@@ -750,8 +743,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   styleCard: {
-    width: (width - 44) / 2,
-    height: 100,
+    width: (width - 56) / 3,
+    height: 110,
     borderRadius: 12,
     overflow: 'hidden',
   },
