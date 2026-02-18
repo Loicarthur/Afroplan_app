@@ -22,6 +22,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 type ServiceItem = {
   id: string;
@@ -30,19 +31,21 @@ type ServiceItem = {
   price: number;
   duration: number;
   category: string;
+  subStyle: string;
   isActive: boolean;
 };
 
-const CATEGORIES = [
-  'Tresses',
-  'Locks',
-  'Coupe',
-  'Coloration',
-  'Soins',
-  'Extensions',
-  'Barber',
-  'Autre',
-];
+// Catégorie "Autre" additionnelle
+const EXTRA_CATEGORY = {
+  id: 'autre',
+  number: '',
+  emoji: '✏️',
+  title: 'Autre',
+  color: '#808080',
+  styles: [{ id: 'autre-service', name: 'Autre prestation', image: '' }],
+};
+
+const ALL_SERVICE_CATEGORIES = [...HAIRSTYLE_CATEGORIES, EXTRA_CATEGORY];
 
 // Mock data
 const MOCK_SERVICES: ServiceItem[] = [
@@ -52,7 +55,8 @@ const MOCK_SERVICES: ServiceItem[] = [
     description: 'Tresses traditionnelles africaines, style au choix',
     price: 80,
     duration: 120,
-    category: 'Tresses',
+    category: 'Tresses et Nattes',
+    subStyle: 'Cornrows / Nattes collées',
     isActive: true,
   },
   {
@@ -61,16 +65,18 @@ const MOCK_SERVICES: ServiceItem[] = [
     description: 'Box braids de toutes tailles',
     price: 150,
     duration: 240,
-    category: 'Tresses',
+    category: 'Tresses et Nattes',
+    subStyle: 'Box Braids',
     isActive: true,
   },
   {
     id: '3',
-    name: 'Coupe homme',
-    description: 'Coupe + degrade + finitions',
+    name: 'Coupe femme / homme',
+    description: 'Coupe + finitions, tous types de cheveux',
     price: 25,
     duration: 45,
-    category: 'Coupe',
+    category: 'Coupe & Restructuration',
+    subStyle: 'Coupe',
     isActive: true,
   },
   {
@@ -79,7 +85,8 @@ const MOCK_SERVICES: ServiceItem[] = [
     description: 'Reprise des racines et soins',
     price: 60,
     duration: 90,
-    category: 'Locks',
+    category: 'Locs',
+    subStyle: 'Locks (création / entretien)',
     isActive: true,
   },
 ];
@@ -99,6 +106,7 @@ export default function CoiffeurServicesScreen() {
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
   const [category, setCategory] = useState('');
+  const [subStyle, setSubStyle] = useState('');
 
   const resetForm = () => {
     setName('');
@@ -106,6 +114,7 @@ export default function CoiffeurServicesScreen() {
     setPrice('');
     setDuration('');
     setCategory('');
+    setSubStyle('');
     setEditingService(null);
   };
 
@@ -121,8 +130,13 @@ export default function CoiffeurServicesScreen() {
     setPrice(service.price.toString());
     setDuration(service.duration.toString());
     setCategory(service.category);
+    setSubStyle(service.subStyle ?? '');
     setModalVisible(true);
   };
+
+  // Sub-styles available for the selected main category
+  const availableSubStyles =
+    ALL_SERVICE_CATEGORIES.find((c) => c.title === category)?.styles ?? [];
 
   const handleSave = () => {
     if (!name.trim() || !price.trim() || !duration.trim() || !category) {
@@ -142,6 +156,7 @@ export default function CoiffeurServicesScreen() {
                 price: parseFloat(price),
                 duration: parseInt(duration, 10),
                 category,
+                subStyle,
               }
             : s
         )
@@ -155,6 +170,7 @@ export default function CoiffeurServicesScreen() {
         price: parseFloat(price),
         duration: parseInt(duration, 10),
         category,
+        subStyle,
         isActive: true,
       };
       setServices(prev => [...prev, newService]);
@@ -272,10 +288,19 @@ export default function CoiffeurServicesScreen() {
                     <Text style={[styles.serviceName, { color: colors.text }]}>
                       {service.name}
                     </Text>
-                    <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.categoryText, { color: colors.primary }]}>
-                        {service.category}
-                      </Text>
+                    <View style={styles.categoryBadgeRow}>
+                      <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
+                        <Text style={[styles.categoryText, { color: colors.primary }]}>
+                          {service.category}
+                        </Text>
+                      </View>
+                      {service.subStyle ? (
+                        <View style={[styles.subStyleBadge, { backgroundColor: '#191919' + '12' }]}>
+                          <Text style={[styles.subStyleText, { color: colors.textSecondary }]}>
+                            {service.subStyle}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                   </View>
                   <TouchableOpacity
@@ -404,31 +429,68 @@ export default function CoiffeurServicesScreen() {
               </View>
             </View>
 
+            {/* Catégorie principale */}
             <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Categorie *</Text>
-              <View style={styles.categoriesGrid}>
-                {CATEGORIES.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryOption,
-                      { backgroundColor: colors.card, borderColor: colors.border },
-                      category === cat && { backgroundColor: colors.primary, borderColor: colors.primary },
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <Text
+              <Text style={[styles.formLabel, { color: colors.text }]}>Catégorie principale *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                <View style={styles.categoriesGrid}>
+                  {ALL_SERVICE_CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
                       style={[
-                        styles.categoryOptionText,
-                        { color: category === cat ? '#FFFFFF' : colors.text },
+                        styles.categoryOption,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                        category === cat.title && { backgroundColor: colors.primary, borderColor: colors.primary },
                       ]}
+                      onPress={() => {
+                        setCategory(cat.title);
+                        setSubStyle('');
+                      }}
                     >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text style={styles.categoryOptionEmoji}>{cat.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.categoryOptionText,
+                          { color: category === cat.title ? '#FFFFFF' : colors.text },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {cat.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
+
+            {/* Sous-style (affiché après sélection de la catégorie) */}
+            {category && availableSubStyles.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Style spécifique</Text>
+                <View style={styles.subStylesGrid}>
+                  {availableSubStyles.map((s) => (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[
+                        styles.subStyleOption,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                        subStyle === s.name && { backgroundColor: '#191919', borderColor: '#191919' },
+                      ]}
+                      onPress={() => setSubStyle(subStyle === s.name ? '' : s.name)}
+                    >
+                      <Text
+                        style={[
+                          styles.subStyleOptionText,
+                          { color: subStyle === s.name ? '#FFFFFF' : colors.text },
+                        ]}
+                      >
+                        {s.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -495,16 +557,31 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.lg,
     fontWeight: '700',
   },
+  categoryBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
   categoryBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.md,
-    marginTop: Spacing.xs,
   },
   categoryText: {
     fontSize: FontSizes.xs,
     fontWeight: '600',
+  },
+  subStyleBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+  },
+  subStyleText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '500',
   },
   toggleButton: {
     padding: Spacing.xs,
@@ -603,16 +680,38 @@ const styles = StyleSheet.create({
   },
   categoriesGrid: {
     flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  categoryOption: {
+    width: 100,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  categoryOptionEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  categoryOptionText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  subStylesGrid: {
+    flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
   },
-  categoryOption: {
+  subStyleOption: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
   },
-  categoryOptionText: {
+  subStyleOptionText: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
   },
