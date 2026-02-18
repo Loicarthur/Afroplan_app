@@ -303,18 +303,24 @@ export default function SalonDetailScreen() {
           {salon.gallery && salon.gallery.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Galerie
+                Nos réalisations
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.galleryGrid}>
                 {salon.gallery.map((image) => (
-                  <Image
-                    key={image.id}
-                    source={{ uri: image.image_url }}
-                    style={styles.galleryImage}
-                    contentFit="cover"
-                  />
+                  <View key={image.id} style={[styles.galleryItem, { backgroundColor: colors.card }]}>
+                    <Image
+                      source={{ uri: image.image_url }}
+                      style={styles.galleryImage}
+                      contentFit="cover"
+                    />
+                    {image.caption ? (
+                      <Text style={[styles.galleryCaption, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {image.caption}
+                      </Text>
+                    ) : null}
+                  </View>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           )}
 
@@ -513,11 +519,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: Spacing.lg,
   },
-  galleryImage: {
-    width: 200,
-    height: 150,
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  galleryItem: {
+    width: '48%',
     borderRadius: BorderRadius.lg,
-    marginRight: Spacing.sm,
+    overflow: 'hidden',
+  },
+  galleryImage: {
+    width: '100%',
+    height: 160,
+  },
+  galleryCaption: {
+    fontSize: 12,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
   },
   bottomBar: {
     position: 'absolute',

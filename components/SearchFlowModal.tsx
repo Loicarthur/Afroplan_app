@@ -25,20 +25,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
-
-// Types de coiffure
-const HAIRSTYLE_TYPES = [
-  { id: 'tresses', name: 'Tresses', icon: '👩🏾‍🦱', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: 'locks', name: 'Locks', icon: '🧔🏾', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-  { id: 'coupe', name: 'Coupe', icon: '✂️', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: 'soins', name: 'Soins', icon: '💆🏾', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: 'coloration', name: 'Coloration', icon: '🎨', image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200' },
-  { id: 'tissage', name: 'Tissage', icon: '👸🏾', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: 'cornrows', name: 'Cornrows', icon: '🪮', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: 'afro', name: 'Afro', icon: '🌟', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-];
 
 // Types de cheveux
 const HAIR_TYPES = [
@@ -170,25 +159,25 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             <Text style={styles.stepSubtitle}>Quel style te ferait plaisir ?</Text>
 
             <View style={styles.hairstyleGrid}>
-              {HAIRSTYLE_TYPES.map((style) => (
+              {HAIRSTYLE_CATEGORIES.map((cat) => (
                 <TouchableOpacity
-                  key={style.id}
+                  key={cat.id}
                   style={[
                     styles.hairstyleCard,
-                    filters.hairstyle === style.id && styles.hairstyleCardSelected
+                    filters.hairstyle === cat.id && styles.hairstyleCardSelected
                   ]}
-                  onPress={() => selectHairstyle(style.id)}
+                  onPress={() => selectHairstyle(cat.id)}
                 >
                   <Image
-                    source={{ uri: style.image }}
+                    source={{ uri: cat.styles[0]?.image ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' }}
                     style={styles.hairstyleImage}
                     contentFit="cover"
                   />
-                  <View style={styles.hairstyleOverlay}>
-                    <Text style={styles.hairstyleEmoji}>{style.icon}</Text>
-                    <Text style={styles.hairstyleName}>{style.name}</Text>
+                  <View style={[styles.hairstyleOverlay, { backgroundColor: cat.color + 'BB' }]}>
+                    <Text style={styles.hairstyleEmoji}>{cat.emoji}</Text>
+                    <Text style={styles.hairstyleName} numberOfLines={2}>{cat.title}</Text>
                   </View>
-                  {filters.hairstyle === style.id && (
+                  {filters.hairstyle === cat.id && (
                     <View style={styles.selectedBadge}>
                       <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                     </View>
@@ -567,9 +556,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hairstyleCard: {
-    width: (width - 60) / 2,
-    height: 120,
-    borderRadius: 16,
+    width: (width - 72) / 3,
+    height: 110,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#E5E5E5',
     borderWidth: 2,
@@ -588,13 +577,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hairstyleEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 22,
+    marginBottom: 2,
   },
   hairstyleName: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   selectedBadge: {
     position: 'absolute',
