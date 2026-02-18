@@ -26,6 +26,8 @@ import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
+type SalonLocationType = 'salon' | 'domicile' | 'both';
+
 // Liste des specialites de coiffure afro
 const AFRO_SPECIALTIES = [
   { id: 'tresses', name: 'Tresses', icon: 'git-branch-outline' },
@@ -104,8 +106,8 @@ export default function SalonManagementScreen() {
   // Opening hours
   const [openingHours, setOpeningHours] = useState<OpeningHours>(DEFAULT_HOURS);
 
-  // Home service
-  const [offersHomeService, setOffersHomeService] = useState(false);
+  // Lieu de prestation du salon
+  const [serviceLocationType, setServiceLocationType] = useState<SalonLocationType>('salon');
   const [homeServiceFee, setHomeServiceFee] = useState('');
 
   // Email par defaut (celui de l'inscription)
@@ -126,7 +128,12 @@ export default function SalonManagementScreen() {
           setCity(salon.city || '');
           setPostalCode(salon.postal_code || '');
           setIsPublished(salon.is_active === true);
-          setOffersHomeService(salon.offers_home_service || false);
+          // Déduire le type de localisation depuis les données existantes
+          if (salon.offers_home_service) {
+            setServiceLocationType('both');
+          } else {
+            setServiceLocationType('salon');
+          }
           if (salon.opening_hours) {
             setOpeningHours(salon.opening_hours as unknown as OpeningHours);
           }
@@ -144,29 +151,62 @@ export default function SalonManagementScreen() {
       return;
     }
 
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission requise', 'Vous devez autoriser l\'acces a la galerie pour ajouter des photos.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const newPhotos = [...photos];
-      if (index !== undefined) {
-        newPhotos[index] = result.assets[0].uri;
-      } else {
-        newPhotos.push(result.assets[0].uri);
-      }
-      setPhotos(newPhotos);
-    }
+    Alert.alert(
+      'Ajouter une photo',
+      'Choisissez la source',
+      [
+        {
+          text: 'Prendre une photo',
+          onPress: async () => {
+            const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!cameraPermission.granted) {
+              Alert.alert('Permission requise', 'Autorisez l\'accès à la caméra pour prendre des photos.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [16, 9],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const newPhotos = [...photos];
+              if (index !== undefined) {
+                newPhotos[index] = result.assets[0].uri;
+              } else {
+                newPhotos.push(result.assets[0].uri);
+              }
+              setPhotos(newPhotos);
+            }
+          },
+        },
+        {
+          text: 'Choisir depuis la galerie',
+          onPress: async () => {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+              Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour ajouter des photos.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [16, 9],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const newPhotos = [...photos];
+              if (index !== undefined) {
+                newPhotos[index] = result.assets[0].uri;
+              } else {
+                newPhotos.push(result.assets[0].uri);
+              }
+              setPhotos(newPhotos);
+            }
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
   };
 
   const removePhoto = (index: number) => {
@@ -272,8 +312,11 @@ export default function SalonManagementScreen() {
         specialties: selectedSpecialties,
         photos: photoUrls,
         opening_hours: openingHours,
-        offers_home_service: offersHomeService,
-        min_home_service_amount: offersHomeService ? parseFloat(homeServiceFee || '0') : 0,
+        offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
+        service_location: serviceLocationType,
+        min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both')
+          ? parseFloat(homeServiceFee || '0')
+          : 0,
         is_active: isPublished,
       };
 
@@ -635,46 +678,77 @@ export default function SalonManagementScreen() {
           })}
         </View>
 
-        {/* Service à domicile */}
+        {/* Lieu de prestation */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('salon.homeService')}
+            Lieu de prestation
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            {t('salon.homeServiceDesc')}
+            Où réalisez-vous vos prestations ?
           </Text>
 
-          <TouchableOpacity
-            style={[
-              styles.homeServiceToggle,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              offersHomeService && { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-            ]}
-            onPress={() => setOffersHomeService(!offersHomeService)}
-          >
-            <View style={[
-              styles.dayCheckbox,
-              offersHomeService && { backgroundColor: colors.primary, borderColor: colors.primary },
-              { borderColor: colors.border },
-            ]}>
-              {offersHomeService && (
-                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+          {(
+            [
+              {
+                value: 'salon' as const,
+                label: 'En salon uniquement',
+                desc: 'Les clients viennent dans votre salon',
+                icon: 'storefront-outline',
+              },
+              {
+                value: 'domicile' as const,
+                label: 'À domicile uniquement',
+                desc: 'Vous vous déplacez chez les clients',
+                icon: 'home-outline',
+              },
+              {
+                value: 'both' as const,
+                label: 'Salon & Domicile',
+                desc: 'En salon ou à domicile selon le client',
+                icon: 'swap-horizontal-outline',
+              },
+            ]
+          ).map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.locationTypeCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                serviceLocationType === opt.value && {
+                  borderColor: colors.primary,
+                  backgroundColor: colors.primary + '10',
+                },
+              ]}
+              onPress={() => setServiceLocationType(opt.value)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={opt.icon as any}
+                size={26}
+                color={serviceLocationType === opt.value ? colors.primary : colors.textSecondary}
+              />
+              <View style={styles.locationTypeText}>
+                <Text style={[
+                  styles.locationTypeLabel,
+                  { color: serviceLocationType === opt.value ? colors.primary : colors.text },
+                ]}>
+                  {opt.label}
+                </Text>
+                <Text style={[styles.locationTypeDesc, { color: colors.textSecondary }]}>
+                  {opt.desc}
+                </Text>
+              </View>
+              {serviceLocationType === opt.value && (
+                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
               )}
-            </View>
-            <View style={styles.homeServiceText}>
-              <Text style={[styles.homeServiceLabel, { color: colors.text }]}>
-                {t('salon.homeService')}
-              </Text>
-              <Text style={[styles.homeServiceDesc, { color: colors.textSecondary }]}>
-                {language === 'en' ? 'I can travel to clients' : 'Je me déplace chez les clients'}
-              </Text>
-            </View>
-            <Ionicons name="home-outline" size={24} color={offersHomeService ? colors.primary : colors.textMuted} />
-          </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
 
-          {offersHomeService && (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('salon.homeServiceFee')} (€)</Text>
+          {(serviceLocationType === 'domicile' || serviceLocationType === 'both') && (
+            <View style={[styles.inputGroup, { marginTop: Spacing.md }]}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>
+                {t('salon.homeServiceFee')} (€)
+              </Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                 placeholder="Ex: 15"
@@ -683,6 +757,9 @@ export default function SalonManagementScreen() {
                 onChangeText={setHomeServiceFee}
                 keyboardType="numeric"
               />
+              <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+                Frais de déplacement facturés en supplément
+              </Text>
             </View>
           )}
         </View>
@@ -896,23 +973,23 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     fontStyle: 'italic',
   },
-  homeServiceToggle: {
+  locationTypeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1.5,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  homeServiceText: {
+  locationTypeText: {
     flex: 1,
     marginLeft: Spacing.sm,
   },
-  homeServiceLabel: {
+  locationTypeLabel: {
     fontSize: FontSizes.md,
     fontWeight: '600',
   },
-  homeServiceDesc: {
+  locationTypeDesc: {
     fontSize: FontSizes.sm,
     marginTop: 2,
   },
