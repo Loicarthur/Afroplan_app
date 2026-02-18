@@ -52,7 +52,8 @@ const HAIR_TYPES = [
 
 // Lieux
 const LOCATION_OPTIONS = [
-  { id: 'salon', name: 'En salon', icon: 'storefront', description: 'Se déplacer au salon' },
+  { id: 'salon', name: 'En salon', icon: 'storefront', description: 'Se déplacer au salon professionnel' },
+  { id: 'coiffeur', name: 'Chez le coiffeur', icon: 'person', description: 'À son domicile ou son atelier' },
   { id: 'domicile', name: 'À domicile', icon: 'home', description: 'Le coiffeur vient chez vous' },
 ];
 
@@ -245,23 +246,33 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                     ]}
                     onPress={() => selectLocation(loc.id)}
                   >
-                    <Ionicons
-                      name={loc.icon as any}
-                      size={28}
-                      color={filters.location === loc.id ? '#FFFFFF' : '#191919'}
-                    />
-                    <Text style={[
-                      styles.locationName,
-                      filters.location === loc.id && styles.locationNameSelected
+                    <View style={[
+                      styles.locationIconWrap,
+                      filters.location === loc.id && styles.locationIconWrapSelected,
                     ]}>
-                      {loc.name}
-                    </Text>
-                    <Text style={[
-                      styles.locationDesc,
-                      filters.location === loc.id && styles.locationDescSelected
-                    ]}>
-                      {loc.description}
-                    </Text>
+                      <Ionicons
+                        name={loc.icon as any}
+                        size={22}
+                        color={filters.location === loc.id ? '#FFFFFF' : '#191919'}
+                      />
+                    </View>
+                    <View style={styles.locationCardText}>
+                      <Text style={[
+                        styles.locationName,
+                        filters.location === loc.id && styles.locationNameSelected
+                      ]}>
+                        {loc.name}
+                      </Text>
+                      <Text style={[
+                        styles.locationDesc,
+                        filters.location === loc.id && styles.locationDescSelected
+                      ]}>
+                        {loc.description}
+                      </Text>
+                    </View>
+                    {filters.location === loc.id && (
+                      <Ionicons name="checkmark-circle" size={20} color="#191919" />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -631,17 +642,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   locationOptions: {
-    flexDirection: 'row',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 10,
   },
   locationCard: {
-    flex: 1,
-    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E5E5E5',
+    gap: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#191919',
@@ -655,26 +667,38 @@ const styles = StyleSheet.create({
     }),
   },
   locationCardSelected: {
-    backgroundColor: '#191919',
+    backgroundColor: '#F0F0F0',
     borderColor: '#191919',
+  },
+  locationIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationIconWrapSelected: {
+    backgroundColor: '#191919',
+  },
+  locationCardText: {
+    flex: 1,
   },
   locationName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#191919',
-    marginTop: 8,
   },
   locationNameSelected: {
-    color: '#FFFFFF',
+    color: '#191919',
   },
   locationDesc: {
     fontSize: 12,
     color: '#808080',
-    marginTop: 4,
-    textAlign: 'center',
+    marginTop: 2,
   },
   locationDescSelected: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#4A4A4A',
   },
   sliderHeader: {
     flexDirection: 'row',
