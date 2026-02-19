@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useSalon } from '@/hooks/use-salons';
 import { useFavorite } from '@/hooks/use-favorites';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
@@ -31,6 +32,7 @@ export default function SalonDetailScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, isAuthenticated } = useAuth();
+  const { t, language } = useLanguage();
   const { salon, isLoading, error } = useSalon(id || '');
   const { isFavorite, toggle: toggleFavorite, isToggling } = useFavorite(
     user?.id || '',
@@ -88,6 +90,8 @@ export default function SalonDetailScreen() {
         serviceName: selectedService.name,
         servicePrice: selectedService.price.toString(),
         serviceDuration: selectedService.duration_minutes.toString(),
+        requiresExtensions: selectedService.requires_extensions ? 'true' : 'false',
+        extensionsIncluded: selectedService.extensions_included ? 'true' : 'false',
       },
     });
   };
@@ -236,7 +240,7 @@ export default function SalonDetailScreen() {
           {salon.description && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                A propos
+                {language === 'fr' ? 'À propos' : 'About'}
               </Text>
               <Text style={[styles.description, { color: colors.textSecondary }]}>
                 {salon.description}
@@ -247,7 +251,7 @@ export default function SalonDetailScreen() {
           {/* Services */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Services
+              {language === 'fr' ? 'Services' : 'Services'}
             </Text>
             {Object.keys(servicesByCategory).length > 0 ? (
               Object.entries(servicesByCategory).map(([category, services]) => (
@@ -273,6 +277,23 @@ export default function SalonDetailScreen() {
                         <Text style={[styles.serviceName, { color: colors.text }]}>
                           {service.name}
                         </Text>
+                        {service.requires_extensions && (
+                          <View style={styles.extensionBadge}>
+                            <Ionicons 
+                              name="sparkles-outline" 
+                              size={12} 
+                              color={service.extensions_included ? colors.success : colors.warning} 
+                            />
+                            <Text style={[
+                              styles.extensionText, 
+                              { color: service.extensions_included ? colors.success : colors.warning }
+                            ]}>
+                              {service.extensions_included 
+                                ? t('service.extensionsIncluded') 
+                                : t('service.extensionsNotIncluded')}
+                            </Text>
+                          </View>
+                        )}
                         {service.description && (
                           <Text
                             style={[styles.serviceDescription, { color: colors.textSecondary }]}
@@ -294,7 +315,7 @@ export default function SalonDetailScreen() {
               ))
             ) : (
               <Text style={[styles.noServices, { color: colors.textMuted }]}>
-                Aucun service disponible
+                {language === 'fr' ? 'Aucun service disponible' : 'No services available'}
               </Text>
             )}
           </View>
@@ -303,7 +324,7 @@ export default function SalonDetailScreen() {
           {salon.gallery && salon.gallery.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Nos réalisations
+                {language === 'fr' ? 'Nos réalisations' : 'Our creations'}
               </Text>
               <View style={styles.galleryGrid}>
                 {salon.gallery.map((image) => (
@@ -343,11 +364,11 @@ export default function SalonDetailScreen() {
             </View>
           ) : (
             <Text style={[styles.selectServiceHint, { color: colors.textSecondary }]}>
-              Selectionnez un service
+              {language === 'fr' ? 'Sélectionnez un service' : 'Select a service'}
             </Text>
           )}
           <Button
-            title="Reserver"
+            title={t('booking.book')}
             onPress={handleBook}
             disabled={!selectedService}
             style={{ minWidth: 120 }}
@@ -513,6 +534,16 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.lg,
     fontWeight: '700',
     marginLeft: Spacing.md,
+  },
+  extensionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  extensionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   noServices: {
     fontSize: FontSizes.md,

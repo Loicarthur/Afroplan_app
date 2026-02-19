@@ -27,24 +27,25 @@ import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors } from '@/constants/theme';
 
 // Types de coiffure pour filtres
 const HAIRSTYLE_FILTERS = [
-  { id: 'all', name: 'Tous', icon: 'grid-outline' },
-  { id: 'tresses', name: 'Tresses', icon: 'cut-outline' },
-  { id: 'locks', name: 'Locks', icon: 'ribbon-outline' },
-  { id: 'coupe', name: 'Coupe', icon: 'scissors-outline' },
-  { id: 'soins', name: 'Soins', icon: 'heart-outline' },
-  { id: 'coloration', name: 'Coloration', icon: 'color-palette-outline' },
+  { id: 'all', nameKey: 'common.seeAll', icon: 'grid-outline' },
+  { id: 'tresses', nameKey: 'hairstyle.tresses', icon: 'cut-outline' },
+  { id: 'locks', nameKey: 'hairstyle.locks', icon: 'ribbon-outline' },
+  { id: 'coupe', nameKey: 'hairstyle.coupe', icon: 'scissors-outline' },
+  { id: 'soins', nameKey: 'hairstyle.soins', icon: 'heart-outline' },
+  { id: 'coloration', nameKey: 'hairstyle.coloration', icon: 'color-palette-outline' },
 ];
 
 // Filtres rapides
 const QUICK_FILTERS = [
-  { id: 'nearby', name: 'Proche de moi', icon: 'location' },
-  { id: 'rated', name: 'Mieux notés', icon: 'star' },
-  { id: 'available', name: 'Dispo maintenant', icon: 'time' },
-  { id: 'promo', name: 'Promos', icon: 'pricetag' },
+  { id: 'nearby', nameKey: 'home.nearbyCoiffeurs', icon: 'location' },
+  { id: 'rated', nameKey: 'QUICK_FILTERS.rated', icon: 'star' },
+  { id: 'available', nameKey: 'QUICK_FILTERS.available', icon: 'time' },
+  { id: 'promo', nameKey: 'home.promotions', icon: 'pricetag' },
 ];
 
 // Données de test pour les salons
@@ -136,6 +137,7 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { t, language } = useLanguage();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -180,6 +182,8 @@ export default function SearchScreen() {
   };
 
   const requestLocationPermission = async () => {
+    if (Platform.OS === 'web') return;
+    
     setLocationLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -231,7 +235,7 @@ export default function SearchScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Recherche</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('common.search')}</Text>
         <TouchableOpacity
           style={[styles.viewModeButton, { backgroundColor: colors.card }]}
           onPress={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
@@ -250,7 +254,7 @@ export default function SearchScreen() {
           <Ionicons name="search" size={20} color={colors.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Salon, coiffeur, style..."
+            placeholder={t('home.searchSubtitle')}
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -298,7 +302,7 @@ export default function SearchScreen() {
                   { color: selectedCategory === category.id ? '#FFFFFF' : colors.text },
                 ]}
               >
-                {category.name}
+                {t(category.nameKey)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -337,7 +341,10 @@ export default function SearchScreen() {
                     { color: isSelected ? '#FFFFFF' : colors.textSecondary },
                   ]}
                 >
-                  {filter.name}
+                  {filter.id === 'nearby' ? t('home.nearbyCoiffeurs') : 
+                   filter.id === 'promo' ? t('home.promotions') : 
+                   language === 'fr' ? (filter.id === 'rated' ? 'Mieux notés' : 'Dispo maintenant') : 
+                   (filter.id === 'rated' ? 'Top rated' : 'Available now')}
                 </Text>
               </TouchableOpacity>
             );
@@ -348,10 +355,10 @@ export default function SearchScreen() {
       {/* Results Header */}
       <View style={styles.resultsHeader}>
         <Text style={[styles.resultsCount, { color: colors.text }]}>
-          {filteredSalons.length} salon{filteredSalons.length > 1 ? 's' : ''} trouvé{filteredSalons.length > 1 ? 's' : ''}
+          {filteredSalons.length} {language === 'fr' ? 'salons trouvés' : 'salons found'}
         </Text>
         <TouchableOpacity style={styles.sortButton}>
-          <Text style={[styles.sortText, { color: '#191919' }]}>Trier par</Text>
+          <Text style={[styles.sortText, { color: '#191919' }]}>{language === 'fr' ? 'Trier par' : 'Sort by'}</Text>
           <Ionicons name="chevron-down" size={16} color="#191919" />
         </TouchableOpacity>
       </View>
@@ -361,20 +368,6 @@ export default function SearchScreen() {
         <View style={styles.mapContainer}>
           {/* Map Background */}
           <View style={[styles.mapBackground, { backgroundColor: colorScheme === 'dark' ? '#1a2332' : '#e8eedb' }]}>
-            {/* Grid lines for map feel */}
-            {[...Array(8)].map((_, i) => (
-              <View
-                key={`h-${i}`}
-                style={[styles.mapGridLine, styles.mapGridHorizontal, { top: `${(i + 1) * 12.5}%`, backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}
-              />
-            ))}
-            {[...Array(6)].map((_, i) => (
-              <View
-                key={`v-${i}`}
-                style={[styles.mapGridLine, styles.mapGridVertical, { left: `${(i + 1) * 16.6}%`, backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}
-              />
-            ))}
-
             {/* User location marker */}
             {userLocation && (
               <View style={[styles.userMarker, { top: '50%', left: '50%' }]}>
@@ -387,7 +380,7 @@ export default function SearchScreen() {
               <View style={styles.mapLoadingOverlay}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={[styles.mapLoadingText, { color: colors.text }]}>
-                  Localisation...
+                  {t('common.loading')}
                 </Text>
               </View>
             )}
@@ -407,7 +400,7 @@ export default function SearchScreen() {
                   key={salon.id}
                   style={[
                     styles.mapMarker,
-                    { top: pos.top as `${number}%`, left: pos.left as `${number}%` },
+                    { top: pos.top as any, left: pos.left as any },
                     selectedMapSalon === salon.id && styles.mapMarkerSelected,
                   ]}
                   onPress={() => setSelectedMapSalon(selectedMapSalon === salon.id ? null : salon.id)}
@@ -539,7 +532,7 @@ export default function SearchScreen() {
 
                   <View style={styles.salonFooter}>
                     <View style={styles.priceContainer}>
-                      <Text style={[styles.priceLabel, { color: colors.textMuted }]}>À partir de</Text>
+                      <Text style={[styles.priceLabel, { color: colors.textMuted }]}>{language === 'fr' ? 'À partir de' : 'From'}</Text>
                       <Text style={[styles.priceValue, { color: '#7C3AED' }]}>{salon.minPrice}€</Text>
                     </View>
 
@@ -574,9 +567,9 @@ export default function SearchScreen() {
             <TouchableOpacity onPress={() => setShowFiltersModal(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Filtres avancés</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{language === 'fr' ? 'Filtres avancés' : 'Advanced filters'}</Text>
             <TouchableOpacity onPress={resetFilters}>
-              <Text style={styles.resetText}>Réinitialiser</Text>
+              <Text style={styles.resetText}>{language === 'fr' ? 'Réinitialiser' : 'Reset'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -584,7 +577,7 @@ export default function SearchScreen() {
             {/* Distance */}
             <View style={styles.filterSection}>
               <View style={styles.filterHeader}>
-                <Text style={[styles.filterLabel, { color: colors.text }]}>Distance maximum</Text>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>{t('geo.maxDistance')}</Text>
                 <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.maxDistance} km</Text>
               </View>
               <Slider
@@ -603,7 +596,7 @@ export default function SearchScreen() {
             {/* Rating */}
             <View style={styles.filterSection}>
               <View style={styles.filterHeader}>
-                <Text style={[styles.filterLabel, { color: colors.text }]}>Note minimum</Text>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>{language === 'fr' ? 'Note minimum' : 'Minimum rating'}</Text>
                 <View style={styles.ratingDisplay}>
                   <Ionicons name="star" size={14} color="#F59E0B" />
                   <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.minRating.toFixed(1)}</Text>
@@ -625,7 +618,7 @@ export default function SearchScreen() {
             {/* Max Price */}
             <View style={styles.filterSection}>
               <View style={styles.filterHeader}>
-                <Text style={[styles.filterLabel, { color: colors.text }]}>Budget maximum</Text>
+                <Text style={[styles.filterLabel, { color: colors.text }]}>{t('search.maxBudget')}</Text>
                 <Text style={[styles.filterValue, { color: '#191919' }]}>{filters.maxPrice}€</Text>
               </View>
               <Slider
@@ -643,12 +636,12 @@ export default function SearchScreen() {
 
             {/* Location Type */}
             <View style={styles.filterSection}>
-              <Text style={[styles.filterLabel, { color: colors.text }]}>Lieu</Text>
+              <Text style={[styles.filterLabel, { color: colors.text }]}>{language === 'fr' ? 'Lieu' : 'Location'}</Text>
               <View style={styles.locationOptions}>
                 {[
-                  { id: 'salon', label: 'En salon', icon: 'storefront' },
-                  { id: 'domicile', label: 'À domicile', icon: 'home' },
-                  { id: 'both', label: 'Les deux', icon: 'apps' },
+                  { id: 'salon', label: t('search.inSalon'), icon: 'storefront' },
+                  { id: 'domicile', label: t('search.atHome'), icon: 'home' },
+                  { id: 'both', label: language === 'fr' ? 'Les deux' : 'Both', icon: 'apps' },
                 ].map((option) => (
                   <TouchableOpacity
                     key={option.id}
@@ -685,7 +678,7 @@ export default function SearchScreen() {
               <View style={styles.promoToggleContent}>
                 <Ionicons name="pricetag" size={20} color="#7C3AED" />
                 <Text style={[styles.promoToggleText, { color: colors.text }]}>
-                  Uniquement les promotions
+                  {language === 'fr' ? 'Uniquement les promotions' : 'Promotions only'}
                 </Text>
               </View>
               <View style={[
@@ -706,7 +699,9 @@ export default function SearchScreen() {
               style={styles.applyButton}
               onPress={() => setShowFiltersModal(false)}
             >
-              <Text style={styles.applyButtonText}>Voir {filteredSalons.length} résultats</Text>
+              <Text style={styles.applyButtonText}>
+                {language === 'fr' ? `Voir ${filteredSalons.length} résultats` : `See ${filteredSalons.length} results`}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
