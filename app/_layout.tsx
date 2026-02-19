@@ -2,7 +2,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import 'react-native-url-polyfill/auto';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 
@@ -49,11 +48,6 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? AfroPlanDarkTheme : AfroPlanLightTheme;
-
-  useEffect(() => {
-    // Cacher le splash screen apres le chargement
-    SplashScreen.hideAsync();
-  }, []);
 
   return (
     <ErrorBoundary>
