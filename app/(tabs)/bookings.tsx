@@ -138,11 +138,6 @@ export default function StylesScreen() {
                         >
                           {style.name}
                         </Text>
-                        {style.priceRange && (
-                          <Text style={[styles.stylePrice, { color: category.color }]}>
-                            {style.priceRange}
-                          </Text>
-                        )}
                         {style.duration && (
                           <View style={styles.styleDurationRow}>
                             <Ionicons name="time-outline" size={11} color={colors.textMuted} />

@@ -53,7 +53,7 @@ export default function BookingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLoading: loadingSalon } = useSalon(id || '');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
