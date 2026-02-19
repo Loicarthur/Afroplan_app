@@ -2,6 +2,9 @@
  * Hiérarchie complète des styles de coiffure AfroPlan
  * Grand titre = catégorie principale
  * Sous-titres = styles spécifiques proposés par les coiffeurs
+ *
+ * Note : Les prix ne sont pas définis ici.
+ * Chaque coiffeur/salon fixe ses propres tarifs selon les styles qu'il propose.
  */
 
 export interface HairstyleSubStyle {
@@ -10,7 +13,7 @@ export interface HairstyleSubStyle {
   image: string;
   description?: string;
   duration?: string;
-  priceRange?: string;
+  // Prix supprimés : c'est chaque coiffeur qui définit ses tarifs
 }
 
 export interface HairstyleCategory {
@@ -36,7 +39,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
         description: 'Style naturel défini, hydraté et libre',
         duration: '1-2h',
-        priceRange: '30-80€',
       },
     ],
   },
@@ -53,7 +55,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
         description: 'Tresses carrées individuelles, toutes tailles',
         duration: '4-8h',
-        priceRange: '120-250€',
       },
       {
         id: 'knotless-braids',
@@ -61,7 +62,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
         description: 'Tresses sans nœud, légères et naturelles',
         duration: '5-9h',
-        priceRange: '150-300€',
       },
       {
         id: 'boho-braids',
@@ -69,7 +69,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
         description: 'Tresses bohèmes avec mèches ondulées',
         duration: '5-8h',
-        priceRange: '150-280€',
       },
       {
         id: 'cornrows',
@@ -77,7 +76,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
         description: 'Nattes plaquées au crâne, design au choix',
         duration: '2-5h',
-        priceRange: '60-180€',
       },
       {
         id: 'fulani-braids',
@@ -85,7 +83,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
         description: 'Style Fulani, tresses avec accessoires',
         duration: '4-7h',
-        priceRange: '130-220€',
       },
       {
         id: 'crochet-braids',
@@ -93,7 +90,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400',
         description: 'Extensions au crochet sur cornrows',
         duration: '3-6h',
-        priceRange: '100-200€',
       },
     ],
   },
@@ -110,7 +106,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
         description: 'Deux brins torsadés naturels ou avec extension',
         duration: '3-6h',
-        priceRange: '80-180€',
       },
       {
         id: 'barrel-twist',
@@ -118,7 +113,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
         description: 'Twists épais style barrel, look volumineux',
         duration: '2-4h',
-        priceRange: '70-150€',
       },
     ],
   },
@@ -135,7 +129,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
         description: 'Création ou entretien de locks naturelles',
         duration: '3-8h',
-        priceRange: '60-250€',
       },
       {
         id: 'fausse-locs',
@@ -143,7 +136,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
         description: 'Fausses locks avec extensions',
         duration: '5-9h',
-        priceRange: '180-350€',
       },
       {
         id: 'dreadlocks',
@@ -151,7 +143,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
         description: 'Dreadlocks 100% naturelles',
         duration: '4-10h',
-        priceRange: '80-300€',
       },
       {
         id: 'sisterlocks',
@@ -159,7 +150,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
         description: 'Micro-locks fines et délicates',
         duration: '8-20h',
-        priceRange: '300-800€',
       },
       {
         id: 'soft-locks',
@@ -167,7 +157,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400',
         description: 'Locks douces et légères',
         duration: '5-8h',
-        priceRange: '150-280€',
       },
       {
         id: 'butterfly-locks',
@@ -175,7 +164,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
         description: 'Locks style papillon, aspect volumineux',
         duration: '5-9h',
-        priceRange: '180-320€',
       },
       {
         id: 'invisible-locks',
@@ -183,7 +171,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
         description: 'Locks à base invisible, look naturel',
         duration: '6-10h',
-        priceRange: '200-350€',
       },
       {
         id: 'bohemian-soft-locks',
@@ -191,7 +178,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
         description: 'Locks bohèmes avec mèches ondulées',
         duration: '6-10h',
-        priceRange: '200-380€',
       },
     ],
   },
@@ -208,7 +194,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
         description: 'Petits chignons enroulés sur toute la tête',
         duration: '2-4h',
-        priceRange: '60-140€',
       },
     ],
   },
@@ -225,7 +210,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
         description: 'Pose de tissage sur tresses cornrows',
         duration: '3-6h',
-        priceRange: '100-300€',
       },
       {
         id: 'pose-perruque',
@@ -233,7 +217,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400',
         description: 'Pose et personnalisation de perruque',
         duration: '1-3h',
-        priceRange: '50-150€',
       },
       {
         id: 'flip-over',
@@ -241,7 +224,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
         description: 'Méthode flip over sans colle',
         duration: '2-4h',
-        priceRange: '80-180€',
       },
       {
         id: 'tape-in',
@@ -249,7 +231,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
         description: 'Extensions collées type tape-in',
         duration: '1-3h',
-        priceRange: '150-400€',
       },
     ],
   },
@@ -266,7 +247,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
         description: 'Queue de cheval stylisée, lisse ou bouclée',
         duration: '1-3h',
-        priceRange: '40-120€',
       },
     ],
   },
@@ -283,7 +263,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
         description: 'Coupe femme, homme ou enfant',
         duration: '0.5-2h',
-        priceRange: '20-80€',
       },
       {
         id: 'restructuration',
@@ -291,7 +270,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
         description: 'Remodelage et restructuration capillaire',
         duration: '1-3h',
-        priceRange: '50-150€',
       },
     ],
   },
@@ -308,7 +286,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400',
         description: 'Lissage brésilien, kératine ou fer',
         duration: '2-4h',
-        priceRange: '80-250€',
       },
       {
         id: 'soin',
@@ -316,7 +293,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
         description: 'Soin hydratant, protéique ou réparateur',
         duration: '1-3h',
-        priceRange: '30-100€',
       },
       {
         id: 'couleur',
@@ -324,7 +300,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
         description: 'Coloration complète, racines ou mèches',
         duration: '1.5-4h',
-        priceRange: '50-200€',
       },
       {
         id: 'balayage',
@@ -332,7 +307,6 @@ export const HAIRSTYLE_CATEGORIES: HairstyleCategory[] = [
         image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
         description: 'Balayage naturel, californien ou ombré',
         duration: '2-5h',
-        priceRange: '100-300€',
       },
     ],
   },

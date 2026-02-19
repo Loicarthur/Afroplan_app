@@ -438,6 +438,8 @@ export interface Database {
           image_url: string;
           caption: string | null;
           order: number;
+          /** true = photo principale du salon (affichée en grand dans les listings) */
+          is_main_photo: boolean;
           created_at: string;
         };
         Insert: {
@@ -446,6 +448,8 @@ export interface Database {
           image_url: string;
           caption?: string | null;
           order?: number;
+          /** true = photo principale du salon, false = sous-photo / galerie */
+          is_main_photo?: boolean;
           created_at?: string;
         };
         Update: {
@@ -454,6 +458,7 @@ export interface Database {
           image_url?: string;
           caption?: string | null;
           order?: number;
+          is_main_photo?: boolean;
           created_at?: string;
         };
         Relationships: [];

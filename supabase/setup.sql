@@ -255,16 +255,23 @@ CREATE TABLE favorites (
 CREATE INDEX idx_favorites_user ON favorites(user_id);
 
 -- GALLERY_IMAGES
+-- Distinction photo principale / sous-photos :
+--   is_main_photo = true  → Photo principale du salon (affichée en grand dans les listings)
+--   is_main_photo = false → Sous-photos / galerie (affichées lors du clic sur le salon)
+-- Note : la colonne salons.cover_image_url peut aussi servir de photo principale
+--        gallery_images complète la galerie avec les réalisations du salon.
 CREATE TABLE gallery_images (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     salon_id UUID NOT NULL REFERENCES salons(id) ON DELETE CASCADE,
     image_url TEXT NOT NULL,
     caption TEXT,
     "order" INTEGER DEFAULT 0,
+    is_main_photo BOOLEAN DEFAULT false,  -- true = photo principale du salon, false = sous-photo / galerie
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_gallery_salon ON gallery_images(salon_id);
+CREATE INDEX idx_gallery_main_photo ON gallery_images(salon_id, is_main_photo) WHERE is_main_photo = true;
 
 -- ============================================
 -- ÉTAPE 5: TABLES ÉTENDUES (coiffeur, promos, etc.)
@@ -1064,18 +1071,42 @@ ORDER BY month DESC;
 -- ============================================
 -- ÉTAPE 12: DONNÉES INITIALES
 -- ============================================
+-- AfroPlan est une plateforme exclusivement dédiée à la coiffure afro.
+-- Tous les styles et catégories reflètent l'univers capillaire afro.
+-- Les prix ne sont PAS définis ici : c'est chaque coiffeur/salon
+-- qui fixe ses propres tarifs selon les styles qu'il propose.
+-- ============================================
 
+-- Catégories 100% afro (alignées avec HAIRSTYLE_CATEGORIES du frontend)
 INSERT INTO categories (name, slug, description, icon, "order") VALUES
-    ('Tresses', 'tresses', 'Tresses africaines, box braids, cornrows', 'git-branch-outline', 1),
-    ('Locks / Dreadlocks', 'locks', 'Création et entretien de locks', 'infinite-outline', 2),
-    ('Coupe', 'coupe', 'Coupes hommes et femmes', 'cut-outline', 3),
-    ('Coloration', 'coloration', 'Coloration, mèches, balayage', 'color-palette-outline', 4),
-    ('Soins capillaires', 'soins', 'Soins hydratants, traitements', 'heart-outline', 5),
-    ('Lissage', 'lissage', 'Lissage brésilien, japonais', 'water-outline', 6),
-    ('Extensions', 'extensions', 'Tissages, extensions, perruques', 'sparkles-outline', 7),
-    ('Barber', 'barber', 'Coupe homme, barbe, dégradé', 'man-outline', 8),
-    ('Enfants', 'enfants', 'Coiffures pour enfants', 'happy-outline', 9),
-    ('Mariage', 'mariage', 'Coiffures de mariage', 'diamond-outline', 10);
+    ('Naturels / Cheveux libres', 'naturels', 'Wash & Go, styles naturels définis sur cheveux crépus et frisés', 'leaf-outline', 1),
+    ('Tresses et Nattes', 'tresses-nattes', 'Box Braids, Knotless Braids, Cornrows, Boho Braids, Fulani Braids, Crochet Braids', 'git-branch-outline', 2),
+    ('Vanilles et Twists', 'vanilles-twists', 'Vanilles, Barrel Twist — torsades naturelles ou avec extensions', 'repeat-outline', 3),
+    ('Locs', 'locs', 'Création et entretien de locks, Fausse Locs, Dreadlocks, Sisterlocks, Soft Locks, Butterfly Locks', 'infinite-outline', 4),
+    ('Boucles et Ondulations', 'boucles-ondulations', 'Bantu Knots, styles bouclés et ondulés sur cheveux afro', 'sparkles-outline', 5),
+    ('Tissages et Perruques', 'tissages-perruques', 'Tissage, Pose de perruque, Flip Over, Tape-in', 'layers-outline', 6),
+    ('Ponytail', 'ponytail', 'Queues de cheval stylisées, lisses ou bouclées', 'chevron-up-outline', 7),
+    ('Coupe et Restructuration', 'coupe-restructuration', 'Coupes afro femme / homme / enfant, restructuration capillaire', 'cut-outline', 8),
+    ('Soins, Lissage et Coloration', 'soins-lissage-coloration', 'Soins hydratants, lissage brésilien/kératine, coloration et balayage', 'color-palette-outline', 9);
+
+-- ============================================
+-- EXEMPLES DE SEED DATA : salons afro
+-- (à adapter selon l'environnement de démo)
+-- ============================================
+-- Pour insérer des salons de démo, créez d'abord des profils coiffeurs via l'app,
+-- puis exécutez des INSERT INTO salons(...) avec les owner_id correspondants.
+--
+-- Exemple de structure pour gallery_images avec distinction photo principale / sous-photos :
+--
+-- INSERT INTO gallery_images (salon_id, image_url, caption, "order", is_main_photo) VALUES
+--   -- Photo principale du salon (affichée en grand dans le listing)
+--   ('uuid-du-salon', 'https://...photo-principale.jpg', 'Façade du salon', 0, true),
+--   -- Sous-photos / galerie (affichées lors du clic sur le salon)
+--   ('uuid-du-salon', 'https://...realisation-1.jpg', 'Box Braids réalisées', 1, false),
+--   ('uuid-du-salon', 'https://...realisation-2.jpg', 'Cornrows design', 2, false),
+--   ('uuid-du-salon', 'https://...realisation-3.jpg', 'Knotless Braids', 3, false),
+--   ('uuid-du-salon', 'https://...realisation-4.jpg', 'Fulani Braids avec accessoires', 4, false);
+-- ============================================
 
 -- ============================================
 -- ÉTAPE 13: STORAGE BUCKETS

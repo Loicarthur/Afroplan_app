@@ -333,7 +333,7 @@ export default function HomeScreen() {
                       params: { styleId: style.firstStyleId, styleName: style.name },
                     });
                   } else {
-                    router.push('/(tabs)/bookings');
+                    router.push('/(tabs)/explore');
                   }
                 }}
               >

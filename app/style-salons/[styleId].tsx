@@ -219,9 +219,10 @@ export default function StyleSalonsScreen() {
               </Text>
             )}
           </View>
-          {styleInfo.style.priceRange && (
-            <View style={[styles.bannerPriceBadge, { backgroundColor: categoryColor }]}>
-              <Text style={styles.bannerPriceText}>{styleInfo.style.priceRange}</Text>
+          {styleInfo.style.duration && (
+            <View style={[styles.bannerDurationBadge, { backgroundColor: categoryColor + '22', borderColor: categoryColor + '55' }]}>
+              <Ionicons name="time-outline" size={12} color={categoryColor} />
+              <Text style={[styles.bannerDurationText, { color: categoryColor }]}>{styleInfo.style.duration}</Text>
             </View>
           )}
         </Animated.View>
@@ -265,13 +266,18 @@ export default function StyleSalonsScreen() {
               onPress={() => setSelectedSalon(salon)}
               activeOpacity={0.9}
             >
-              {/* Cover + availability badge */}
+              {/* Photo principale du salon */}
               <View style={styles.salonCoverWrapper}>
                 <Image
                   source={{ uri: salon.coverImage }}
                   style={styles.salonCover}
                   contentFit="cover"
                 />
+                {/* Badge "Photo principale" */}
+                <View style={styles.mainPhotoBadge}>
+                  <Ionicons name="image-outline" size={10} color="#FFFFFF" />
+                  <Text style={styles.mainPhotoBadgeText}>Photo principale</Text>
+                </View>
                 <View
                   style={[
                     styles.availBadge,
@@ -284,22 +290,31 @@ export default function StyleSalonsScreen() {
                 </View>
               </View>
 
-              {/* Portfolio thumbnails */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.portfolioScroll}
-                contentContainerStyle={styles.portfolioContent}
-              >
-                {salon.portfolio.map((uri, i) => (
-                  <Image
-                    key={i}
-                    source={{ uri }}
-                    style={styles.portfolioThumb}
-                    contentFit="cover"
-                  />
-                ))}
-              </ScrollView>
+              {/* Sous-photos : Réalisations du salon */}
+              {salon.portfolio.length > 0 && (
+                <View style={styles.portfolioSection}>
+                  <View style={styles.portfolioHeader}>
+                    <Ionicons name="images-outline" size={13} color="#808080" />
+                    <Text style={styles.portfolioHeaderText}>Réalisations du salon</Text>
+                    <Text style={styles.portfolioCount}>{salon.portfolio.length} photos</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.portfolioScroll}
+                    contentContainerStyle={styles.portfolioContent}
+                  >
+                    {salon.portfolio.map((uri, i) => (
+                      <Image
+                        key={i}
+                        source={{ uri }}
+                        style={styles.portfolioThumb}
+                        contentFit="cover"
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Info */}
               <View style={styles.salonInfo}>
@@ -422,12 +437,18 @@ export default function StyleSalonsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Cover */}
-              <Image
-                source={{ uri: selectedSalon.coverImage }}
-                style={styles.modalCover}
-                contentFit="cover"
-              />
+              {/* Photo principale du salon */}
+              <View style={styles.modalCoverWrapper}>
+                <Image
+                  source={{ uri: selectedSalon.coverImage }}
+                  style={styles.modalCover}
+                  contentFit="cover"
+                />
+                <View style={styles.modalMainPhotoBadge}>
+                  <Ionicons name="image-outline" size={11} color="#FFFFFF" />
+                  <Text style={styles.modalMainPhotoBadgeText}>Photo principale</Text>
+                </View>
+              </View>
 
               <View style={styles.modalContent}>
                 {/* Name + verified */}
@@ -474,14 +495,21 @@ export default function StyleSalonsScreen() {
                   <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
                 </TouchableOpacity>
 
-                {/* Portfolio section */}
-                <Text style={[styles.portfolioTitle, { color: colors.text }]}>
-                  Travaux sur "{displayName}"
-                </Text>
+                {/* Galerie photos du salon (sous-photos) */}
+                <View style={styles.galleryHeader}>
+                  <Ionicons name="images-outline" size={16} color={categoryColor} />
+                  <Text style={[styles.portfolioTitle, { color: colors.text, marginBottom: 0 }]}>
+                    Galerie photos
+                  </Text>
+                  <Text style={[styles.gallerySubLabel, { color: colors.textMuted }]}>
+                    Réalisations sur "{displayName}"
+                  </Text>
+                </View>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.portfolioLargeContent}
+                  style={{ marginBottom: 20 }}
                 >
                   {selectedSalon.portfolio.map((uri, i) => (
                     <Image
@@ -539,13 +567,11 @@ export default function StyleSalonsScreen() {
                   </View>
                 </View>
 
-                {/* Price */}
-                <View style={[styles.priceCard, { backgroundColor: colors.card }]}>
-                  <Text style={[styles.priceCardLabel, { color: colors.textMuted }]}>
-                    Prix à partir de
-                  </Text>
-                  <Text style={[styles.priceCardValue, { color: categoryColor }]}>
-                    {selectedSalon.minPrice}€
+                {/* Info prix : défini par le coiffeur dans ses services */}
+                <View style={[styles.priceInfoCard, { backgroundColor: categoryColor + '10', borderColor: categoryColor + '30' }]}>
+                  <Ionicons name="information-circle-outline" size={16} color={categoryColor} />
+                  <Text style={[styles.priceInfoText, { color: colors.textSecondary }]}>
+                    Les tarifs sont fixés par le coiffeur. Consultez ses services pour les prix exacts.
                   </Text>
                 </View>
               </View>
@@ -621,8 +647,16 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1 },
   bannerCategory: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 },
   bannerDesc: { fontSize: 12, lineHeight: 16 },
-  bannerPriceBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  bannerPriceText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  bannerDurationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  bannerDurationText: { fontSize: 12, fontWeight: '600' },
 
   // Sort bar
   sortBar: {
@@ -659,6 +693,35 @@ const styles = StyleSheet.create({
   },
   salonCoverWrapper: { position: 'relative', height: 160 },
   salonCover: { width: '100%', height: '100%' },
+
+  // Badge "Photo principale" sur la cover
+  mainPhotoBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  mainPhotoBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '500' },
+
+  // Section "Réalisations du salon"
+  portfolioSection: { backgroundColor: 'transparent' },
+  portfolioHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  portfolioHeaderText: { fontSize: 11, fontWeight: '600', color: '#808080', flex: 1 },
+  portfolioCount: { fontSize: 10, color: '#B0B0B0' },
+
   availBadge: {
     position: 'absolute',
     top: 12,
@@ -716,6 +779,18 @@ const styles = StyleSheet.create({
   },
   ctaPrimaryText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
+  // Price info (replaces priceCard)
+  priceInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  priceInfoText: { flex: 1, fontSize: 13, lineHeight: 18 },
+
   // Modal
   modalContainer: { flex: 1 },
   modalHeader: {
@@ -727,7 +802,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: { fontSize: 17, fontWeight: '700' },
+  modalCoverWrapper: { position: 'relative' },
   modalCover: { width: '100%', height: 220 },
+  modalMainPhotoBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  modalMainPhotoBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '500' },
+
+  // Gallery header dans le modal
+  galleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  gallerySubLabel: { fontSize: 12, fontStyle: 'italic' },
   modalContent: { padding: 16 },
   modalSalonName: { fontSize: 22, fontWeight: '700' },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -765,16 +865,7 @@ const styles = StyleSheet.create({
   availLabel: { fontSize: 13, fontWeight: '500', marginBottom: 3 },
   availSlot: { fontSize: 14, fontWeight: '700' },
 
-  priceCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
-  priceCardLabel: { fontSize: 13 },
-  priceCardValue: { fontSize: 22, fontWeight: '700' },
+  // (styles priceCard supprimés — prix définis par chaque coiffeur)
 
   // Modal footer
   modalFooter: {
