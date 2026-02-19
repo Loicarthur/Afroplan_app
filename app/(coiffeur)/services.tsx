@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
 
@@ -150,6 +151,7 @@ export default function CoiffeurServicesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   // Styles sélectionnés et configurés
   const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
@@ -552,7 +554,7 @@ export default function CoiffeurServicesScreen() {
 
             {/* Mèches / Extensions (Spécifique Afro) */}
             <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Gestion des mèches / extensions</Text>
+              <Text style={[styles.formLabel, { color: colors.text }]}>{t('service.manageExtensions')}</Text>
               
               <TouchableOpacity 
                 style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -560,9 +562,9 @@ export default function CoiffeurServicesScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.toggleText}>
-                  <Text style={[styles.toggleLabel, { color: colors.text }]}>Mèches nécessaires</Text>
+                  <Text style={[styles.toggleLabel, { color: colors.text }]}>{t('service.requiresExtensions')}</Text>
                   <Text style={[styles.toggleDesc, { color: colors.textMuted }]}>
-                    Indique si cette coiffure nécessite des extensions
+                    {t('service.extensionsDesc')}
                   </Text>
                 </View>
                 <View style={[
@@ -581,9 +583,9 @@ export default function CoiffeurServicesScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.toggleText}>
-                    <Text style={[styles.toggleLabel, { color: colors.text }]}>Mèches fournies par le salon</Text>
+                    <Text style={[styles.toggleLabel, { color: colors.text }]}>{t('service.extensionsIncluded')}</Text>
                     <Text style={[styles.toggleDesc, { color: colors.textMuted }]}>
-                      Désactivez si la cliente doit apporter ses propres mèches
+                      {t('service.extensionsIncludedDesc')}
                     </Text>
                   </View>
                   <View style={[

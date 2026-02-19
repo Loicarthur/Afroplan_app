@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useSalon } from '@/hooks/use-salons';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
@@ -52,6 +53,7 @@ export default function BookingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const { isLoading: loadingSalon } = useSalon(id || '');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -69,21 +71,21 @@ export default function BookingScreen() {
         return {
           amountNow: price,
           amountLater: 0,
-          label: 'Paiement integral',
-          description: 'Payez la totalite maintenant',
+          label: t('checkout.fullPayment'),
+          description: t('checkout.payFull'),
         };
       case 'deposit':
         return {
           amountNow: DEPOSIT_AMOUNT,
           amountLater: price - DEPOSIT_AMOUNT,
-          label: 'Acompte',
-          description: `Payez ${DEPOSIT_AMOUNT} EUR maintenant, le reste au salon`,
+          label: t('checkout.depositOnly'),
+          description: t('checkout.depositInfo'),
         };
       case 'on_site':
         return {
           amountNow: 0,
           amountLater: price,
-          label: 'Payer au salon',
+          label: 'Payer au salon', // Fallback if no key
           description: 'Payez la totalite lors de votre visite',
         };
     }
@@ -142,18 +144,18 @@ export default function BookingScreen() {
   const handleConfirmBooking = async () => {
     if (!isAuthenticated) {
       Alert.alert(
-        'Connexion requise',
-        'Vous devez etre connecte pour reserver',
+        t('auth.loginRequired'),
+        t('auth.loginRequiredMessage'),
         [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push('/(auth)/login') },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('auth.login'), onPress: () => router.push('/(auth)/login') },
         ]
       );
       return;
     }
 
     if (!selectedSlot) {
-      Alert.alert('Attention', 'Veuillez selectionner un creneau horaire');
+      Alert.alert(t('common.error'), 'Veuillez selectionner un creneau horaire');
       return;
     }
 
@@ -167,8 +169,8 @@ export default function BookingScreen() {
       const bookingId = `booking-${Date.now()}`;
 
       Alert.alert(
-        'Reservation confirmee!',
-        `Votre reservation a ete confirmee.\n\nDate: ${formatDate(selectedDate).day} ${formatDate(selectedDate).date} ${formatDate(selectedDate).month}\nHeure: ${selectedSlot.start}\nService: ${serviceName}\n\nMontant paye: ${paymentDetails.amountNow} EUR\nReste a payer: ${paymentDetails.amountLater} EUR\n\nVous pouvez desormais echanger avec votre coiffeur.`,
+        t('checkout.paymentSuccess'),
+        `${t('checkout.paymentSuccessDesc')}\n\nDate: ${formatDate(selectedDate).day} ${formatDate(selectedDate).date} ${formatDate(selectedDate).month}\nHeure: ${selectedSlot.start}\nService: ${serviceName}\n\nMontant paye: ${paymentDetails.amountNow} EUR\nReste a payer: ${paymentDetails.amountLater} EUR\n\nVous pouvez desormais echanger avec votre coiffeur.`,
         [
           {
             text: 'Envoyer un message',
@@ -178,13 +180,13 @@ export default function BookingScreen() {
             }),
           },
           {
-            text: 'Mes reservations',
+            text: t('booking.yourBookings'),
             onPress: () => router.replace('/(tabs)/reservations'),
           },
         ]
       );
     } catch {
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la reservation');
+      Alert.alert(t('common.error'), t('common.errorOccurred'));
     } finally {
       setIsSubmitting(false);
     }
@@ -196,19 +198,19 @@ export default function BookingScreen() {
         <View style={styles.authPrompt}>
           <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
           <Text style={[styles.authTitle, { color: colors.text }]}>
-            Connexion requise
+            {t('auth.loginRequired')}
           </Text>
           <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-            Vous devez etre connecte pour effectuer une reservation
+            {t('auth.loginRequiredMessage')}
           </Text>
           <Button
-            title="Se connecter"
+            title={t('auth.login')}
             onPress={() => router.push('/(auth)/login')}
             fullWidth
             style={{ marginTop: Spacing.lg }}
           />
           <Button
-            title="Creer un compte"
+            title={t('auth.register')}
             variant="outline"
             onPress={() => router.push('/(auth)/register')}
             fullWidth
@@ -233,7 +235,7 @@ export default function BookingScreen() {
         {/* Service selectionne */}
         <View style={[styles.section, styles.serviceSection, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Service selectionne
+            {language === 'fr' ? 'Service sélectionné' : 'Selected Service'}
           </Text>
           <View style={styles.serviceInfo}>
             <View>
@@ -258,8 +260,8 @@ export default function BookingScreen() {
               />
               <Text style={[styles.extensionNoteText, { color: isExtensionsIncluded ? '#166534' : '#92400E' }]}>
                 {isExtensionsIncluded 
-                  ? 'Mèches incluses : Le coiffeur fournit les mèches.' 
-                  : 'Mèches non fournies : Vous devez apporter vos propres mèches.'}
+                  ? t('service.extensionsNoteIncluded')
+                  : t('service.extensionsNoteNotIncluded')}
               </Text>
             </View>
           )}
@@ -268,7 +270,7 @@ export default function BookingScreen() {
         {/* Selection de la date */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Choisir une date
+            {language === 'fr' ? 'Choisir une date' : 'Choose a date'}
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.datesContainer}>
@@ -322,7 +324,7 @@ export default function BookingScreen() {
         {/* Selection de l'heure */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Choisir un creneau
+            {language === 'fr' ? 'Choisir un créneau' : 'Choose a time slot'}
           </Text>
           <View style={styles.slotsGrid}>
             {timeSlots.map((slot, index) => {
@@ -354,7 +356,7 @@ export default function BookingScreen() {
         {/* Options de paiement */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Mode de paiement
+            {t('checkout.paymentMethod')}
           </Text>
 
           {/* Option: Paiement integral */}
@@ -377,10 +379,10 @@ export default function BookingScreen() {
               </View>
               <View style={styles.paymentOptionInfo}>
                 <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  Paiement integral
+                  {t('checkout.fullPayment')}
                 </Text>
                 <Text style={[styles.paymentOptionDesc, { color: colors.textSecondary }]}>
-                  Payez la totalite maintenant
+                  {t('checkout.payFull')}
                 </Text>
               </View>
               <Text style={[styles.paymentOptionAmount, { color: colors.primary }]}>
@@ -409,7 +411,7 @@ export default function BookingScreen() {
               </View>
               <View style={styles.paymentOptionInfo}>
                 <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  Acompte de {DEPOSIT_AMOUNT} EUR
+                  {t('checkout.depositOnly')} ({DEPOSIT_AMOUNT} EUR)
                 </Text>
                 <Text style={[styles.paymentOptionDesc, { color: colors.textSecondary }]}>
                   Payez {DEPOSIT_AMOUNT} EUR maintenant, le reste ({price - DEPOSIT_AMOUNT} EUR) au salon
@@ -461,7 +463,7 @@ export default function BookingScreen() {
         {/* Resume */}
         <View style={[styles.section, styles.summarySection, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Resume
+            {language === 'fr' ? 'Résumé' : 'Summary'}
           </Text>
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
@@ -522,7 +524,7 @@ export default function BookingScreen() {
       {/* Bouton de confirmation */}
       <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
         <Button
-          title={isSubmitting ? 'Confirmation...' : `Confirmer - ${paymentDetails.amountNow} EUR`}
+          title={isSubmitting ? 'Confirmation...' : `${t('common.confirm')} - ${paymentDetails.amountNow} EUR`}
           onPress={handleConfirmBooking}
           disabled={!selectedSlot || isSubmitting}
           fullWidth

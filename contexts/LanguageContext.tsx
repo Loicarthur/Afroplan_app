@@ -227,6 +227,16 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.homeServiceFee': 'Frais de déplacement',
     'salon.connectLogin': 'Se connecter',
     'salon.createPro': 'Créer un compte Pro',
+
+    // Extensions
+    'service.requiresExtensions': 'Mèches nécessaires',
+    'service.extensionsIncluded': 'Mèches fournies par le salon',
+    'service.extensionsNotIncluded': 'Mèches non fournies',
+    'service.extensionsNoteIncluded': 'Mèches incluses : Le coiffeur fournit les mèches.',
+    'service.extensionsNoteNotIncluded': 'Mèches non fournies : Vous devez apporter vos propres mèches.',
+    'service.manageExtensions': 'Gestion des mèches / extensions',
+    'service.extensionsDesc': 'Indique si cette coiffure nécessite des extensions',
+    'service.extensionsIncludedDesc': 'Désactivez si la cliente doit apporter ses propres mèches',
   },
 
   en: {
@@ -430,6 +440,16 @@ const translations: Record<Language, Record<string, string>> = {
     'salon.homeServiceFee': 'Travel fee',
     'salon.connectLogin': 'Log in',
     'salon.createPro': 'Create Pro account',
+
+    // Extensions
+    'service.requiresExtensions': 'Extensions required',
+    'service.extensionsIncluded': 'Extensions provided by salon',
+    'service.extensionsNotIncluded': 'Extensions not provided',
+    'service.extensionsNoteIncluded': 'Extensions included: The hairstylist provides the extensions.',
+    'service.extensionsNoteNotIncluded': 'Extensions not included: You must bring your own extensions.',
+    'service.manageExtensions': 'Manage extensions',
+    'service.extensionsDesc': 'Indicate if this hairstyle requires extensions',
+    'service.extensionsIncludedDesc': 'Disable if the client must bring their own extensions',
   },
 
   de: {
