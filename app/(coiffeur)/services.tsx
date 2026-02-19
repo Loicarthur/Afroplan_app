@@ -140,6 +140,8 @@ type ConfiguredStyle = {
   price: string;
   duration: string;
   location: ServiceLocation;
+  requiresExtensions: boolean;
+  extensionsIncluded: boolean;
 };
 
 // ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
@@ -158,6 +160,8 @@ export default function CoiffeurServicesScreen() {
   const [configPrice, setConfigPrice] = useState('');
   const [configDuration, setConfigDuration] = useState('');
   const [configLocation, setConfigLocation] = useState<ServiceLocation>('salon');
+  const [requiresExtensions, setRequiresExtensions] = useState(false);
+  const [extensionsIncluded, setExtensionsIncluded] = useState(false);
 
   // Vue catalogue ou vue "mes styles"
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
@@ -174,10 +178,14 @@ export default function CoiffeurServicesScreen() {
       setConfigPrice(existing.price);
       setConfigDuration(existing.duration);
       setConfigLocation(existing.location);
+      setRequiresExtensions(existing.requiresExtensions || false);
+      setExtensionsIncluded(existing.extensionsIncluded || false);
     } else {
       setConfigPrice('');
       setConfigDuration('');
       setConfigLocation('salon');
+      setRequiresExtensions(false);
+      setExtensionsIncluded(false);
     }
     setPendingStyle({ ...style, categoryLabel });
     setConfigModal(true);
@@ -223,6 +231,8 @@ export default function CoiffeurServicesScreen() {
       price: configPrice,
       duration: configDuration,
       location: configLocation,
+      requiresExtensions: requiresExtensions,
+      extensionsIncluded: extensionsIncluded,
     };
 
     setConfiguredStyles((prev) => {
@@ -539,6 +549,53 @@ export default function CoiffeurServicesScreen() {
                 ))}
               </View>
             </View>
+
+            {/* Mèches / Extensions (Spécifique Afro) */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Gestion des mèches / extensions</Text>
+              
+              <TouchableOpacity 
+                style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setRequiresExtensions(!requiresExtensions)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.toggleText}>
+                  <Text style={[styles.toggleLabel, { color: colors.text }]}>Mèches nécessaires</Text>
+                  <Text style={[styles.toggleDesc, { color: colors.textMuted }]}>
+                    Indique si cette coiffure nécessite des extensions
+                  </Text>
+                </View>
+                <View style={[
+                  styles.toggleSwitch, 
+                  requiresExtensions && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  { borderColor: colors.border }
+                ]}>
+                  {requiresExtensions && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                </View>
+              </TouchableOpacity>
+
+              {requiresExtensions && (
+                <TouchableOpacity 
+                  style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: Spacing.sm }]}
+                  onPress={() => setExtensionsIncluded(!extensionsIncluded)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.toggleText}>
+                    <Text style={[styles.toggleLabel, { color: colors.text }]}>Mèches fournies par le salon</Text>
+                    <Text style={[styles.toggleDesc, { color: colors.textMuted }]}>
+                      Désactivez si la cliente doit apporter ses propres mèches
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.toggleSwitch, 
+                    extensionsIncluded && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    { borderColor: colors.border }
+                  ]}>
+                    {extensionsIncluded && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -785,6 +842,33 @@ const styles = StyleSheet.create({
   locationOptionDesc: {
     fontSize: FontSizes.sm,
     marginTop: 2,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  toggleText: {
+    flex: 1,
+  },
+  toggleLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  toggleDesc: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  toggleSwitch: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   /* Auth prompt */

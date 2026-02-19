@@ -88,6 +88,8 @@ export default function SalonDetailScreen() {
         serviceName: selectedService.name,
         servicePrice: selectedService.price.toString(),
         serviceDuration: selectedService.duration_minutes.toString(),
+        requiresExtensions: selectedService.requires_extensions ? 'true' : 'false',
+        extensionsIncluded: selectedService.extensions_included ? 'true' : 'false',
       },
     });
   };
@@ -273,6 +275,21 @@ export default function SalonDetailScreen() {
                         <Text style={[styles.serviceName, { color: colors.text }]}>
                           {service.name}
                         </Text>
+                        {service.requires_extensions && (
+                          <View style={styles.extensionBadge}>
+                            <Ionicons 
+                              name="sparkles-outline" 
+                              size={12} 
+                              color={service.extensions_included ? colors.success : colors.warning} 
+                            />
+                            <Text style={[
+                              styles.extensionText, 
+                              { color: service.extensions_included ? colors.success : colors.warning }
+                            ]}>
+                              {service.extensions_included ? 'Mèches incluses' : 'Mèches non fournies'}
+                            </Text>
+                          </View>
+                        )}
                         {service.description && (
                           <Text
                             style={[styles.serviceDescription, { color: colors.textSecondary }]}
@@ -513,6 +530,16 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.lg,
     fontWeight: '700',
     marginLeft: Spacing.md,
+  },
+  extensionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  extensionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   noServices: {
     fontSize: FontSizes.md,

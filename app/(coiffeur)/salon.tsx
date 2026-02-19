@@ -310,6 +310,7 @@ export default function SalonManagementScreen() {
         city: city.trim(),
         postal_code: postalCode.trim(),
         specialties: selectedSpecialties,
+        cover_image_url: photoUrls.length > 0 ? photoUrls[0] : null,
         photos: photoUrls,
         opening_hours: openingHours,
         offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',

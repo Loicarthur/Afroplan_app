@@ -27,7 +27,7 @@ web-build/
 # macOS
 .DS_Store
 *.pem
-
+.gemini
 # Local
 *.local
 

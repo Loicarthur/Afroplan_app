@@ -29,13 +29,25 @@ type TimeSlot = {
 };
 
 export default function BookingScreen() {
-  const { id, serviceName, servicePrice, serviceDuration } = useLocalSearchParams<{
+  const { 
+    id, 
+    serviceName, 
+    servicePrice, 
+    serviceDuration,
+    requiresExtensions,
+    extensionsIncluded
+  } = useLocalSearchParams<{
     id: string;
     serviceId: string;
     serviceName: string;
     servicePrice: string;
     serviceDuration: string;
+    requiresExtensions: string;
+    extensionsIncluded: string;
   }>();
+
+  const isRequiresExtensions = requiresExtensions === 'true';
+  const isExtensionsIncluded = extensionsIncluded === 'true';
 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -236,6 +248,21 @@ export default function BookingScreen() {
               {price} EUR
             </Text>
           </View>
+
+          {isRequiresExtensions && (
+            <View style={[styles.extensionNote, { backgroundColor: isExtensionsIncluded ? '#F0FDF4' : '#FFFBEB' }]}>
+              <Ionicons 
+                name={isExtensionsIncluded ? 'checkmark-circle' : 'alert-circle'} 
+                size={18} 
+                color={isExtensionsIncluded ? '#22C55E' : '#D97706'} 
+              />
+              <Text style={[styles.extensionNoteText, { color: isExtensionsIncluded ? '#166534' : '#92400E' }]}>
+                {isExtensionsIncluded 
+                  ? 'Mèches incluses : Le coiffeur fournit les mèches.' 
+                  : 'Mèches non fournies : Vous devez apporter vos propres mèches.'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Selection de la date */}
@@ -563,6 +590,19 @@ const styles = StyleSheet.create({
   servicePrice: {
     fontSize: FontSizes.xl,
     fontWeight: '700',
+  },
+  extensionNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+  },
+  extensionNoteText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    flex: 1,
   },
   datesContainer: {
     flexDirection: 'row',
