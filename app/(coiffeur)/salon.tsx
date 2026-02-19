@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -333,7 +334,6 @@ export default function SalonManagementScreen() {
         photos: photoUrls,
         opening_hours: openingHours,
         offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
-        service_location: serviceLocationType,
         min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both')
           ? parseFloat(homeServiceFee || '0')
           : 0,

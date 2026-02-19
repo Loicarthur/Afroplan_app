@@ -377,6 +377,9 @@ export default function CoiffeurServicesScreen() {
                             <View style={styles.styleChipLocBadge}>
                               <Ionicons name={locationIcon(config.location)} size={11} color={colors.primary} />
                             </View>
+                            {config.requiresExtensions && (
+                              <Ionicons name="sparkles" size={11} color="#F59E0B" />
+                            )}
                           </View>
                         )}
                       </TouchableOpacity>
@@ -451,6 +454,14 @@ export default function CoiffeurServicesScreen() {
                       <Ionicons name={locationIcon(cs.location)} size={14} color="#7C3AED" />
                       <Text style={[styles.myStyleBadgeText, { color: '#7C3AED' }]}>{locationLabel(cs.location)}</Text>
                     </View>
+                    {cs.requiresExtensions && (
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#F59E0B20' }]}>
+                        <Ionicons name="sparkles-outline" size={14} color="#F59E0B" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#F59E0B' }]}>
+                          {cs.extensionsIncluded ? t('service.extensionsIncluded') : t('service.requiresExtensions')}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               ))

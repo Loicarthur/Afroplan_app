@@ -60,7 +60,7 @@ export default function RootLayout() {
       <AuthProvider>
         <LanguageProvider>
           <ThemeProvider value={theme}>
-            <Stack>
+            <Stack initialRouteName="index">
           <Stack.Screen
             name="index"
             options={{
