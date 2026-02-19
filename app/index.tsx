@@ -8,6 +8,7 @@ import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 
@@ -23,6 +24,13 @@ export default function Index() {
     });
   }, []);
 
+  // Cacher le splash screen uniquement quand auth ET role sont chargés
+  useEffect(() => {
+    if (!isLoading && roleLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [isLoading, roleLoaded]);
+
   if (isLoading || !roleLoaded) {
     return (
       <View style={styles.container}>
@@ -32,7 +40,15 @@ export default function Index() {
   }
 
   // Connecté → direction l'app selon le rôle
-  if (isAuthenticated && profile) {
+  if (isAuthenticated) {
+    // Profil pas encore chargé (chargement asynchrone post-auth)
+    if (!profile) {
+      return (
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#191919" />
+        </View>
+      );
+    }
     if (profile.role === 'coiffeur') {
       return <Redirect href="/(coiffeur)" />;
     }
