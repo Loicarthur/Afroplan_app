@@ -1,22 +1,10 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
-import fs from "fs";
-import path from "path";
-import dotenv from "dotenv";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  // 1) EAS fournit EXPO_PUBLIC_APP_ENV via eas.json
+  // Expo SDK 49+ automatically loads .env.development / .env.production etc.
+  // and injects EXPO_PUBLIC_* variables into process.env before this file runs.
+  // No manual dotenv loading is needed here.
   const appEnv = process.env.EXPO_PUBLIC_APP_ENV ?? "development";
-
-  // 2) Charge automatiquement .env.preview / .env.production etc.
-  const envFile = `.env.${appEnv}`;
-  const envPath = path.resolve(__dirname, envFile);
-
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    console.log(`Loaded env file: ${envFile}`);
-  } else {
-    console.warn(`Env file not found: ${envFile}`);
-  }
 
   return {
     ...config,
