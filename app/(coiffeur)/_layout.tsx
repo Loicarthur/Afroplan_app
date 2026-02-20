@@ -32,6 +32,7 @@ export default function CoiffeurLayout() {
         name="index"
         options={{
           title: 'Accueil',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
           ),
