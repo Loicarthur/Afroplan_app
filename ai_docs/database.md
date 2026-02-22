@@ -21,7 +21,7 @@ profiles (Users: clients, coiffeurs, admins)
 | Table | Description | RLS |
 |-------|-------------|-----|
 | `profiles` | User profiles (linked to Supabase Auth) | Yes |
-| `categories` | Afro hair style categories (Braids, Locs, etc.) | Yes |
+| `categories` | Afro hair style categories (Braids, Locks, etc.) | Yes |
 | `salons` | Salons or coiffeur profiles | Yes |
 | `services` | Specific services offered by a salon | Yes |
 | `bookings` | Appointments with status and payment tracking | Yes |

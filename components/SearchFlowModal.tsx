@@ -169,12 +169,11 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                   onPress={() => selectHairstyle(cat.id)}
                 >
                   <Image
-                    source={{ uri: cat.styles[0]?.image ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' }}
+                    source={cat.styles[0]?.image}
                     style={styles.hairstyleImage}
                     contentFit="cover"
                   />
                   <View style={[styles.hairstyleOverlay, { backgroundColor: cat.color + 'BB' }]}>
-                    <Text style={styles.hairstyleEmoji}>{cat.emoji}</Text>
                     <Text style={styles.hairstyleName} numberOfLines={2}>{cat.title}</Text>
                   </View>
                   {filters.hairstyle === cat.id && (

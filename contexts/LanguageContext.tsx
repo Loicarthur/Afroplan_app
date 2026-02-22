@@ -350,7 +350,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Hairstyles
     'hairstyle.tresses': 'Braids',
-    'hairstyle.locks': 'Locs',
+    'hairstyle.locks': 'Locks',
     'hairstyle.coupe': 'Cut',
     'hairstyle.soins': 'Care',
     'hairstyle.coloration': 'Coloring',

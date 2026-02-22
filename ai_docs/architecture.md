@@ -13,6 +13,19 @@
 | State Management | React Context (Auth, Language) |
 | Icons | @expo/vector-icons |
 
+## Core Concepts
+
+### Image Handling
+The application uses local assets for hairstyle categories and styles.
+- **Source**: `assets/images/`
+- **Implementation**: Managed in `constants/hairstyleCategories.ts` using `require()`.
+- **Display**: Categories automatically use the image of their first sub-style as a preview.
+
+### Service Pricing & Flexibility
+- **Customization**: Hairdressers (Coiffeurs) have full control over their offerings. They define their own prices and estimated durations for each style.
+- **Custom Notes**: Hairdressers can add specific notes to each service (e.g., "Includes hair take-down", "Extra for long hair").
+- **Location**: Services can be offered in-salon, at home, or both, as defined by the professional.
+
 ## Folder Structure
 
 ```

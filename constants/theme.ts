@@ -66,7 +66,7 @@ export const Colors = {
     badgeBraids: '#191919',
     badgeNatural: '#4A4A4A',
     badgeTwists: '#191919',
-    badgeLocs: '#4A4A4A',
+    badgeLocks: '#4A4A4A',
     badgeWeave: '#191919',
   },
   dark: {
@@ -119,7 +119,7 @@ export const Colors = {
     badgeBraids: '#f9f8f8',
     badgeNatural: '#C0C0C0',
     badgeTwists: '#f9f8f8',
-    badgeLocs: '#C0C0C0',
+    badgeLocks: '#C0C0C0',
     badgeWeave: '#f9f8f8',
   },
 };

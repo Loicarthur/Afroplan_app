@@ -22,6 +22,15 @@ Afroplan uses a custom theme (defined in `constants/theme.ts`) with a focus on a
 - **AuthGuardModal**: Prompts unauthenticated users to log in before performing actions.
 - **SearchFlowModal**: Stepper-based search for location and service.
 - **SuccessModal**: Feedback after booking or payment.
+- **ServiceConfigModal**: (Internal to `(coiffeur)/services.tsx`) allows coiffeurs to set prices, durations, and notes with visual image feedback of the selected style.
+
+## Special UI Features
+
+### Visual Service Management
+Coiffeurs receive rich visual feedback when managing their catalog:
+- **Thumbnail Previews**: In the style catalog and my-styles list.
+- **Hero Image Previews**: In configuration modals to confirm style selection.
+- **Dynamic Headers**: Category headers are simplified (emojis removed) to focus on professional photography.
 
 ## Navigation Structure (`app/`)
 The app uses Expo Router with the following structure:

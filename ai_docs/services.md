@@ -31,6 +31,10 @@ async getSalonById(id: string): Promise<Salon | null> {
 }
 ```
 
+### Service Definitions
+- **Provider Autonomy**: The application does not define fixed prices or durations. These are entirely managed by the provider via `salon.service.ts` and UI interfaces.
+- **Service Extensions**: Support for adding custom notes/précisions to each service, allowing providers to specify if they include take-down (démontage) or other extra tasks.
+
 ### Real-time
 Some services might use Supabase Realtime for updates (e.g., chat messages or booking status changes).
 

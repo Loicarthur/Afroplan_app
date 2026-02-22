@@ -32,7 +32,7 @@ const FAVORITE_SALONS = [
     rating: 4.9,
     reviews_count: 234,
     address: 'Paris 18e',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/Box_Braids.jpg'),
   },
   {
     id: '2',
@@ -40,7 +40,7 @@ const FAVORITE_SALONS = [
     rating: 4.8,
     reviews_count: 189,
     address: 'Lyon 2e',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    image: require('@/assets/images/Fausse_Locks.jpg'),
   },
 ];
 
@@ -51,28 +51,28 @@ const SAVED_STYLES = [
     name: 'Box Braids Longues',
     price: '150-200€',
     category: 'braids',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/Box_Braids.jpg'),
   },
   {
     id: '2',
     name: 'Cornrows Design',
     price: '90-150€',
     category: 'braids',
-    image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+    image: require('@/assets/images/Nattes_Collees.jpg'),
   },
   {
     id: '3',
-    name: 'Faux Locs',
+    name: 'Faux Locks',
     price: '180-250€',
-    category: 'locs',
-    image: 'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
+    category: 'locks',
+    image: require('@/assets/images/Fausse_Locks.jpg'),
   },
   {
     id: '4',
     name: 'Passion Twists',
     price: '120-180€',
     category: 'twists',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/Vanille.jpg'),
   },
 ];
 
@@ -117,7 +117,7 @@ export default function FavoritesScreen() {
       braids: 'Braids',
       natural: 'Natural',
       twists: 'Twists',
-      locs: 'Locs',
+      locks: 'Locks',
       weave: 'Weave',
     };
     return labels[category] || category;
@@ -149,7 +149,7 @@ export default function FavoritesScreen() {
               style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
               activeOpacity={0.7}
             >
-              <Image source={{ uri: salon.image }} style={styles.salonImage} contentFit="cover" />
+              <Image source={salon.image} style={styles.salonImage} contentFit="cover" />
               <View style={styles.salonContent}>
                 <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
                 <View style={styles.ratingRow}>
@@ -190,7 +190,7 @@ export default function FavoritesScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.styleImageContainer}>
-                  <Image source={{ uri: item.image }} style={styles.styleImage} contentFit="cover" />
+                  <Image source={item.image} style={styles.styleImage} contentFit="cover" />
                   <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
                     <Text style={[styles.categoryText, { color: colorScheme === 'dark' ? '#191919' : '#FFFFFF' }]}>
                       {getCategoryLabel(item.category)}

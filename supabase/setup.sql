@@ -1087,7 +1087,7 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
     ('Naturels / Cheveux libres', 'naturels', 'Wash & Go, styles naturels définis sur cheveux crépus et frisés', 'leaf-outline', 1),
     ('Tresses et Nattes', 'tresses-nattes', 'Box Braids, Knotless Braids, Cornrows, Boho Braids, Fulani Braids, Crochet Braids', 'git-branch-outline', 2),
     ('Vanilles et Twists', 'vanilles-twists', 'Vanilles, Barrel Twist — torsades naturelles ou avec extensions', 'repeat-outline', 3),
-    ('Locs', 'locs', 'Création et entretien de locks, Fausse Locs, Dreadlocks, Sisterlocks, Soft Locks, Butterfly Locks', 'infinite-outline', 4),
+    ('Locks', 'locks', 'Création et entretien de locks, Fausse Locks, Dreadlocks, Sisterlocks, Soft Locks, Butterfly Locks', 'infinite-outline', 4),
     ('Boucles et Ondulations', 'boucles-ondulations', 'Bantu Knots, styles bouclés et ondulés sur cheveux afro', 'sparkles-outline', 5),
     ('Tissages et Perruques', 'tissages-perruques', 'Tissage, Pose de perruque, Flip Over, Tape-in', 'layers-outline', 6),
     ('Ponytail', 'ponytail', 'Queues de cheval stylisées, lisses ou bouclées', 'chevron-up-outline', 7),

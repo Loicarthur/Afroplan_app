@@ -60,7 +60,7 @@ const SALONS_DATA = [
     distance: '1.2 km',
     availability: "Aujourd'hui 15h",
     availabilityColor: '#22C55E',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/Box_Braids.jpg'),
     services: ['Tresses', 'Twists', 'Coloration'],
     minPrice: 45,
     hasPromo: true,
@@ -78,8 +78,8 @@ const SALONS_DATA = [
     distance: '2.5 km',
     availability: 'Demain 10h',
     availabilityColor: '#4A4A4A',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
-    services: ['Locs', 'Coupe homme', 'Entretien'],
+    image: require('@/assets/images/Fausse_Locks.jpg'),
+    services: ['Locks', 'Coupe homme', 'Entretien'],
     minPrice: 30,
     hasPromo: false,
     promoText: '',
@@ -96,7 +96,7 @@ const SALONS_DATA = [
     distance: '3.8 km',
     availability: 'Mercredi 14h',
     availabilityColor: '#191919',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/Wash_and_Go.jpg'),
     services: ['Soins', 'Hydratation', 'Coupe'],
     minPrice: 35,
     hasPromo: true,
@@ -114,7 +114,7 @@ const SALONS_DATA = [
     distance: '4.2 km',
     availability: "Aujourd'hui 18h",
     availabilityColor: '#22C55E',
-    image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+    image: require('@/assets/images/Crochet_Braids.jpg'),
     services: ['Tresses', 'Cornrows', 'Box braids'],
     minPrice: 50,
     hasPromo: false,
@@ -440,7 +440,7 @@ export default function SearchScreen() {
                   style={styles.mapSalonCardContent}
                   onPress={() => handleSalonPress(salon.id)}
                 >
-                  <Image source={{ uri: salon.image }} style={styles.mapSalonImage} contentFit="cover" />
+                  <Image source={salon.image} style={styles.mapSalonImage} contentFit="cover" />
                   <View style={styles.mapSalonInfo}>
                     <Text style={[styles.mapSalonName, { color: colors.text }]} numberOfLines={1}>
                       {salon.name}
@@ -496,7 +496,7 @@ export default function SearchScreen() {
               >
                 <View style={styles.salonImageContainer}>
                   <Image
-                    source={{ uri: salon.image }}
+                    source={salon.image}
                     style={styles.salonImage}
                     contentFit="cover"
                   />

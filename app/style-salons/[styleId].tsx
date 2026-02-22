@@ -42,13 +42,12 @@ const MOCK_SALONS = [
     available: true,
     nextSlot: "Aujourd'hui 15h",
     minPrice: 45,
-    coverImage:
-      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600',
+    coverImage: require('@/assets/images/Box_Braids.jpg'),
     portfolio: [
-      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
-      'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
-      'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
-      'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+      require('@/assets/images/Box_Braids.jpg'),
+      require('@/assets/images/Boho_Braids.jpg'),
+      require('@/assets/images/Knotless_Braids.jpg'),
+      require('@/assets/images/Fulani_Braids.jpg'),
     ],
     specialties: ['Box Braids', 'Knotless Braids', 'Cornrows'],
     isVerified: true,
@@ -65,15 +64,14 @@ const MOCK_SALONS = [
     available: true,
     nextSlot: 'Demain 10h',
     minPrice: 60,
-    coverImage:
-      'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=600',
+    coverImage: require('@/assets/images/Fausse_Locks.jpg'),
     portfolio: [
-      'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
-      'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400',
-      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
-      'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
+      require('@/assets/images/Fausse_Locks.jpg'),
+      require('@/assets/images/Soft_Locks.jpg'),
+      require('@/assets/images/Butterfly_Locks.jpg'),
+      require('@/assets/images/Invisible_Locks.jpg'),
     ],
-    specialties: ['Fausse Locs', 'Soft Locks', 'Butterfly Locks'],
+    specialties: ['Fausse Locks', 'Soft Locks', 'Butterfly Locks'],
     isVerified: true,
   },
   {
@@ -88,12 +86,11 @@ const MOCK_SALONS = [
     available: false,
     nextSlot: 'Mercredi 14h',
     minPrice: 35,
-    coverImage:
-      'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=600',
+    coverImage: require('@/assets/images/Wash_and_Go.jpg'),
     portfolio: [
-      'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
-      'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=400',
-      'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+      require('@/assets/images/Wash_and_Go.jpg'),
+      require('@/assets/images/Bantu_Knots.jpg'),
+      require('@/assets/images/Vanille.jpg'),
     ],
     specialties: ['Wash & Go', 'Bantu Knots', 'Twists'],
     isVerified: false,
@@ -110,12 +107,12 @@ const MOCK_SALONS = [
     available: true,
     nextSlot: "Aujourd'hui 18h",
     minPrice: 50,
-    coverImage:
-      'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=600',
+    coverImage: require('@/assets/images/Crochet_Braids.jpg'),
     portfolio: [
-      'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=400',
-      'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400',
-      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+      require('@/assets/images/Crochet_Braids.jpg'),
+      require('@/assets/images/Boho_Braids.jpg'),
+      require('@/assets/images/Nattes_Collees.jpg'),
+      require('@/assets/images/Box_Braids.jpg'),
     ],
     specialties: ['Fulani Braids', 'Crochet Braids', 'Boho Braids'],
     isVerified: false,
@@ -219,12 +216,6 @@ export default function StyleSalonsScreen() {
               </Text>
             )}
           </View>
-          {styleInfo.style.duration && (
-            <View style={[styles.bannerDurationBadge, { backgroundColor: categoryColor + '22', borderColor: categoryColor + '55' }]}>
-              <Ionicons name="time-outline" size={12} color={categoryColor} />
-              <Text style={[styles.bannerDurationText, { color: categoryColor }]}>{styleInfo.style.duration}</Text>
-            </View>
-          )}
         </Animated.View>
       )}
 
@@ -269,7 +260,7 @@ export default function StyleSalonsScreen() {
               {/* Photo principale du salon */}
               <View style={styles.salonCoverWrapper}>
                 <Image
-                  source={{ uri: salon.coverImage }}
+                  source={salon.coverImage}
                   style={styles.salonCover}
                   contentFit="cover"
                 />
@@ -304,10 +295,10 @@ export default function StyleSalonsScreen() {
                     style={styles.portfolioScroll}
                     contentContainerStyle={styles.portfolioContent}
                   >
-                    {salon.portfolio.map((uri, i) => (
+                    {salon.portfolio.map((img, i) => (
                       <Image
                         key={i}
-                        source={{ uri }}
+                        source={img}
                         style={styles.portfolioThumb}
                         contentFit="cover"
                       />
@@ -440,7 +431,7 @@ export default function StyleSalonsScreen() {
               {/* Photo principale du salon */}
               <View style={styles.modalCoverWrapper}>
                 <Image
-                  source={{ uri: selectedSalon.coverImage }}
+                  source={selectedSalon.coverImage}
                   style={styles.modalCover}
                   contentFit="cover"
                 />
@@ -511,10 +502,10 @@ export default function StyleSalonsScreen() {
                   contentContainerStyle={styles.portfolioLargeContent}
                   style={{ marginBottom: 20 }}
                 >
-                  {selectedSalon.portfolio.map((uri, i) => (
+                  {selectedSalon.portfolio.map((img, i) => (
                     <Image
                       key={i}
-                      source={{ uri }}
+                      source={img}
                       style={styles.portfolioLarge}
                       contentFit="cover"
                     />

@@ -46,7 +46,7 @@ const ALL_STYLES = HAIRSTYLE_CATEGORIES.map((cat) => ({
   emoji: cat.emoji,
   color: cat.color,
   // use first sub-style image as preview
-  image: cat.styles[0]?.image ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200',
+  image: cat.styles[0]?.image,
   firstStyleId: cat.styles[0]?.id,
 }));
 
@@ -60,18 +60,18 @@ const NEARBY_COIFFEURS = [
     rating: 4.9,
     reviews: 127,
     distance: '0.8 km',
-    image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200',
+    image: require('@/assets/images/Tissage.jpg'),
     available: true,
     price: 'À partir de 45€',
   },
   {
     id: '2',
     name: 'Fatou Diallo',
-    specialty: 'Twists & Locs',
+    specialty: 'Twists & Locks',
     rating: 4.8,
     reviews: 89,
     distance: '1.2 km',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
+    image: require('@/assets/images/Vanille.jpg'),
     available: true,
     price: 'À partir de 35€',
   },
@@ -82,7 +82,7 @@ const NEARBY_COIFFEURS = [
     rating: 4.7,
     reviews: 64,
     distance: '2.1 km',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200',
+    image: require('@/assets/images/Wash_and_Go.jpg'),
     available: false,
     price: 'À partir de 30€',
   },
@@ -97,18 +97,18 @@ const POPULAR_SALONS = [
     priceRange: '30€ - 150€',
     rating: 4.9,
     reviews: 234,
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/Box_Braids.jpg'),
     location: 'Paris 18e',
     openNow: true,
   },
   {
     id: '2',
     name: 'Afro Style Studio',
-    services: ['Locs', 'Coupe homme', 'Entretien'],
+    services: ['Locks', 'Coupe homme', 'Entretien'],
     priceRange: '20€ - 100€',
     rating: 4.8,
     reviews: 156,
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    image: require('@/assets/images/Fausse_Locks.jpg'),
     location: 'Paris 11e',
     openNow: true,
   },
@@ -119,7 +119,7 @@ const POPULAR_SALONS = [
     priceRange: '25€ - 80€',
     rating: 4.7,
     reviews: 98,
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/Soin.jpg'),
     location: 'Paris 10e',
     openNow: false,
   },
@@ -131,21 +131,21 @@ const TIPS_AND_INSPIRATION = [
     id: '1',
     title: 'Comment entretenir ses tresses ?',
     category: 'Conseils',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/afro_image1.jpg'),
     readTime: '3 min',
   },
   {
     id: '2',
     title: 'Les tendances coiffures 2024',
     category: 'Tendances',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    image: require('@/assets/images/afro_image2.jpg'),
     readTime: '5 min',
   },
   {
     id: '3',
     title: 'Routine capillaire cheveux crépus',
     category: 'Tutoriel',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/afro_image3.jpg'),
     readTime: '4 min',
   },
 ];
@@ -337,9 +337,8 @@ export default function HomeScreen() {
                   }
                 }}
               >
-                <Image source={{ uri: style.image }} style={styles.styleImage} contentFit="cover" />
+                <Image source={style.image} style={styles.styleImage} contentFit="cover" />
                 <View style={[styles.styleOverlay, { backgroundColor: (style.color ?? '#191919') + '99' }]}>
-                  <Text style={styles.styleEmoji}>{style.emoji}</Text>
                   <Text style={styles.styleName} numberOfLines={2}>{style.name}</Text>
                 </View>
               </TouchableOpacity>
@@ -365,7 +364,7 @@ export default function HomeScreen() {
                 onPress={() => requireAuth(() => router.push(`/salon/${coiffeur.id}`))}
               >
                 <View style={styles.coiffeurImageContainer}>
-                  <Image source={{ uri: coiffeur.image }} style={styles.coiffeurImage} contentFit="cover" />
+                  <Image source={coiffeur.image} style={styles.coiffeurImage} contentFit="cover" />
                   {coiffeur.available && (
                     <View style={styles.availableBadge}>
                       <Text style={styles.availableText}>{language === 'fr' ? 'Dispo' : 'Available'}</Text>
@@ -405,7 +404,7 @@ export default function HomeScreen() {
               style={[styles.salonCard, { backgroundColor: colors.card }]}
               onPress={() => requireAuth(() => router.push(`/salon/${salon.id}`))}
             >
-              <Image source={{ uri: salon.image }} style={styles.salonImage} contentFit="cover" />
+              <Image source={salon.image} style={styles.salonImage} contentFit="cover" />
               <View style={styles.salonInfo}>
                 <View style={styles.salonHeader}>
                   <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
@@ -447,7 +446,7 @@ export default function HomeScreen() {
           >
             {TIPS_AND_INSPIRATION.map((tip) => (
               <TouchableOpacity key={tip.id} style={styles.tipCard}>
-                <Image source={{ uri: tip.image }} style={styles.tipImage} contentFit="cover" />
+                <Image source={tip.image} style={styles.tipImage} contentFit="cover" />
                 <View style={styles.tipOverlay}>
                   <View style={styles.tipCategoryBadge}>
                     <Text style={styles.tipCategoryText}>{tip.category}</Text>

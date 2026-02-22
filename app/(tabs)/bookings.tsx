@@ -76,14 +76,6 @@ export default function StylesScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.categoryLeft}>
-                  <View
-                    style={[
-                      styles.categoryColorDot,
-                      { backgroundColor: category.color + '22' },
-                    ]}
-                  >
-                    <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                  </View>
                   <View style={styles.categoryTitleBlock}>
                     <Text style={[styles.categoryNumber, { color: colors.textMuted }]}>
                       {category.number}
@@ -118,7 +110,7 @@ export default function StylesScreen() {
                     >
                       <View style={styles.styleImageWrapper}>
                         <Image
-                          source={{ uri: style.image }}
+                          source={style.image}
                           style={styles.styleImage}
                           contentFit="cover"
                         />
