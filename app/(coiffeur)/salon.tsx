@@ -26,27 +26,16 @@ import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 type SalonLocationType = 'salon' | 'domicile' | 'both';
 
-// Liste des specialites de coiffure afro
-const AFRO_SPECIALTIES = [
-  { id: 'tresses', name: 'Tresses', icon: 'git-branch-outline' },
-  { id: 'locks', name: 'Locks / Dreadlocks', icon: 'infinite-outline' },
-  { id: 'coupe', name: 'Coupe', icon: 'cut-outline' },
-  { id: 'coloration', name: 'Coloration', icon: 'color-palette-outline' },
-  { id: 'soins', name: 'Soins capillaires', icon: 'heart-outline' },
-  { id: 'lissage', name: 'Lissage', icon: 'water-outline' },
-  { id: 'extensions', name: 'Extensions', icon: 'sparkles-outline' },
-  { id: 'barber', name: 'Barber', icon: 'man-outline' },
-  { id: 'enfants', name: 'Enfants', icon: 'happy-outline' },
-  { id: 'mariage', name: 'Mariage', icon: 'diamond-outline' },
-  { id: 'braids', name: 'Box Braids', icon: 'grid-outline' },
-  { id: 'crochet', name: 'Crochet Braids', icon: 'link-outline' },
-  { id: 'twist', name: 'Twists', icon: 'sync-outline' },
-  { id: 'afro', name: 'Coupe Afro', icon: 'ellipse-outline' },
-  { id: 'tissage', name: 'Tissage', icon: 'layers-outline' },
-];
+// Liste des spécialités synchronisée avec les catégories globales de l'app
+const AFRO_SPECIALTIES = HAIRSTYLE_CATEGORIES.map(cat => ({
+  id: cat.id,
+  name: cat.title,
+  icon: cat.emoji, // On peut utiliser l'emoji comme icône ou mapper vers Ionicons
+}));
 
 const MAX_PHOTOS = 4;
 
@@ -89,6 +78,7 @@ export default function SalonManagementScreen() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [existingSalonId, setExistingSalonId] = useState<string | null>(null);
+  const [servicesCount, setServicesCount] = useState<number | null>(null);
 
   // Informations du salon
   const [salonName, setSalonName] = useState('');
@@ -137,6 +127,14 @@ export default function SalonManagementScreen() {
           }
           if (salon.opening_hours) {
             setOpeningHours(salon.opening_hours as unknown as OpeningHours);
+          }
+
+          // Vérifier si des services sont configurés
+          try {
+            const services = await salonService.getSalonServices(salon.id);
+            setServicesCount(services?.length || 0);
+          } catch (e) {
+            setServicesCount(0);
           }
         }
       } catch {
@@ -388,7 +386,24 @@ export default function SalonManagementScreen() {
 
     setIsPublishing(true);
     try {
-      // Sauvegarder d'abord, puis publier
+      // 1. Vérifier si des services sont configurés
+      if (existingSalonId) {
+        const services = await salonService.getSalonServices(existingSalonId);
+        if (!services || services.length === 0) {
+          Alert.alert(
+            'Services manquants',
+            'Vous devez configurer au moins un service (prix/durée) avant de publier votre salon.',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Gérer mes services', onPress: () => router.push('/(coiffeur)/services') }
+            ]
+          );
+          setIsPublishing(false);
+          return;
+        }
+      }
+
+      // 2. Sauvegarder d'abord, puis publier
       await handleSave();
 
       if (existingSalonId) {
@@ -441,6 +456,26 @@ export default function SalonManagementScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Bandeau d'alerte si services manquants */}
+        {servicesCount === 0 && (
+          <View style={[styles.warningBanner, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
+            <Ionicons name="warning" size={22} color="#DC2626" />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>Action requise</Text>
+              <Text style={styles.warningText}>
+                Vous devez configurer vos tarifs dans l&apos;onglet &quot;Services&quot; pour pouvoir être visible.
+              </Text>
+              <TouchableOpacity 
+                style={styles.warningButton}
+                onPress={() => router.push('/(coiffeur)/services')}
+              >
+                <Text style={styles.warningButtonText}>Configurer mes services</Text>
+                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Photos du salon */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -604,6 +639,9 @@ export default function SalonManagementScreen() {
           <View style={styles.specialtiesGrid}>
             {AFRO_SPECIALTIES.map((specialty) => {
               const isSelected = selectedSpecialties.includes(specialty.id);
+              // Détection robuste d'emoji (Unicode)
+              const isEmoji = specialty.icon && /\p{Emoji}/u.test(specialty.icon);
+
               return (
                 <TouchableOpacity
                   key={specialty.id}
@@ -614,11 +652,15 @@ export default function SalonManagementScreen() {
                   ]}
                   onPress={() => toggleSpecialty(specialty.id)}
                 >
-                  <Ionicons
-                    name={specialty.icon as any}
-                    size={24}
-                    color={isSelected ? '#FFFFFF' : colors.textSecondary}
-                  />
+                  {isEmoji ? (
+                    <Text style={{ fontSize: 24 }}>{specialty.icon}</Text>
+                  ) : (
+                    <Ionicons
+                      name={specialty.icon as any}
+                      size={24}
+                      color={isSelected ? '#FFFFFF' : colors.textSecondary}
+                    />
+                  )}
                   <Text
                     style={[
                       styles.specialtyName,
@@ -702,30 +744,36 @@ export default function SalonManagementScreen() {
         {/* Lieu de prestation */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Lieu de prestation
+            Type d&apos;établissement
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Où réalisez-vous vos prestations ?
+            Où recevez-vous vos clients ?
           </Text>
 
           {(
             [
               {
                 value: 'salon' as const,
-                label: 'En salon uniquement',
-                desc: 'Les clients viennent dans votre salon',
+                label: 'Salon professionnel',
+                desc: 'Local commercial avec vitrine',
                 icon: 'storefront-outline',
               },
               {
-                value: 'domicile' as const,
-                label: 'À domicile uniquement',
-                desc: 'Vous vous déplacez chez les clients',
+                value: 'coiffeur_home' as const,
+                label: 'À mon domicile',
+                desc: 'Je reçois chez moi (adresse privée)',
                 icon: 'home-outline',
               },
               {
+                value: 'domicile' as const,
+                label: 'Chez le client uniquement',
+                desc: 'Je me déplace uniquement',
+                icon: 'car-outline',
+              },
+              {
                 value: 'both' as const,
-                label: 'Salon & Domicile',
-                desc: 'En salon ou à domicile selon le client',
+                label: 'Mixte',
+                desc: 'Je reçois et je me déplace',
                 icon: 'swap-horizontal-outline',
               },
             ]
@@ -768,7 +816,7 @@ export default function SalonManagementScreen() {
           {(serviceLocationType === 'domicile' || serviceLocationType === 'both') && (
             <View style={[styles.inputGroup, { marginTop: Spacing.md }]}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>
-                {t('salon.homeServiceFee')} (€)
+                Frais de déplacement (€)
               </Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -778,9 +826,6 @@ export default function SalonManagementScreen() {
                 onChangeText={setHomeServiceFee}
                 keyboardType="numeric"
               />
-              <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-                Frais de déplacement facturés en supplément
-              </Text>
             </View>
           )}
         </View>
@@ -814,16 +859,26 @@ export default function SalonManagementScreen() {
 
           {!isPublished && (
             <TouchableOpacity
-              style={[styles.publishButton, (isPublishing) && styles.publishButtonDisabled]}
+              style={[
+                styles.publishButton, 
+                (isPublishing || servicesCount === 0) && styles.publishButtonDisabled,
+                servicesCount === 0 && { backgroundColor: '#4B5563' }
+              ]}
               onPress={handlePublish}
-              disabled={isPublishing || isSaving}
+              disabled={isPublishing || isSaving || servicesCount === 0}
               activeOpacity={0.8}
             >
-              <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
+              <Ionicons 
+                name={servicesCount === 0 ? "lock-closed-outline" : "rocket-outline"} 
+                size={20} 
+                color="#FFFFFF" 
+              />
               <Text style={styles.publishButtonText}>
-                {isPublishing
-                  ? (language === 'en' ? 'Publishing...' : 'Publication...')
-                  : (language === 'en' ? 'Publish my salon' : 'Publier mon salon')}
+                {servicesCount === 0 
+                  ? 'Services requis' 
+                  : isPublishing
+                    ? (language === 'en' ? 'Publishing...' : 'Publication...')
+                    : (language === 'en' ? 'Publish my salon' : 'Publier mon salon')}
               </Text>
             </TouchableOpacity>
           )}
@@ -1057,6 +1112,46 @@ const styles = StyleSheet.create({
   saveSection: {
     paddingHorizontal: Spacing.md,
     marginTop: Spacing.lg,
+  },
+  /* Warning Banner */
+  warningBanner: {
+    flexDirection: 'row',
+    margin: Spacing.md,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+  },
+  warningContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  warningButton: {
+    backgroundColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  warningButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   /* Auth Prompt */

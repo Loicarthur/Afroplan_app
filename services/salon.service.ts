@@ -664,6 +664,28 @@ export const salonService = {
   },
 
   /**
+   * Creer ou mettre a jour plusieurs services en une fois
+   */
+  async upsertServicesBatch(services: (ServiceInsert & {
+    service_location?: ServiceLocationType;
+    home_service_additional_fee?: number;
+    min_booking_notice_hours?: number;
+  })[]): Promise<Service[]> {
+    if (services.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('services')
+      .upsert(services, { onConflict: 'id' }) // Assurez-vous que 'id' est bien la clé primaire ou contrainte unique
+      .select();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  },
+
+  /**
    * Supprimer un service
    */
   async deleteService(id: string): Promise<void> {

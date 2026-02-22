@@ -26,6 +26,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
+import { salonService } from '@/services/salon.service';
 
 // ─── CATALOGUE DES STYLES AFRO PRÉDÉFINIS ───────────────────────────────────
 
@@ -76,8 +77,8 @@ type ConfiguredStyle = {
 export default function CoiffeurServicesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+  const { isAuthenticated, user } = useAuth();
+  const { language } = useLanguage();
 
   // Styles sélectionnés et configurés
   const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
@@ -86,6 +87,7 @@ export default function CoiffeurServicesScreen() {
   const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([]);
   const [isBatchConfiguring, setIsBatchConfiguring] = useState(false);
   const [batchData, setBatchData] = useState<Record<string, Partial<ConfiguredStyle>>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   // Vue catalogue ou vue "mes styles"
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
@@ -136,7 +138,9 @@ export default function CoiffeurServicesScreen() {
     }));
   };
 
-  const handleSaveBatch = () => {
+  const handleSaveBatch = async () => {
+    if (!user) return;
+
     // Validation simple
     const stylesToSave = Object.values(batchData) as ConfiguredStyle[];
     const invalid = stylesToSave.find(s => !s.price || !s.duration);
@@ -146,15 +150,52 @@ export default function CoiffeurServicesScreen() {
       return;
     }
 
-    setConfiguredStyles(prev => {
-      const filtered = prev.filter(s => !selectedStyleIds.includes(s.styleId));
-      return [...filtered, ...stylesToSave];
-    });
+    setIsSaving(true);
+    try {
+      // 1. Récupérer le salon du coiffeur
+      let salon = await salonService.getSalonByOwnerId(user.id);
+      
+      // Si pas de salon, on devrait normalement en créer un ou rediriger, 
+      // mais pour l'instant on suppose que l'onboarding l'a fait.
+      if (!salon) {
+        Alert.alert('Erreur', 'Aucun salon associé à ce compte.');
+        setIsSaving(false);
+        return;
+      }
 
-    setIsBatchConfiguring(false);
-    setSelectedStyleIds([]);
-    setActiveTab('my_styles');
-    Alert.alert('Succès', `${selectedStyleIds.length} style(s) configuré(s) avec succès.`);
+      // 2. Préparer les données pour Supabase
+      const servicesPayload = stylesToSave.map(style => ({
+        salon_id: salon!.id,
+        name: style.styleName,
+        category: style.categoryLabel,
+        price: parseFloat(style.price),
+        duration_minutes: parseInt(style.duration, 10),
+        description: style.customDescription || null, // On stocke la note dans description
+        service_location: style.location,
+        is_active: true,
+        // On pourrait stocker l'ID du style original dans une colonne metadata si besoin
+      }));
+
+      // 3. Sauvegarder
+      await salonService.upsertServicesBatch(servicesPayload);
+
+      // 4. Mettre à jour l'état local
+      setConfiguredStyles(prev => {
+        const filtered = prev.filter(s => !selectedStyleIds.includes(s.styleId));
+        return [...filtered, ...stylesToSave];
+      });
+
+      setIsBatchConfiguring(false);
+      setSelectedStyleIds([]);
+      setActiveTab('my_styles');
+      Alert.alert('Succès', `${selectedStyleIds.length} style(s) configuré(s) et sauvegardé(s).`);
+
+    } catch (error) {
+      if (__DEV__) console.error(error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder les services. Vérifiez votre connexion.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRemoveStyle = (styleId: string) => {

@@ -14,16 +14,21 @@ import {
   Dimensions,
   StatusBar,
   Platform,
+  Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSizes } from '@/constants/theme';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
+import { Button } from '@/components/ui';
 
 const { width } = Dimensions.get('window');
 const STYLE_CARD_WIDTH = (width - 52) / 2;
@@ -36,8 +41,48 @@ export default function StylesScreen() {
     HAIRSTYLE_CATEGORIES[0]?.id ?? null
   );
 
+  // États pour l'ajout de style personnalisé
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [selectedCategoryForAdd, setSelectedCategoryForAdd] = useState<string | null>(null);
+  const [newStyleName, setNewStyleName] = useState('');
+  const [newStyleImage, setNewStyleImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSaving] = useState(false);
+
   const toggleCategory = (categoryId: string) => {
     setExpandedCategory((prev) => (prev === categoryId ? null : categoryId));
+  };
+
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setNewStyleImage(result.assets[0].uri);
+    }
+  };
+
+  const handleSubmitStyle = () => {
+    if (!newStyleName || !newStyleImage) {
+      Alert.alert('Champs requis', 'Veuillez ajouter une photo et un nom pour ce style.');
+      return;
+    }
+
+    setIsSaving(true);
+    // Simulation d'envoi à Supabase/Admin
+    setTimeout(() => {
+      setIsSaving(false);
+      setAddModalVisible(false);
+      setNewStyleName('');
+      setNewStyleImage(null);
+      Alert.alert(
+        'Merci !',
+        'Votre style a été envoyé pour validation. Il apparaîtra bientôt dans le catalogue après vérification par notre équipe.'
+      );
+    }, 1500);
   };
 
   const handleStylePress = (styleId: string, styleName: string) => {
@@ -141,6 +186,21 @@ export default function StylesScreen() {
                       </View>
                     </TouchableOpacity>
                   ))}
+
+                  {/* Carte "Ajouter un style" */}
+                  <TouchableOpacity
+                    style={[styles.styleCard, styles.addStyleCard, { borderColor: category.color + '40' }]}
+                    onPress={() => {
+                      setSelectedCategoryForAdd(category.id);
+                      setAddModalVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.addStyleIconContainer, { backgroundColor: category.color + '15' }]}>
+                      <Ionicons name="add" size={32} color={category.color} />
+                    </View>
+                    <Text style={[styles.addStyleText, { color: category.color }]}>Ajouter un style</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -181,6 +241,64 @@ export default function StylesScreen() {
         {/* Bottom padding */}
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* Modal Ajouter un style */}
+      <Modal
+        visible={addModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setAddModalVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Suggérer un style</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.modalLabel, { color: colors.text }]}>Photo de l&apos;inspiration *</Text>
+            <TouchableOpacity 
+              style={[styles.imagePicker, { backgroundColor: colors.card, borderColor: colors.border }]} 
+              onPress={handlePickImage}
+            >
+              {newStyleImage ? (
+                <Image source={{ uri: newStyleImage }} style={styles.pickedImage} />
+              ) : (
+                <View style={styles.pickerPlaceholder}>
+                  <Ionicons name="camera" size={40} color={colors.textMuted} />
+                  <Text style={{ color: colors.textMuted, marginTop: 8 }}>Prendre ou choisir une photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 24 }]}>Nom du style *</Text>
+            <TextInput
+              style={[styles.modalInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+              placeholder="Ex: Tresses papillon perle"
+              placeholderTextColor={colors.textMuted}
+              value={newStyleName}
+              onChangeText={setNewStyleName}
+            />
+
+            <View style={[styles.infoBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+              <Ionicons name="information-circle" size={20} color={colors.primary} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                Chaque style envoyé est vérifié par nos administrateurs avant d&apos;être visible pour tous les utilisateurs.
+              </Text>
+            </View>
+
+            <Button
+              title="Envoyer le style"
+              onPress={handleSubmitStyle}
+              loading={isSubmitting}
+              style={{ marginTop: 32 }}
+            />
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -348,5 +466,91 @@ const styles = StyleSheet.create({
   },
   styleDuration: {
     fontSize: 11,
+  },
+
+  // Add style card
+  addStyleCard: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    height: 215,
+  },
+  addStyleIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  addStyleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalContent: {
+    padding: 24,
+  },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  imagePicker: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  pickedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  pickerPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalInput: {
+    width: '100%',
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 24,
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

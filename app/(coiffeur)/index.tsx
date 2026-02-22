@@ -4,7 +4,7 @@
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
@@ -26,9 +26,11 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Colors, Spacing, FontSizes, Shadows } from '@/constants/theme';
+import { Colors, Spacing, FontSizes, Shadows, BorderRadius } from '@/constants/theme';
 import LanguageSelector from '@/components/LanguageSelector';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { salonService } from '@/services/salon.service';
+import { SalonWithDetails } from '@/types';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
@@ -57,6 +59,42 @@ function StatCard({ icon, title, value, color, onPress }: StatCardProps) {
       </View>
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statTitle, { color: colors.textSecondary }]}>{title}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Composant étape onboarding
+function OnboardingStep({ 
+  icon, 
+  title, 
+  description, 
+  isCompleted, 
+  onPress, 
+  colors 
+}: { 
+  icon: any, 
+  title: string, 
+  description: string, 
+  isCompleted: boolean, 
+  onPress: () => void, 
+  colors: any 
+}) {
+  return (
+    <TouchableOpacity 
+      style={[styles.onboardingStep, { backgroundColor: colors.card, borderColor: isCompleted ? colors.success : colors.border }]}
+      onPress={onPress}
+      disabled={isCompleted}
+    >
+      <View style={[styles.stepIcon, { backgroundColor: isCompleted ? colors.success + '20' : colors.backgroundSecondary }]}>
+        <Ionicons name={isCompleted ? "checkmark" : icon} size={20} color={isCompleted ? colors.success : colors.textSecondary} />
+      </View>
+      <View style={styles.stepContent}>
+        <Text style={[styles.stepTitle, { color: colors.text, textDecorationLine: isCompleted ? 'line-through' : 'none' }]}>{title}</Text>
+        <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>{description}</Text>
+      </View>
+      {!isCompleted && (
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -94,9 +132,48 @@ function BenefitCard({ icon, title, description, iconBgColor, iconColor, delay }
 export default function CoiffeurDashboard() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile, isAuthenticated, refreshProfile } = useAuth();
+  const { profile, isAuthenticated, refreshProfile, user } = useAuth();
   const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
+  const [salon, setSalon] = useState<SalonWithDetails | null>(null);
+  const [loadingSalon, setLoadingSalon] = useState(true);
+
+  // Calcul de la progression
+  const steps = [
+    { id: 'services', title: 'Définir mes services', desc: 'Ajoutez vos prestations et tarifs', completed: (salon?.services?.length || 0) > 0, route: '/(coiffeur)/services' },
+    { id: 'location', title: 'Ajouter ma localisation', desc: 'Adresse ou zone de déplacement', completed: !!salon?.address || !!salon?.city, route: '/(coiffeur)/salon' },
+    { id: 'availability', title: 'Mes disponibilités', desc: 'Définissez quand vous travaillez', completed: false, route: '/(coiffeur)/salon' }, // TODO: check real availability
+  ];
+  const completedCount = steps.filter(s => s.completed).length;
+  const progress = completedCount / steps.length;
+  const showOnboarding = completedCount < steps.length;
+
+  const fetchSalonStatus = async () => {
+    if (!user) return;
+    try {
+      // On utilise getSalonByOwnerId qui devrait retourner le salon du coiffeur
+      // S'il n'existe pas, on pourrait le créer à la volée, mais pour l'instant on gère juste l'affichage
+      const salonData = await salonService.getSalonByOwnerId(user.id);
+      
+      if (salonData) {
+        // On récupère les détails pour savoir s'il a des services
+        const fullSalon = await salonService.getSalonById(salonData.id);
+        setSalon(fullSalon);
+      }
+    } catch (error) {
+      console.error('Erreur chargement salon:', error);
+    } finally {
+      setLoadingSalon(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated && profile?.role === 'coiffeur') {
+        fetchSalonStatus();
+      }
+    }, [isAuthenticated, profile?.role])
+  );
 
   const handleSwitchToClient = async () => {
     await AsyncStorage.setItem('@afroplan_selected_role', 'client');
@@ -112,7 +189,7 @@ export default function CoiffeurDashboard() {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    fetchSalonStatus().then(() => setRefreshing(false));
   }, []);
 
   const getGreeting = () => {
@@ -438,8 +515,40 @@ export default function CoiffeurDashboard() {
           </View>
         </View>
 
+        {/* Smart Onboarding - Affiché si le profil n'est pas complet */}
+        {showOnboarding && (
+          <View style={styles.section}>
+            <View style={[styles.onboardingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.onboardingHeader}>
+                <View>
+                  <Text style={[styles.onboardingTitle, { color: colors.text }]}>Configuration du salon</Text>
+                  <Text style={[styles.onboardingSubtitle, { color: colors.textSecondary }]}>Complétez votre profil pour être visible</Text>
+                </View>
+                <View style={styles.progressRing}>
+                  <Text style={[styles.progressText, { color: colors.primary }]}>{Math.round(progress * 100)}%</Text>
+                </View>
+              </View>
+              
+              <View style={styles.stepsContainer}>
+                {steps.map((step, index) => (
+                  <OnboardingStep
+                    key={step.id}
+                    icon={step.id === 'services' ? 'cut' : step.id === 'location' ? 'location' : 'time'}
+                    title={step.title}
+                    description={step.desc}
+                    isCompleted={step.completed}
+                    onPress={() => router.push(step.route as any)}
+                    colors={colors}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Stats */}
-        <View style={styles.statsContainer}>
+        {!showOnboarding && (
+          <View style={styles.statsContainer}>
           <View style={styles.statsRow}>
             <StatCard
               icon="calendar"
@@ -471,8 +580,9 @@ export default function CoiffeurDashboard() {
             />
           </View>
         </View>
+      )}
 
-        {/* Quick Actions */}
+      {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Actions rapides
@@ -967,5 +1077,67 @@ const styles = StyleSheet.create({
   appointmentStatusText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  onboardingCard: {
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  onboardingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  onboardingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  onboardingSubtitle: {
+    fontSize: 13,
+  },
+  progressRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: '#E5E5E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepsContainer: {
+    gap: 12,
+  },
+  onboardingStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  stepIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  stepDesc: {
+    fontSize: 12,
   },
 });
