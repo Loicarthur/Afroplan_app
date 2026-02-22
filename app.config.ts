@@ -1,22 +1,8 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
-import fs from "fs";
-import path from "path";
-import dotenv from "dotenv";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  // 1) EAS fournit EXPO_PUBLIC_APP_ENV via eas.json
+  // EXPO_PUBLIC_APP_ENV est fourni par l'environnement ou les fichiers .env
   const appEnv = process.env.EXPO_PUBLIC_APP_ENV ?? "development";
-
-  // 2) Charge automatiquement .env.preview / .env.production etc.
-  const envFile = `.env.${appEnv}`;
-  const envPath = path.resolve(__dirname, envFile);
-
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    console.log(`Loaded env file: ${envFile}`);
-  } else {
-    console.warn(`Env file not found: ${envFile}`);
-  }
 
   return {
     ...config,
@@ -27,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     icon: "./assets/images/icon.png",
     scheme: "afroplan",
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
+    newArchEnabled: false,
     splash: {
       image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
@@ -57,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     web: {
       bundler: "metro",
       output: "static",
-      favicon: "./assets/images/favicon.png",
+      favicon: "./assets/images/favicon.ico",
     },
     plugins: [
       "expo-router",

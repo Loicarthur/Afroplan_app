@@ -502,7 +502,7 @@ export default function StyleSalonsScreen() {
                     Galerie photos
                   </Text>
                   <Text style={[styles.gallerySubLabel, { color: colors.textMuted }]}>
-                    Réalisations sur "{displayName}"
+                    Réalisations sur &quot;{displayName}&quot;
                   </Text>
                 </View>
                 <ScrollView

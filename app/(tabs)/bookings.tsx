@@ -23,7 +23,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { HAIRSTYLE_CATEGORIES, HairstyleCategory } from '@/constants/hairstyleCategories';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
 const STYLE_CARD_WIDTH = (width - 52) / 2;
@@ -138,11 +138,6 @@ export default function StylesScreen() {
                         >
                           {style.name}
                         </Text>
-                        {style.priceRange && (
-                          <Text style={[styles.stylePrice, { color: category.color }]}>
-                            {style.priceRange}
-                          </Text>
-                        )}
                         {style.duration && (
                           <View style={styles.styleDurationRow}>
                             <Ionicons name="time-outline" size={11} color={colors.textMuted} />
