@@ -64,6 +64,8 @@ export interface Database {
           website: string | null;
           image_url: string | null;
           cover_image_url: string | null;
+          photos: string[] | null;
+          specialties: string[] | null;
           rating: number;
           reviews_count: number;
           is_verified: boolean;
@@ -91,6 +93,8 @@ export interface Database {
           website?: string | null;
           image_url?: string | null;
           cover_image_url?: string | null;
+          photos?: string[] | null;
+          specialties?: string[] | null;
           rating?: number;
           reviews_count?: number;
           is_verified?: boolean;
@@ -118,6 +122,8 @@ export interface Database {
           website?: string | null;
           image_url?: string | null;
           cover_image_url?: string | null;
+          photos?: string[] | null;
+          specialties?: string[] | null;
           rating?: number;
           reviews_count?: number;
           is_verified?: boolean;
@@ -145,6 +151,8 @@ export interface Database {
           service_location: 'salon' | 'domicile' | 'both';
           home_service_additional_fee: number;
           min_booking_notice_hours: number;
+          requires_extensions: boolean;
+          extensions_included: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -161,6 +169,8 @@ export interface Database {
           service_location?: 'salon' | 'domicile' | 'both';
           home_service_additional_fee?: number;
           min_booking_notice_hours?: number;
+          requires_extensions?: boolean;
+          extensions_included?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -177,6 +187,8 @@ export interface Database {
           service_location?: 'salon' | 'domicile' | 'both';
           home_service_additional_fee?: number;
           min_booking_notice_hours?: number;
+          requires_extensions?: boolean;
+          extensions_included?: boolean;
           created_at?: string;
           updated_at?: string;
         };

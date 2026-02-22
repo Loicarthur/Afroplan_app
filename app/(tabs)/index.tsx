@@ -175,7 +175,7 @@ export default function HomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, profile } = useAuth();
   const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
@@ -279,10 +279,10 @@ export default function HomeScreen() {
           {isAuthenticated && profile && (
             <View style={styles.welcomeMessage}>
               <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-                Bonjour {profile.full_name?.split(' ')[0] || 'toi'} 👋
+                {language === 'fr' ? 'Bonjour' : 'Hello'} {profile.full_name?.split(' ')[0] || 'toi'} 👋
               </Text>
               <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                Prêt(e) pour une nouvelle coiffure ?
+                {language === 'fr' ? 'Prêt(e) pour une nouvelle coiffure ?' : 'Ready for a new hairstyle?'}
               </Text>
             </View>
           )}
@@ -302,8 +302,8 @@ export default function HomeScreen() {
                 <Ionicons name="search" size={24} color="#FFFFFF" />
               </View>
               <View style={styles.searchTextContainer}>
-                <Text style={styles.searchButtonTitle}>Rechercher mon salon / coiffeur</Text>
-                <Text style={styles.searchButtonSubtitle}>Trouve le style qui te correspond</Text>
+                <Text style={styles.searchButtonTitle}>{t('home.searchSalon')}</Text>
+                <Text style={styles.searchButtonSubtitle}>{t('home.searchSubtitle')}</Text>
               </View>
             </View>
             <Ionicons name="arrow-forward-circle" size={32} color="#191919" />
@@ -317,9 +317,9 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <SectionHeader
-            title="Styles de coiffure"
+            title={t('home.hairstyles')}
             onSeeAll={() => setShowAllStyles(!showAllStyles)}
-            seeAllLabel={showAllStyles ? 'Voir moins' : 'Voir tout'}
+            seeAllLabel={showAllStyles ? (language === 'fr' ? 'Voir moins' : 'See less') : t('common.seeAll')}
           />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
@@ -352,7 +352,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(400).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Coiffeurs à proximité" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -368,14 +368,14 @@ export default function HomeScreen() {
                   <Image source={{ uri: coiffeur.image }} style={styles.coiffeurImage} contentFit="cover" />
                   {coiffeur.available && (
                     <View style={styles.availableBadge}>
-                      <Text style={styles.availableText}>Dispo</Text>
+                      <Text style={styles.availableText}>{language === 'fr' ? 'Dispo' : 'Available'}</Text>
                     </View>
                   )}
                 </View>
                 <View style={styles.coiffeurInfo}>
                   <Text style={[styles.coiffeurName, { color: colors.text }]}>{coiffeur.name}</Text>
                   <Text style={[styles.coiffeurSpecialty, { color: colors.textSecondary }]}>{coiffeur.specialty}</Text>
-                  <Text style={[styles.coiffeurPrice, { color: '#7C3AED' }]}>{coiffeur.price}</Text>
+                  <Text style={[styles.coiffeurPrice, { color: '#7C3AED' }]}>{language === 'fr' ? 'À partir de' : 'From'} {coiffeur.price.replace('À partir de ', '')}</Text>
                   <View style={styles.coiffeurMeta}>
                     <View style={styles.ratingContainer}>
                       <Ionicons name="star" size={12} color="#F59E0B" />
@@ -398,7 +398,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(450).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Salons populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
           {POPULAR_SALONS.map((salon) => (
             <TouchableOpacity
               key={salon.id}
@@ -411,7 +411,7 @@ export default function HomeScreen() {
                   <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
                   {salon.openNow && (
                     <View style={styles.openBadge}>
-                      <Text style={styles.openBadgeText}>Ouvert</Text>
+                      <Text style={styles.openBadgeText}>{language === 'fr' ? 'Ouvert' : 'Open'}</Text>
                     </View>
                   )}
                 </View>
@@ -439,7 +439,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(500).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Conseils & Inspiration" />
+          <SectionHeader title={t('home.tipsAndInspiration')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -473,15 +473,15 @@ export default function HomeScreen() {
           <View style={styles.ctaCard}>
             <View style={styles.ctaContent}>
               <Ionicons name="cut" size={32} color="#FFFFFF" />
-              <Text style={styles.ctaTitle}>Tu es coiffeur(se) ?</Text>
+              <Text style={styles.ctaTitle}>{t('home.areYouCoiffeur')}</Text>
               <Text style={styles.ctaSubtitle}>
-                Rejoins AfroPlan Pro et développe ton activité
+                {t('home.joinAfroPlanPro')}
               </Text>
               <TouchableOpacity
                 style={styles.ctaButton}
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
               >
-                <Text style={styles.ctaButtonText}>Découvrir AfroPlan Pro</Text>
+                <Text style={styles.ctaButtonText}>{t('home.discoverPro')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#191919" />
               </TouchableOpacity>
             </View>

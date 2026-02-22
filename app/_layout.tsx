@@ -3,7 +3,6 @@ import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -45,10 +44,6 @@ const AfroPlanDarkTheme = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? AfroPlanDarkTheme : AfroPlanLightTheme;
-
-  useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
 
   return (
     <ErrorBoundary>

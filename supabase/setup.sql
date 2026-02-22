@@ -139,6 +139,8 @@ CREATE TABLE salons (
     website TEXT,
     image_url TEXT,
     cover_image_url TEXT,
+    photos TEXT[], -- Liste d'URLs pour compatibilité avec le frontend
+    specialties TEXT[], -- Liste de spécialités
     rating DECIMAL(2, 1) DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
     is_verified BOOLEAN DEFAULT false,
@@ -180,6 +182,9 @@ CREATE TABLE services (
     service_location service_location_type DEFAULT 'salon',
     home_service_additional_fee DECIMAL(10, 2) DEFAULT 0,
     min_booking_notice_hours INTEGER DEFAULT 2,
+    -- Nouveau : Gestion des mèches pour coiffure afro
+    requires_extensions BOOLEAN DEFAULT false,
+    extensions_included BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1115,6 +1120,7 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
 -- 1. avatars  (public)
 -- 2. salons   (public)
 -- 3. gallery  (public)
+-- 4. salon-photos (public)
 
 -- ============================================
 -- ÉTAPE 14: PROMOUVOIR UN ADMIN

@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -147,66 +148,85 @@ export default function SalonManagementScreen() {
 
   const pickImage = async (index?: number) => {
     if (photos.length >= MAX_PHOTOS && index === undefined) {
-      Alert.alert('Limite atteinte', `Vous ne pouvez ajouter que ${MAX_PHOTOS} photos maximum.`);
+      Alert.alert(t('common.error'), `Vous ne pouvez ajouter que ${MAX_PHOTOS} photos maximum.`);
       return;
     }
 
-    Alert.alert(
-      'Ajouter une photo',
-      'Choisissez la source',
-      [
-        {
-          text: 'Prendre une photo',
-          onPress: async () => {
-            const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-            if (!cameraPermission.granted) {
-              Alert.alert('Permission requise', 'Autorisez l\'accès à la caméra pour prendre des photos.');
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              allowsEditing: true,
-              aspect: [16, 9],
-              quality: 0.8,
-            });
-            if (!result.canceled && result.assets[0]) {
-              const newPhotos = [...photos];
-              if (index !== undefined) {
-                newPhotos[index] = result.assets[0].uri;
-              } else {
-                newPhotos.push(result.assets[0].uri);
+    if (Platform.OS === 'web') {
+      Alert.alert('Info', 'La sélection d\'image n\'est pas encore supportée sur le web dans cette démo.');
+      return;
+    }
+
+    try {
+      Alert.alert(
+        'Ajouter une photo',
+        'Choisissez la source',
+        [
+          {
+            text: 'Prendre une photo',
+            onPress: async () => {
+              try {
+                const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+                if (!cameraPermission.granted) {
+                  Alert.alert('Permission requise', 'Autorisez l\'accès à la caméra pour prendre des photos.');
+                  return;
+                }
+                const result = await ImagePicker.launchCameraAsync({
+                  allowsEditing: true,
+                  aspect: [16, 9],
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets[0]) {
+                  const newPhotos = [...photos];
+                  if (index !== undefined) {
+                    newPhotos[index] = result.assets[0].uri;
+                  } else {
+                    newPhotos.push(result.assets[0].uri);
+                  }
+                  setPhotos(newPhotos);
+                }
+              } catch (e) {
+                console.error(e);
+                Alert.alert('Erreur', 'Impossible d\'ouvrir la caméra.');
               }
-              setPhotos(newPhotos);
-            }
+            },
           },
-        },
-        {
-          text: 'Choisir depuis la galerie',
-          onPress: async () => {
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permissionResult.granted) {
-              Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour ajouter des photos.');
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [16, 9],
-              quality: 0.8,
-            });
-            if (!result.canceled && result.assets[0]) {
-              const newPhotos = [...photos];
-              if (index !== undefined) {
-                newPhotos[index] = result.assets[0].uri;
-              } else {
-                newPhotos.push(result.assets[0].uri);
+          {
+            text: 'Choisir depuis la galerie',
+            onPress: async () => {
+              try {
+                const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (!permissionResult.granted) {
+                  Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour ajouter des photos.');
+                  return;
+                }
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [16, 9],
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets[0]) {
+                  const newPhotos = [...photos];
+                  if (index !== undefined) {
+                    newPhotos[index] = result.assets[0].uri;
+                  } else {
+                    newPhotos.push(result.assets[0].uri);
+                  }
+                  setPhotos(newPhotos);
+                }
+              } catch (e) {
+                console.error(e);
+                Alert.alert('Erreur', 'Impossible d\'ouvrir la galerie.');
               }
-              setPhotos(newPhotos);
-            }
+            },
           },
-        },
-        { text: 'Annuler', style: 'cancel' },
-      ]
-    );
+          { text: 'Annuler', style: 'cancel' },
+        ]
+      );
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const removePhoto = (index: number) => {
@@ -310,6 +330,7 @@ export default function SalonManagementScreen() {
         city: city.trim(),
         postal_code: postalCode.trim(),
         specialties: selectedSpecialties,
+        cover_image_url: photoUrls.length > 0 ? photoUrls[0] : null,
         photos: photoUrls,
         opening_hours: openingHours,
         offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
