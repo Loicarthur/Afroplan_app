@@ -602,7 +602,7 @@ CREATE POLICY "categories_select" ON categories FOR SELECT USING (is_active = tr
 -- SALONS
 ALTER TABLE salons ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_full_access_salons" ON salons FOR ALL USING (is_admin());
-CREATE POLICY "salons_select" ON salons FOR SELECT USING (is_active = true);
+CREATE POLICY "salons_select" ON salons FOR SELECT USING (is_active = true OR auth.uid() = owner_id);
 CREATE POLICY "salons_insert" ON salons FOR INSERT WITH CHECK (
     auth.uid() = owner_id
 );

@@ -28,7 +28,11 @@ import * as Location from 'expo-location';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Colors } from '@/constants/theme';
+import { useSalons } from '@/hooks/use-salons';
+import { useAuth } from '@/contexts/AuthContext';
+import { Colors, Shadows } from '@/constants/theme';
+import { salonService } from '@/services/salon.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types de coiffure pour filtres
 const HAIRSTYLE_FILTERS = [
@@ -48,82 +52,6 @@ const QUICK_FILTERS = [
   { id: 'promo', nameKey: 'home.promotions', icon: 'pricetag' },
 ];
 
-// Données de test pour les salons
-const SALONS_DATA = [
-  {
-    id: '1',
-    name: 'Bella Coiffure',
-    rating: 4.9,
-    reviews_count: 234,
-    price_level: '€€€',
-    address: '12 Rue des Martyrs, Paris 18e',
-    distance: '1.2 km',
-    availability: "Aujourd'hui 15h",
-    availabilityColor: '#22C55E',
-    image: require('@/assets/images/Box_Braids.jpg'),
-    services: ['Tresses', 'Twists', 'Coloration'],
-    minPrice: 45,
-    hasPromo: true,
-    promoText: '-20%',
-    latitude: 48.8825,
-    longitude: 2.3383,
-  },
-  {
-    id: '2',
-    name: 'Afro Style Studio',
-    rating: 4.8,
-    reviews_count: 189,
-    price_level: '€€',
-    address: '8 Boulevard Voltaire, Paris 11e',
-    distance: '2.5 km',
-    availability: 'Demain 10h',
-    availabilityColor: '#4A4A4A',
-    image: require('@/assets/images/Fausse_Locks.jpg'),
-    services: ['Locks', 'Coupe homme', 'Entretien'],
-    minPrice: 30,
-    hasPromo: false,
-    promoText: '',
-    latitude: 48.8619,
-    longitude: 2.3700,
-  },
-  {
-    id: '3',
-    name: 'Natural Beauty Salon',
-    rating: 4.7,
-    reviews_count: 156,
-    price_level: '€€€',
-    address: '45 Avenue d\'Italie, Paris 13e',
-    distance: '3.8 km',
-    availability: 'Mercredi 14h',
-    availabilityColor: '#191919',
-    image: require('@/assets/images/Wash_and_Go.jpg'),
-    services: ['Soins', 'Hydratation', 'Coupe'],
-    minPrice: 35,
-    hasPromo: true,
-    promoText: '-15%',
-    latitude: 48.8322,
-    longitude: 2.3561,
-  },
-  {
-    id: '4',
-    name: 'Tresses & Co',
-    rating: 4.6,
-    reviews_count: 98,
-    price_level: '€€',
-    address: '23 Rue de Bagnolet, Paris 20e',
-    distance: '4.2 km',
-    availability: "Aujourd'hui 18h",
-    availabilityColor: '#22C55E',
-    image: require('@/assets/images/Crochet_Braids.jpg'),
-    services: ['Tresses', 'Cornrows', 'Box braids'],
-    minPrice: 50,
-    hasPromo: false,
-    promoText: '',
-    latitude: 48.8566,
-    longitude: 2.3988,
-  },
-];
-
 // Types pour les filtres
 interface AdvancedFilters {
   maxDistance: number;
@@ -139,9 +67,30 @@ export default function SearchScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { t, language } = useLanguage();
   const params = useLocalSearchParams();
+  const { user, isAuthenticated } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(params.category as string || 'all');
+  const [activeRole, setActiveRole] = useState<string | null>(null);
+
+  // Charger le rôle actif au montage
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = await AsyncStorage.getItem('@afroplan_selected_role');
+      setActiveRole(role);
+    };
+    loadRole();
+  }, []);
+
+  // Debounce de la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const [selectedQuickFilters, setSelectedQuickFilters] = useState<string[]>(['nearby']);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -151,15 +100,29 @@ export default function SearchScreen() {
 
   const [filters, setFilters] = useState<AdvancedFilters>({
     maxDistance: params.distance ? parseInt(params.distance as string, 10) : 10,
-    minRating: 4.0,
-    maxPrice: params.budget ? parseInt(params.budget as string, 10) : 200,
+    minRating: 0, // Mis à 0 pour voir les nouveaux salons
+    maxPrice: params.budget ? parseInt(params.budget as string, 10) : 300,
     location: (params.location as any) || 'both',
     onlyPromos: false,
   });
 
-  // Mettre à jour les filtres si les params changent
+  // Memoïser les filtres pour éviter une boucle de re-rendu infinie
+  const salonFilters = React.useMemo(() => ({
+    searchQuery: debouncedQuery || undefined,
+    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+    city: debouncedQuery.length > 2 ? debouncedQuery : undefined,
+    minRating: filters.minRating,
+    maxPrice: filters.maxPrice,
+  }), [debouncedQuery, selectedCategory, filters.minRating, filters.maxPrice]);
+
+  // Récupérer les salons réels depuis la base de données
+  const { salons: realSalons, isLoading: loadingSalons, refresh } = useSalons(salonFilters);
+
+  // Mettre à jour les filtres si les params changent (uniquement à l'initialisation)
   useEffect(() => {
-    if (params.category) setSelectedCategory(params.category as string);
+    if (params.category && params.category !== selectedCategory) {
+      setSelectedCategory(params.category as string);
+    }
     if (params.distance || params.budget || params.location) {
       setFilters(prev => ({
         ...prev,
@@ -168,20 +131,7 @@ export default function SearchScreen() {
         location: (params.location as any) || prev.location,
       }));
     }
-  }, [params]);
-
-  // Filtrer les salons
-  const filteredSalons = SALONS_DATA.filter((salon) => {
-    const matchesSearch = salon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      salon.services.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesDistance = parseFloat(salon.distance) <= filters.maxDistance;
-    const matchesRating = salon.rating >= filters.minRating;
-    const matchesPrice = salon.minPrice <= filters.maxPrice;
-    const matchesPromo = !filters.onlyPromos || salon.hasPromo;
-
-    return matchesSearch && matchesDistance && matchesRating && matchesPrice && matchesPromo;
-  });
+  }, [params.category, params.distance, params.budget, params.location]);
 
   const toggleQuickFilter = (filterId: string) => {
     setSelectedQuickFilters(prev =>
@@ -369,16 +319,21 @@ export default function SearchScreen() {
       {/* Results Header */}
       <View style={styles.resultsHeader}>
         <Text style={[styles.resultsCount, { color: colors.text }]}>
-          {filteredSalons.length} {language === 'fr' ? 'salons trouvés' : 'salons found'}
+          {realSalons.length} {language === 'fr' ? 'salons trouvés' : 'salons found'}
         </Text>
-        <TouchableOpacity style={styles.sortButton}>
-          <Text style={[styles.sortText, { color: '#191919' }]}>{language === 'fr' ? 'Trier par' : 'Sort by'}</Text>
-          <Ionicons name="chevron-down" size={16} color="#191919" />
+        <TouchableOpacity style={styles.sortButton} onPress={refresh}>
+          <Ionicons name="refresh" size={16} color="#191919" />
+          <Text style={[styles.sortText, { color: '#191919' }]}>{language === 'fr' ? 'Actualiser' : 'Refresh'}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Map placeholder or List */}
-      {viewMode === 'map' ? (
+      {loadingSalons && realSalons.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ marginTop: 12, color: colors.textSecondary }}>{language === 'fr' ? 'Recherche des salons...' : 'Searching for salons...'}</Text>
+        </View>
+      ) : viewMode === 'map' ? (
         <View style={styles.mapContainer}>
           {/* Map Background */}
           <View style={[styles.mapBackground, { backgroundColor: colorScheme === 'dark' ? '#1a2332' : '#e8eedb' }]}>
@@ -390,17 +345,8 @@ export default function SearchScreen() {
               </View>
             )}
 
-            {locationLoading && (
-              <View style={styles.mapLoadingOverlay}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.mapLoadingText, { color: colors.text }]}>
-                  {t('common.loading')}
-                </Text>
-              </View>
-            )}
-
-            {/* Salon markers */}
-            {filteredSalons.map((salon, index) => {
+            {/* Salon markers (Real Data) */}
+            {realSalons.map((salon, index) => {
               const positions = [
                 { top: '25%' as const, left: '30%' as const },
                 { top: '35%' as const, left: '65%' as const },
@@ -425,17 +371,6 @@ export default function SearchScreen() {
                   ]}>
                     <Ionicons name="cut" size={14} color="#FFFFFF" />
                   </View>
-                  <View style={[
-                    styles.mapMarkerLabel,
-                    { backgroundColor: selectedMapSalon === salon.id ? colors.primary : colors.card },
-                  ]}>
-                    <Text style={[
-                      styles.mapMarkerPrice,
-                      { color: selectedMapSalon === salon.id ? '#FFFFFF' : colors.text },
-                    ]} numberOfLines={1}>
-                      {salon.minPrice} EUR
-                    </Text>
-                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -443,7 +378,7 @@ export default function SearchScreen() {
 
           {/* Selected salon card */}
           {selectedMapSalon && (() => {
-            const salon = filteredSalons.find(s => s.id === selectedMapSalon);
+            const salon = realSalons.find(s => s.id === selectedMapSalon);
             if (!salon) return null;
             return (
               <Animated.View
@@ -454,7 +389,7 @@ export default function SearchScreen() {
                   style={styles.mapSalonCardContent}
                   onPress={() => handleSalonPress(salon.id)}
                 >
-                  <Image source={salon.image} style={styles.mapSalonImage} contentFit="cover" />
+                  <Image source={{ uri: salon.cover_image_url || salon.image_url || 'https://via.placeholder.com/300' }} style={styles.mapSalonImage} contentFit="cover" />
                   <View style={styles.mapSalonInfo}>
                     <Text style={[styles.mapSalonName, { color: colors.text }]} numberOfLines={1}>
                       {salon.name}
@@ -462,108 +397,100 @@ export default function SearchScreen() {
                     <View style={styles.mapSalonRating}>
                       <Ionicons name="star" size={14} color="#F59E0B" />
                       <Text style={[styles.mapSalonRatingText, { color: colors.text }]}>
-                        {salon.rating}
-                      </Text>
-                      <Text style={[styles.mapSalonReviews, { color: colors.textMuted }]}>
-                        ({salon.reviews_count})
+                        {salon.rating || '0.0'}
                       </Text>
                     </View>
                     <Text style={[styles.mapSalonAddress, { color: colors.textMuted }]} numberOfLines={1}>
                       {salon.address}
                     </Text>
-                    <Text style={[styles.mapSalonDistance, { color: colors.primary }]}>
-                      {salon.distance}
-                    </Text>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.mapDirectionsButton, { backgroundColor: colors.primary }]}
-                    onPress={() => openDirections(salon.latitude, salon.longitude, salon.name)}
-                  >
-                    <Ionicons name="navigate" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
                 </TouchableOpacity>
               </Animated.View>
             );
           })()}
-
-          {/* Recenter button */}
-          <TouchableOpacity
-            style={[styles.mapRecenterButton, { backgroundColor: colors.card }]}
-            onPress={requestLocationPermission}
-          >
-            <Ionicons name="locate" size={22} color={colors.primary} />
-          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
         >
-          {filteredSalons.map((salon, index) => (
-            <Animated.View
-              key={salon.id}
-              entering={FadeInUp.delay(index * 100).duration(400)}
-            >
-              <TouchableOpacity
-                style={[styles.salonCard, { backgroundColor: colors.card }]}
-                onPress={() => handleSalonPress(salon.id)}
-              >
-                <View style={styles.salonImageContainer}>
-                  <Image
-                    source={salon.image}
-                    style={styles.salonImage}
-                    contentFit="cover"
-                  />
-                  {salon.hasPromo && (
-                    <View style={styles.promoBadge}>
-                      <Text style={styles.promoBadgeText}>{salon.promoText}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.salonContent}>
-                  <View style={styles.salonHeader}>
-                    <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
-                    <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={12} color="#F59E0B" />
-                      <Text style={styles.ratingText}>{salon.rating}</Text>
-                    </View>
+          {loadingSalons && realSalons.length === 0 && (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          )}
+          
+          {realSalons.length === 0 && !loadingSalons ? (
+            <View style={{ flex: 1, paddingVertical: 100, alignItems: 'center' }}>
+              <Ionicons name="search-outline" size={64} color={colors.textMuted} />
+              <Text style={{ marginTop: 16, color: colors.textSecondary }}>
+                Aucun salon trouvé dans cette zone.
+              </Text>
+            </View>
+          ) : (
+            realSalons.map((salon, index) => (
+              <View key={salon.id}>
+                <TouchableOpacity
+                  style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.md]}
+                  onPress={() => handleSalonPress(salon.id)}
+                  activeOpacity={0.9}
+                >
+                  {/* Image avec Overlay Gradient simulé */}
+                  <View style={styles.salonImageContainer}>
+                    <Image
+                      source={{ uri: salon.cover_image_url || salon.image_url || 'https://via.placeholder.com/300' }}
+                      style={styles.salonImage}
+                      contentFit="cover"
+                    />
+                    {salon.is_verified && (
+                      <View style={styles.verifiedBadgeOverlay}>
+                        <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
+                      </View>
+                    )}
                   </View>
 
-                  <Text style={[styles.servicesText, { color: colors.textSecondary }]}>
-                    {salon.services.join(' • ')}
-                  </Text>
+                  <View style={styles.salonContent}>
+                    <View style={styles.salonHeader}>
+                      <Text style={[styles.salonName, { color: colors.text }]} numberOfLines={1}>
+                        {salon.name}
+                      </Text>
+                      <View style={styles.ratingBadgePremium}>
+                        <Ionicons name="star" size={14} color="#F59E0B" />
+                        <Text style={styles.ratingTextPremium}>
+                          {salon.rating > 0 ? salon.rating.toFixed(1) : "2.0"}
+                        </Text>
+                      </View>
+                    </View>
 
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-                    <Text style={[styles.addressText, { color: colors.textMuted }]} numberOfLines={1}>
-                      {salon.address}
+                    <Text style={[styles.specialtiesText, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {salon.specialties?.join(' • ') || 'Expert Coiffure Afro'}
                     </Text>
-                    <View style={styles.distanceBadge}>
-                      <Text style={styles.distanceText}>{salon.distance}</Text>
-                    </View>
-                  </View>
 
-                  <View style={styles.salonFooter}>
-                    <View style={styles.priceContainer}>
-                      <Text style={[styles.priceLabel, { color: colors.textMuted }]}>{language === 'fr' ? 'À partir de' : 'From'}</Text>
-                      <Text style={[styles.priceValue, { color: '#7C3AED' }]}>{salon.minPrice}€</Text>
-                    </View>
-
-                    <View style={[
-                      styles.availabilityBadge,
-                      { backgroundColor: salon.availabilityColor + '20' }
-                    ]}>
-                      <Ionicons name="time" size={12} color={salon.availabilityColor} />
-                      <Text style={[styles.availabilityText, { color: salon.availabilityColor }]}>
-                        {salon.availability}
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location" size={14} color={colors.primary} />
+                      <Text style={[styles.addressText, { color: colors.textMuted }]} numberOfLines={1}>
+                        {salon.city} • {salon.postal_code}
                       </Text>
                     </View>
+
+                    <View style={styles.salonFooter}>
+                      <View style={styles.priceContainer}>
+                        <Text style={[styles.pricePrefix, { color: colors.textMuted }]}>À partir de</Text>
+                        <Text style={[styles.priceTag, { color: colors.text }]}>
+                          {(salon as any).min_price !== undefined ? `${(salon as any).min_price}€` : "N/A"}
+                        </Text>
+                      </View>
+                      
+                      <View style={[styles.viewTarifsButton, { backgroundColor: '#191919' }]}>
+                        <Text style={styles.viewTarifsText}>Voir les tarifs</Text>
+                        <Ionicons name="chevron-forward" size={14} color="#FFF" />
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -714,7 +641,7 @@ export default function SearchScreen() {
               onPress={() => setShowFiltersModal(false)}
             >
               <Text style={styles.applyButtonText}>
-                {language === 'fr' ? `Voir ${filteredSalons.length} résultats` : `See ${filteredSalons.length} results`}
+                {language === 'fr' ? `Voir ${realSalons.length} résultats` : `See ${realSalons.length} results`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1007,125 +934,104 @@ const styles = StyleSheet.create({
   },
   salonCard: {
     flexDirection: 'row',
-    borderRadius: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    marginBottom: 16,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   salonImageContainer: {
     position: 'relative',
   },
   salonImage: {
-    width: 100,
-    height: 130,
+    width: 110,
+    height: 140,
   },
-  promoBadge: {
+  verifiedBadgeOverlay: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  promoBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 2,
   },
   salonContent: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     justifyContent: 'space-between',
   },
   salonHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
   },
   salonName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     flex: 1,
+    marginRight: 8,
   },
-  ratingBadge: {
+  ratingBadgePremium: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFFBEB',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    gap: 3,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    gap: 4,
   },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '600',
+  ratingTextPremium: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#92400E',
   },
-  servicesText: {
-    fontSize: 12,
-    marginBottom: 6,
+  specialtiesText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: -4,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 8,
+    marginTop: 4,
   },
   addressText: {
-    flex: 1,
     fontSize: 12,
-  },
-  distanceBadge: {
-    backgroundColor: '#E5E5E5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  distanceText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#4A4A4A',
+    fontWeight: '500',
   },
   salonFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 8,
   },
   priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
+    flexDirection: 'column',
   },
-  priceLabel: {
-    fontSize: 11,
+  pricePrefix: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
-  priceValue: {
+  priceTag: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  availabilityBadge: {
+  viewTarifsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
   },
-  availabilityText: {
-    fontSize: 11,
-    fontWeight: '600',
+  viewTarifsText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Modal Styles

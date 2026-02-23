@@ -51,7 +51,10 @@ export function useFavorite(userId: string, salonId: string) {
 
   useEffect(() => {
     const checkFavorite = async () => {
-      if (!userId || !salonId) {
+      // Validation du format UUID pour éviter les crashs avec les IDs de test "1", "2", etc.
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      if (!userId || !salonId || !uuidRegex.test(salonId)) {
         setIsFavorite(false);
         setIsLoading(false);
         return;

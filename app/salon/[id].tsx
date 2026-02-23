@@ -31,6 +31,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSalon } from '@/hooks/use-salons';
 import { useFavorite } from '@/hooks/use-favorites';
+import { bookingService } from '@/services/booking.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button, Rating } from '@/components/ui';
 import { Service } from '@/types';
@@ -42,7 +44,7 @@ export default function SalonDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, isAuthenticated } = useAuth();
+  const { user, profile, isAuthenticated, signOut } = useAuth();
   const { t, language } = useLanguage();
   const { salon, isLoading, error } = useSalon(id || '');
   const { isFavorite, toggle: toggleFavorite, isToggling } = useFavorite(
@@ -51,6 +53,32 @@ export default function SalonDetailScreen() {
   );
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [hasBooking, setHasBooking] = useState(false);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const loadRole = async () => {
+      const role = await AsyncStorage.getItem('@afroplan_selected_role');
+      setActiveRole(role);
+    };
+    loadRole();
+  }, []);
+
+  React.useEffect(() => {
+    const checkBooking = async () => {
+      if (user?.id && id) {
+        try {
+          const bookings = await bookingService.getSalonBookings(id);
+          // On vérifie si l'utilisateur actuel est parmi les clients ayant réservé
+          const userHasBooked = bookings.data.some(b => b.client_id === user.id && (b.status === 'confirmed' || b.status === 'pending' || b.status === 'completed'));
+          setHasBooking(userHasBooked);
+        } catch (e) {
+          setHasBooking(false);
+        }
+      }
+    };
+    checkBooking();
+  }, [user?.id, id]);
 
   const handleCall = () => {
     if (salon?.phone) {
@@ -201,8 +229,8 @@ export default function SalonDetailScreen() {
             />
           </TouchableOpacity>
 
-          {/* Bouton Modifier (visible uniquement par le proprio) */}
-          {isAuthenticated && user?.id === salon.owner_id && (
+          {/* Bouton Modifier (visible UNIQUEMENT si on est en mode pro et proprio) */}
+          {isAuthenticated && activeRole === 'coiffeur' && user?.id === salon.owner_id && (
             <TouchableOpacity
               style={[styles.editButton, { backgroundColor: '#191919' }]}
               onPress={() => router.push('/(coiffeur)/salon')}
@@ -248,22 +276,33 @@ export default function SalonDetailScreen() {
 
           {/* Quick Actions */}
           <View style={styles.quickActions}>
-            {salon.phone && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={handleCall}
-              >
-                <Ionicons name="call-outline" size={20} color={colors.primary} />
-                <Text style={[styles.actionText, { color: colors.text }]}>Appeler</Text>
-              </TouchableOpacity>
+            {hasBooking ? (
+              <>
+                {salon.phone && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
+                    onPress={handleCall}
+                  >
+                    <Ionicons name="call-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.actionText, { color: colors.text }]}>Appeler</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={handleDirections}
+                >
+                  <Ionicons name="navigate-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.actionText, { color: colors.text }]}>Itineraire</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={[styles.restrictedContactBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+                <Text style={[styles.restrictedContactText, { color: colors.textSecondary }]}>
+                  Réservez une prestation pour débloquer l&apos;itinéraire et le contact direct.
+                </Text>
+              </View>
             )}
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={handleDirections}
-            >
-              <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-              <Text style={[styles.actionText, { color: colors.text }]}>Itineraire</Text>
-            </TouchableOpacity>
           </View>
 
                     {/* Description */}
@@ -289,58 +328,63 @@ export default function SalonDetailScreen() {
                                       <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
                                         {category}
                                       </Text>
-                                      <View style={styles.servicesGrid}>
-                                        {services.map((service) => (
-                                          <View key={service.id} style={[
-                                            styles.serviceCardGrid,
-                                            { backgroundColor: colors.card },
-                                            selectedService?.id === service.id && {
-                                              borderColor: colors.primary,
-                                              borderWidth: 2,
-                                            },
-                                            Shadows.sm,
-                                          ]}>
-                                                                    <TouchableOpacity
-                                                                      style={styles.serviceMainContentGrid}
-                                                                      onPress={() => setSelectedService(service)}
-                                                                    >
-                                                                      {/* Photo spécifique ou photo du catalogue par défaut */}
-                                                                      {(() => {
-                                                                        const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
-                                                                        const imageSource = service.image_url 
-                                                                          ? { uri: service.image_url } 
-                                                                          : catalogStyle?.image;
-                                            
-                                                                        return (
-                                                                          <Image
-                                                                            source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
-                                                                            style={styles.serviceImageGrid}
-                                                                            contentFit="cover"
-                                                                            transition={300}
-                                                                          />
-                                                                        );
-                                                                      })()}
-                                                                      
-                                                                      <View style={styles.serviceInfoGrid}>                                                <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
-                                                  {service.name}
-                                                </Text>
-                                                <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
-                                                  {service.duration_minutes} min
-                                                </Text>
-                                                <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
-                                                  {service.price}€
-                                                </Text>
-                                              </View>
-                                              
-                                              {selectedService?.id === service.id && (
-                                                <View style={styles.selectedOverlay}>
-                                                  <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
-                                                </View>
-                                              )}
-                                            </TouchableOpacity>
-                                          </View>
-                                        ))}
-                                      </View>
+                                                        <View style={styles.servicesGrid}>
+                                                          {services.map((service) => {
+                                                            if (!service) return null;
+                                                            
+                                                            return (
+                                                              <View key={service.id} style={[
+                                                                styles.serviceCardGrid,
+                                                                { backgroundColor: colors.card },
+                                                                selectedService?.id === service.id && {
+                                                                  borderColor: colors.primary,
+                                                                  borderWidth: 2,
+                                                                },
+                                                                Shadows.sm,
+                                                              ]}>
+                                                                <TouchableOpacity
+                                                                  style={styles.serviceMainContentGrid}
+                                                                  onPress={() => setSelectedService(service)}
+                                                                >
+                                                                  {/* Photo spécifique ou photo du catalogue par défaut */}
+                                                                  {(() => {
+                                                                    const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
+                                                                    const imageSource = service.image_url 
+                                                                      ? { uri: service.image_url } 
+                                                                      : catalogStyle?.image;
+                                      
+                                                                    return (
+                                                                      <Image
+                                                                        source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
+                                                                        style={styles.serviceImageGrid}
+                                                                        contentFit="cover"
+                                                                        transition={300}
+                                                                      />
+                                                                    );
+                                                                  })()}
+                                                                  
+                                                                  <View style={styles.serviceInfoGrid}>
+                                                                    <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
+                                                                      {service.name}
+                                                                    </Text>
+                                                                    <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
+                                                                      {service.duration_minutes} min
+                                                                    </Text>
+                                                                    <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
+                                                                      {service.price}€
+                                                                    </Text>
+                                                                  </View>
+                                                                  
+                                                                  {selectedService?.id === service.id && (
+                                                                    <View style={styles.selectedOverlay}>
+                                                                      <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
+                                                                    </View>
+                                                                  )}
+                                                                </TouchableOpacity>
+                                                              </View>
+                                                            );
+                                                          })}
+                                                        </View>
                                     </View>
                                   ))
                                 ) : (              <Text style={[styles.noServices, { color: colors.textMuted }]}>
@@ -554,6 +598,21 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: FontSizes.sm,
+    fontWeight: '500',
+  },
+  restrictedContactBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: 12,
+  },
+  restrictedContactText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
   },
   section: {

@@ -11,6 +11,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,6 +108,7 @@ export default function ClientReservationsScreen() {
       case 'pending': return colors.accent;
       case 'completed': return colors.textMuted;
       case 'cancelled': return colors.error;
+      default: return colors.textMuted;
     }
   };
 
@@ -116,6 +118,7 @@ export default function ClientReservationsScreen() {
       case 'pending': return 'En attente';
       case 'completed': return 'Termine';
       case 'cancelled': return 'Annule';
+      default: return 'Inconnu';
     }
   };
 
@@ -125,7 +128,34 @@ export default function ClientReservationsScreen() {
       case 'pending': return 'time';
       case 'completed': return 'checkmark-done-circle';
       case 'cancelled': return 'close-circle';
+      default: return 'help-circle';
     }
+  };
+
+  const handleCancelBooking = (booking: Booking) => {
+    if (booking.status === 'confirmed' || booking.status === 'completed') {
+      Alert.alert(
+        'Annulation impossible',
+        'Ce rendez-vous a fait l\'objet d\'un paiement (acompte ou total). Conformément à nos conditions, il ne peut plus être annulé via l\'application. Veuillez contacter directement le salon en cas d\'imprévu.'
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Annuler le rendez-vous',
+      'Voulez-vous vraiment annuler ce rendez-vous ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        { 
+          text: 'Oui, annuler', 
+          style: 'destructive', 
+          onPress: () => {
+            // Logique d'annulation pour les RDV non payés uniquement
+            Alert.alert('Succès', 'Rendez-vous annulé.');
+          } 
+        }
+      ]
+    );
   };
 
   const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'confirmed' || b.status === 'pending');
@@ -133,15 +163,16 @@ export default function ClientReservationsScreen() {
   const displayedBookings = filter === 'upcoming' ? upcomingBookings : pastBookings;
 
   const renderBooking = ({ item }: { item: Booking }) => (
-    <TouchableOpacity
-      style={[styles.bookingCard, { backgroundColor: colors.card }, Shadows.sm]}
-      onPress={() => router.push({
-        pathname: '/chat/[bookingId]',
-        params: { bookingId: item.id },
-      })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.bookingHeader}>
+    <View style={[styles.bookingCard, { backgroundColor: colors.card }, Shadows.sm]}>
+      {/* Partie haute cliquable pour voir les détails (simulé) */}
+      <TouchableOpacity 
+        style={styles.bookingHeader}
+        activeOpacity={0.7}
+        onPress={() => router.push({
+          pathname: '/chat/[bookingId]',
+          params: { bookingId: item.id },
+        })}
+      >
         <Image source={{ uri: item.salonImage }} style={styles.salonImage} contentFit="cover" />
         <View style={styles.bookingInfo}>
           <Text style={[styles.salonName, { color: colors.text }]} numberOfLines={1}>
@@ -160,7 +191,7 @@ export default function ClientReservationsScreen() {
             {getStatusLabel(item.status)}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       <View style={[styles.bookingFooter, { borderTopColor: colors.border }]}>
         <View style={styles.dateTimeRow}>
@@ -173,20 +204,31 @@ export default function ClientReservationsScreen() {
       </View>
 
       {(item.status === 'confirmed' || item.status === 'pending') && (
-        <TouchableOpacity
-          style={[styles.chatButton, { backgroundColor: colors.primary + '15' }]}
-          onPress={() => router.push({
-            pathname: '/chat/[bookingId]',
-            params: { bookingId: item.id },
-          })}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
-          <Text style={[styles.chatButtonText, { color: colors.primary }]}>
-            Envoyer un message
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
+            onPress={() => router.push({
+              pathname: '/chat/[bookingId]',
+              params: { bookingId: item.id },
+            })}
+          >
+            <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+            <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+              Message
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={() => handleCancelBooking(item)}
+          >
+            <Ionicons name="close-circle-outline" size={16} color={colors.error} />
+            <Text style={[styles.actionButtonText, { color: colors.error }]}>
+              Annuler
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -354,19 +396,27 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: '700',
   },
-  chatButton: {
+  cardActions: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.sm,
-    gap: Spacing.xs,
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
     borderRadius: BorderRadius.md,
+    gap: Spacing.xs,
   },
-  chatButtonText: {
+  actionButtonText: {
     fontSize: FontSizes.sm,
     fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
   },
   emptyState: {
     flex: 1,

@@ -254,7 +254,10 @@ export default function CoiffeurServicesScreen() {
         return;
       }
 
-      // 2. Upload des images et préparation du payload
+      // 2. Nettoyage : On supprime les anciens services pour repartir sur une base propre
+      await salonService.deleteServicesBySalonId(salon.id);
+
+      // 3. Upload des images et préparation du payload
       const servicesPayload = [];
       
       for (const style of stylesToSave) {
