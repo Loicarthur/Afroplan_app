@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,8 @@ import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
-
+import { bookingService } from '@/services/booking.service';
+import { BookingWithDetails } from '@/types';
 
 interface Message {
   id: string;
@@ -38,57 +40,35 @@ interface Message {
   isAutomatic?: boolean;
 }
 
-interface BookingInfo {
-  id: string;
-  clientName: string;
-  coiffeurName: string;
-  service: string;
-  date: string;
-  time: string;
-  status: 'confirmed' | 'pending' | 'completed';
-  clientImage: string;
-  coiffeurImage: string;
-}
+// Message de remerciement automatique envoyé par le salon dès la réservation
+const AUTOMATIC_THANK_YOU = (salonName: string, service: string): string =>
+  `Bonjour ! Merci pour votre réservation pour "${service}" 🙏\n\nNous sommes ravis de vous accueillir prochainement. N'hésitez pas à nous contacter si vous avez des questions ou des précisions sur votre coiffure.\n\nÀ très bientôt !\nL'équipe ${salonName}`;
 
-// Mock data
-const MOCK_BOOKING: BookingInfo = {
-  id: '1',
-  clientName: 'Marie Dupont',
-  coiffeurName: 'Fatou Diallo',
-  service: 'Tresses africaines',
-  date: 'Samedi 15 Février',
-  time: '14:00',
-  status: 'confirmed',
-  clientImage: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200',
-  coiffeurImage: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
+const buildInitialMessages = (booking: BookingWithDetails, isCoiffeur: boolean): Message[] => {
+  const createdAt = booking.created_at ? new Date(booking.created_at).getTime() : Date.now();
+  
+  return [
+    {
+      id: 'sys-0',
+      text: 'Réservation confirmée ! Vous pouvez maintenant échanger avec votre coiffeuse.',
+      senderId: 'system',
+      senderName: 'Système',
+      timestamp: new Date(createdAt),
+      isMe: false,
+      type: 'system',
+    },
+    {
+      id: 'auto-1',
+      text: AUTOMATIC_THANK_YOU(booking.salon?.name || 'Le Salon', booking.service?.name || 'votre coiffure'),
+      senderId: 'coiffeur',
+      senderName: booking.salon?.name || 'Le Salon',
+      timestamp: new Date(createdAt + 2000),
+      isMe: isCoiffeur,
+      type: 'text',
+      isAutomatic: true,
+    },
+  ];
 };
-
-// Message de remerciement automatique envoyé par le coiffeur dès la réservation
-const AUTOMATIC_THANK_YOU = (coiffeurName: string, service: string): string =>
-  `Bonjour ! Merci pour votre réservation pour "${service}" 🙏\n\nJe suis ravie de vous accueillir prochainement. N'hésitez pas à me contacter si vous avez des questions ou des précisions sur votre coiffure.\n\nÀ très bientôt !\n${coiffeurName}`;
-
-const buildInitialMessages = (booking: BookingInfo, isCoiffeur: boolean): Message[] => [
-  {
-    id: 'sys-0',
-    text: 'Réservation confirmée ! Vous pouvez maintenant échanger avec votre coiffeuse.',
-    senderId: 'system',
-    senderName: 'Système',
-    timestamp: new Date(Date.now() - 3600000 * 2),
-    isMe: false,
-    type: 'system',
-  },
-  {
-    id: 'auto-1',
-    text: AUTOMATIC_THANK_YOU(booking.coiffeurName, booking.service),
-    senderId: 'coiffeur',
-    senderName: booking.coiffeurName,
-    timestamp: new Date(Date.now() - 3600000 * 2 + 5000),
-    isMe: isCoiffeur,
-    type: 'text',
-    isAutomatic: true,
-  },
-];
-
 
 // Suggestions de messages rapides selon le rôle
 const QUICK_MESSAGES_CLIENT = [
@@ -174,17 +154,39 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile } = useAuth();
-  useLocalSearchParams<{ bookingId: string }>();
+  const { profile, user } = useAuth();
+  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
 
-  const [booking] = useState<BookingInfo>(MOCK_BOOKING);
+  const [booking, setBooking] = useState<BookingWithDetails | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
-  const isCoiffeur = profile?.role === 'coiffeur';
-  const otherPersonName = isCoiffeur ? booking.clientName : booking.coiffeurName;
-  const otherPersonImage = isCoiffeur ? booking.clientImage : booking.coiffeurImage;
+  useEffect(() => {
+    const loadBookingData = async () => {
+      if (!bookingId || !user) return;
+      try {
+        const data = await bookingService.getBookingById(bookingId);
+        if (data) {
+          setBooking(data);
+          // On vérifie si l'utilisateur actuel est le coiffeur propriétaire du salon
+          const isSalonOwner = user.id === data.salon?.owner_id;
+          setMessages(buildInitialMessages(data, isSalonOwner));
+        }
+      } catch (error) {
+        console.error('Error loading chat booking:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBookingData();
+  }, [bookingId, user?.id]);
+
+  const isCoiffeur = user?.id === booking?.salon?.owner_id;
+  const otherPersonName = isCoiffeur ? (booking?.client?.full_name || 'Client') : (booking?.salon?.name || 'Le Salon');
+  const otherPersonImage = isCoiffeur ? booking?.client?.avatar_url : booking?.salon?.cover_image_url;
   const quickMessages = isCoiffeur ? QUICK_MESSAGES_COIFFEUR : QUICK_MESSAGES_CLIENT;
 
   const sendMessage = () => {
@@ -194,7 +196,7 @@ export default function ChatScreen() {
       id: Date.now().toString(),
       text: inputText.trim(),
       senderId: isCoiffeur ? 'coiffeur' : 'client',
-      senderName: profile?.full_name || 'Moi',
+      senderName: isCoiffeur ? (booking?.salon?.name || 'Le Salon') : (profile?.full_name || 'Moi'),
       timestamp: new Date(),
       isMe: true,
       type: 'text',
@@ -213,14 +215,13 @@ export default function ChatScreen() {
     setInputText(text);
   };
 
-  useEffect(() => {
-    // Initialiser avec le message automatique de remerciement du coiffeur
-    setMessages(buildInitialMessages(booking, isCoiffeur));
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: false });
-    }, 300);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (loading || !booking) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -237,7 +238,7 @@ export default function ChatScreen() {
 
         <TouchableOpacity style={styles.headerProfile}>
           <Image
-            source={{ uri: otherPersonImage }}
+            source={{ uri: otherPersonImage || 'https://via.placeholder.com/100' }}
             style={styles.headerAvatar}
             contentFit="cover"
           />
@@ -269,10 +270,10 @@ export default function ChatScreen() {
         </View>
         <View style={styles.bookingInfo}>
           <Text style={[styles.bookingService, { color: colors.text }]}>
-            {booking.service}
+            {booking.service?.name}
           </Text>
           <Text style={[styles.bookingDateTime, { color: colors.textSecondary }]}>
-            {booking.date} à {booking.time}
+            {booking.booking_date} à {booking.start_time.substring(0, 5)}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: '#22C55E20' }]}>

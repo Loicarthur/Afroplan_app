@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,90 +22,22 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
-
-type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
-
-type BookingItem = {
-  id: string;
-  clientName: string;
-  service: string;
-  date: string;
-  time: string;
-  duration: string;
-  price: number;
-  status: BookingStatus;
-  paymentMethod: 'full' | 'deposit' | 'on_site';
-  amountPaid: number;
-  remainingAmount: number;
-};
-
-// Mock data
-const MOCK_BOOKINGS: BookingItem[] = [
-  {
-    id: '1',
-    clientName: 'Marie Dupont',
-    service: 'Tresses africaines',
-    date: "Aujourd'hui",
-    time: '10:00',
-    duration: '2h',
-    price: 80,
-    status: 'confirmed',
-    paymentMethod: 'deposit',
-    amountPaid: 10,
-    remainingAmount: 70,
-  },
-  {
-    id: '2',
-    clientName: 'Jean Martin',
-    service: 'Coupe homme',
-    date: "Aujourd'hui",
-    time: '14:30',
-    duration: '45min',
-    price: 25,
-    status: 'pending',
-    paymentMethod: 'on_site',
-    amountPaid: 0,
-    remainingAmount: 25,
-  },
-  {
-    id: '3',
-    clientName: 'Fatou Diallo',
-    service: 'Box Braids',
-    date: 'Demain',
-    time: '09:00',
-    duration: '4h',
-    price: 150,
-    status: 'confirmed',
-    paymentMethod: 'full',
-    amountPaid: 150,
-    remainingAmount: 0,
-  },
-  {
-    id: '4',
-    clientName: 'Aminata Sy',
-    service: 'Locks entretien',
-    date: '5 Fev',
-    time: '11:00',
-    duration: '1h30',
-    price: 60,
-    status: 'pending',
-    paymentMethod: 'deposit',
-    amountPaid: 10,
-    remainingAmount: 50,
-  },
-];
+import { bookingService } from '@/services/booking.service';
+import { salonService } from '@/services/salon.service';
+import { BookingWithDetails } from '@/types';
 
 export default function CoiffeurReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'availability'>('all');
-  const [bookings, setBookings] = useState<BookingItem[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
 
   // État pour les horaires (Simplifié pour la démo)
-  const [weeklySchedule, setWeeklySchedule] = useState({
+  const [weeklySchedule, setWeeklySchedule] = useState<any>({
     monday: { active: true, start: '09:00', end: '18:00' },
     tuesday: { active: true, start: '09:00', end: '18:00' },
     wednesday: { active: true, start: '09:00', end: '18:00' },
@@ -114,17 +47,41 @@ export default function CoiffeurReservationsScreen() {
     sunday: { active: false, start: '00:00', end: '00:00' },
   });
 
-  const onRefresh = React.useCallback(() => {
+  const fetchBookings = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        const response = await bookingService.getSalonBookings(salon.id);
+        setBookings(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching salon bookings:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      fetchBookings();
+    }
+  }, [isAuthenticated, fetchBookings]);
+
+  const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    fetchBookings();
+  };
 
   const filteredBookings = bookings.filter(booking => {
     if (activeTab === 'all') return booking.status !== 'cancelled';
-    return booking.status === activeTab;
+    if (activeTab === 'pending') return booking.status === 'pending';
+    if (activeTab === 'confirmed') return booking.status === 'confirmed';
+    return false;
   });
 
-  const getStatusColor = (status: BookingStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
         return colors.success;
@@ -134,10 +91,12 @@ export default function CoiffeurReservationsScreen() {
         return colors.primary;
       case 'cancelled':
         return colors.error;
+      default:
+        return colors.textMuted;
     }
   };
 
-  const getStatusLabel = (status: BookingStatus) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'confirmed':
         return 'Confirme';
@@ -147,21 +106,12 @@ export default function CoiffeurReservationsScreen() {
         return 'Termine';
       case 'cancelled':
         return 'Annule';
+      default:
+        return 'Inconnu';
     }
   };
 
-  const getPaymentLabel = (method: 'full' | 'deposit' | 'on_site') => {
-    switch (method) {
-      case 'full':
-        return 'Paye';
-      case 'deposit':
-        return 'Acompte';
-      case 'on_site':
-        return 'Au salon';
-    }
-  };
-
-  const handleConfirm = (bookingId: string) => {
+  const handleConfirm = async (bookingId: string) => {
     Alert.alert(
       'Confirmer la reservation',
       'Voulez-vous confirmer cette reservation?',
@@ -169,19 +119,20 @@ export default function CoiffeurReservationsScreen() {
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Confirmer',
-          onPress: () => {
-            setBookings(prev =>
-              prev.map(b =>
-                b.id === bookingId ? { ...b, status: 'confirmed' } : b
-              )
-            );
+          onPress: async () => {
+            try {
+              await bookingService.confirmBooking(bookingId);
+              fetchBookings();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de confirmer le rendez-vous.');
+            }
           },
         },
       ]
     );
   };
 
-  const handleCancel = (bookingId: string) => {
+  const handleCancel = async (bookingId: string) => {
     Alert.alert(
       'Annuler la reservation',
       'Voulez-vous vraiment annuler cette reservation?',
@@ -190,17 +141,26 @@ export default function CoiffeurReservationsScreen() {
         {
           text: 'Oui, annuler',
           style: 'destructive',
-          onPress: () => {
-            setBookings(prev =>
-              prev.map(b =>
-                b.id === bookingId ? { ...b, status: 'cancelled' } : b
-              )
-            );
+          onPress: async () => {
+            try {
+              await bookingService.cancelBooking(bookingId);
+              fetchBookings();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible d\'annuler le rendez-vous.');
+            }
           },
         },
       ]
     );
   };
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
@@ -289,12 +249,12 @@ export default function CoiffeurReservationsScreen() {
                 </Text>
               </View>
 
-              {Object.entries(weeklySchedule).map(([day, config]) => (
+              {Object.entries(weeklySchedule).map(([day, config]: [string, any]) => (
                 <View key={day} style={[styles.dayRow, { borderBottomColor: colors.border }]}>
                   <View style={styles.dayMain}>
                     <TouchableOpacity 
                       style={[styles.checkbox, config.active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                      onPress={() => setWeeklySchedule(prev => ({
+                      onPress={() => setWeeklySchedule((prev: any) => ({
                         ...prev,
                         [day]: { ...config, active: !config.active }
                       }))}
@@ -356,10 +316,10 @@ export default function CoiffeurReservationsScreen() {
                 <View style={styles.bookingHeader}>
                   <View style={styles.bookingDateTime}>
                     <Text style={[styles.bookingDate, { color: colors.text }]}>
-                      {booking.date}
+                      {booking.booking_date}
                     </Text>
                     <Text style={[styles.bookingTime, { color: colors.primary }]}>
-                      {booking.time} - {booking.duration}
+                      {booking.start_time.substring(0, 5)} - {booking.service?.duration_minutes}min
                     </Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status) + '20' }]}>
@@ -375,10 +335,10 @@ export default function CoiffeurReservationsScreen() {
                     <Ionicons name="person-circle-outline" size={40} color={colors.textMuted} />
                     <View style={styles.clientText}>
                       <Text style={[styles.clientName, { color: colors.text }]}>
-                        {booking.clientName}
+                        {booking.client?.full_name || booking.notes?.replace('Client: ', '') || 'Client'}
                       </Text>
                       <Text style={[styles.serviceName, { color: colors.textSecondary }]}>
-                        {booking.service}
+                        {booking.service?.name || 'Service'}
                       </Text>
                     </View>
                   </View>
@@ -391,24 +351,24 @@ export default function CoiffeurReservationsScreen() {
                       Mode de paiement
                     </Text>
                     <Text style={[styles.paymentValue, { color: colors.text }]}>
-                      {getPaymentLabel(booking.paymentMethod)}
+                      {booking.payment_method === 'deposit' ? 'Acompte' : 'Totalité'}
                     </Text>
                   </View>
                   <View style={styles.paymentRow}>
                     <Text style={[styles.paymentLabel, { color: colors.textSecondary }]}>
-                      Paye
+                      Payé en ligne
                     </Text>
                     <Text style={[styles.paymentValue, { color: colors.success }]}>
-                      {booking.amountPaid} EUR
+                      {booking.amount_paid} EUR
                     </Text>
                   </View>
-                  {booking.remainingAmount > 0 && (
+                  {(booking.remaining_amount || 0) > 0 && (
                     <View style={styles.paymentRow}>
                       <Text style={[styles.paymentLabel, { color: colors.textSecondary }]}>
-                        Reste a payer
+                        Reste à payer au salon
                       </Text>
                       <Text style={[styles.paymentValue, { color: colors.accent }]}>
-                        {booking.remainingAmount} EUR
+                        {booking.remaining_amount} EUR
                       </Text>
                     </View>
                   )}
@@ -417,7 +377,7 @@ export default function CoiffeurReservationsScreen() {
                       Total
                     </Text>
                     <Text style={[styles.paymentValue, { color: colors.primary, fontWeight: '700' }]}>
-                      {booking.price} EUR
+                      {booking.total_price} EUR
                     </Text>
                   </View>
                 </View>

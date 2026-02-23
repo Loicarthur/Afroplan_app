@@ -1,11 +1,35 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
+import { bookingService } from '@/services/booking.service';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user, isAuthenticated } = useAuth();
+  const [activeBookingsCount, setActiveBookingsCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const response = await bookingService.getClientBookings(user.id);
+          // On compte les RDV à venir (pending ou confirmed)
+          const count = response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
+          setActiveBookingsCount(count);
+        } catch (e) {
+          setActiveBookingsCount(0);
+        }
+      }
+    };
+    fetchCount();
+    // Rafraîchir toutes les 30 secondes pour la démo
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
 
   return (
     <Tabs
@@ -63,6 +87,7 @@ export default function TabLayout() {
         options={{
           title: 'Rendez-vous',
           headerShown: false,
+          tabBarBadge: activeBookingsCount > 0 ? activeBookingsCount : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'calendar' : 'calendar-outline'}

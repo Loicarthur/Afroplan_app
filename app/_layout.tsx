@@ -59,7 +59,6 @@ export default function RootLayout() {
                 <Stack.Screen name="(coiffeur)" options={{ headerShown: false }} />
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                 <Stack.Screen name="(salon)" options={{ headerShown: false }} />
-                <Stack.Screen name="chat" options={{ headerShown: false }} />
                 <Stack.Screen name="checkout" options={{ headerShown: false, presentation: 'modal' }} />
                 <Stack.Screen
                   name="salon/[id]"

@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,65 +22,40 @@ import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-
-interface Booking {
-  id: string;
-  salonName: string;
-  salonImage: string;
-  service: string;
-  date: string;
-  time: string;
-  price: number;
-  status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
-  coiffeurName: string;
-}
-
-const MOCK_BOOKINGS: Booking[] = [
-  {
-    id: 'booking-1',
-    salonName: 'Bella Coiffure',
-    salonImage: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200',
-    service: 'Tresses africaines',
-    date: 'Aujourd\'hui',
-    time: '14h00',
-    price: 65,
-    status: 'confirmed',
-    coiffeurName: 'Marie Kone',
-  },
-  {
-    id: 'booking-2',
-    salonName: 'Afro Style Studio',
-    salonImage: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200',
-    service: 'Locks entretien',
-    date: 'Demain',
-    time: '10h00',
-    price: 45,
-    status: 'pending',
-    coiffeurName: 'Fatou Diallo',
-  },
-  {
-    id: 'booking-3',
-    salonName: 'Natural Beauty',
-    salonImage: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
-    service: 'Coupe + Coloration',
-    date: '15 Jan 2025',
-    time: '11h00',
-    price: 80,
-    status: 'completed',
-    coiffeurName: 'Aminata Bamba',
-  },
-];
+import { bookingService } from '@/services/booking.service';
+import { BookingWithDetails, Booking } from '@/types';
 
 export default function ClientReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchBookings = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await bookingService.getClientBookings(user.id);
+      setBookings(response.data);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      fetchBookings();
+    }
+  }, [isAuthenticated, fetchBookings]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    fetchBookings();
   };
 
   if (!isAuthenticated) {
@@ -158,11 +134,11 @@ export default function ClientReservationsScreen() {
     );
   };
 
-  const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'confirmed' || b.status === 'pending');
-  const pastBookings = MOCK_BOOKINGS.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  const upcomingBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+  const pastBookings = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
   const displayedBookings = filter === 'upcoming' ? upcomingBookings : pastBookings;
 
-  const renderBooking = ({ item }: { item: Booking }) => (
+  const renderBooking = ({ item }: { item: BookingWithDetails }) => (
     <View style={[styles.bookingCard, { backgroundColor: colors.card }, Shadows.sm]}>
       {/* Partie haute cliquable pour voir les détails (simulé) */}
       <TouchableOpacity 
@@ -173,16 +149,20 @@ export default function ClientReservationsScreen() {
           params: { bookingId: item.id },
         })}
       >
-        <Image source={{ uri: item.salonImage }} style={styles.salonImage} contentFit="cover" />
+        <Image 
+          source={{ uri: item.salon?.cover_image_url || item.salon?.image_url || 'https://via.placeholder.com/200' }} 
+          style={styles.salonImage} 
+          contentFit="cover" 
+        />
         <View style={styles.bookingInfo}>
           <Text style={[styles.salonName, { color: colors.text }]} numberOfLines={1}>
-            {item.salonName}
+            {item.salon?.name || 'Salon'}
           </Text>
           <Text style={[styles.serviceName, { color: colors.textSecondary }]} numberOfLines={1}>
-            {item.service}
+            {item.service?.name || 'Service'}
           </Text>
           <Text style={[styles.coiffeurName, { color: colors.textMuted }]}>
-            avec {item.coiffeurName}
+            {item.booking_date} à {item.start_time.substring(0, 5)}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
@@ -196,11 +176,11 @@ export default function ClientReservationsScreen() {
       <View style={[styles.bookingFooter, { borderTopColor: colors.border }]}>
         <View style={styles.dateTimeRow}>
           <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-          <Text style={[styles.dateText, { color: colors.text }]}>{item.date}</Text>
+          <Text style={[styles.dateText, { color: colors.text }]}>{item.booking_date}</Text>
           <Ionicons name="time-outline" size={16} color={colors.primary} />
-          <Text style={[styles.dateText, { color: colors.text }]}>{item.time}</Text>
+          <Text style={[styles.dateText, { color: colors.text }]}>{item.start_time.substring(0, 5)}</Text>
         </View>
-        <Text style={[styles.priceText, { color: colors.primary }]}>{item.price} EUR</Text>
+        <Text style={[styles.priceText, { color: colors.primary }]}>{item.total_price} EUR</Text>
       </View>
 
       {(item.status === 'confirmed' || item.status === 'pending') && (
@@ -219,7 +199,7 @@ export default function ClientReservationsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => handleCancelBooking(item)}
+            onPress={() => handleCancelBooking(item as any)}
           >
             <Ionicons name="close-circle-outline" size={16} color={colors.error} />
             <Text style={[styles.actionButtonText, { color: colors.error }]}>
@@ -230,6 +210,14 @@ export default function ClientReservationsScreen() {
       )}
     </View>
   );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>

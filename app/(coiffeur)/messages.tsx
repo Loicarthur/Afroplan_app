@@ -12,6 +12,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,69 +22,44 @@ import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-
-interface Conversation {
-  id: string;
-  bookingId: string;
-  clientName: string;
-  clientImage: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  service: string;
-  bookingDate: string;
-  bookingStatus: 'confirmed' | 'pending' | 'completed';
-}
-
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: '1',
-    bookingId: 'booking-1',
-    clientName: 'Marie Dupont',
-    clientImage: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=100',
-    lastMessage: 'Bonjour, je serai un peu en retard, environ 10 minutes.',
-    lastMessageTime: 'Il y a 5 min',
-    unreadCount: 2,
-    service: 'Box Braids',
-    bookingDate: "Aujourd'hui, 14h00",
-    bookingStatus: 'confirmed',
-  },
-  {
-    id: '2',
-    bookingId: 'booking-2',
-    clientName: 'Aminata Bamba',
-    clientImage: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=100',
-    lastMessage: '⚡ Merci pour votre réservation « Knotless Braids » 🙏 Je suis ravie…',
-    lastMessageTime: 'À l\'instant',
-    unreadCount: 0,
-    service: 'Knotless Braids',
-    bookingDate: 'Jeudi, 10h00',
-    bookingStatus: 'confirmed',
-  },
-  {
-    id: '3',
-    bookingId: 'booking-3',
-    clientName: 'Fatou Diallo',
-    clientImage: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=100',
-    lastMessage: 'Merci pour la prestation, c\'était parfait !',
-    lastMessageTime: 'Hier',
-    unreadCount: 0,
-    service: 'Locks (entretien)',
-    bookingDate: 'Hier, 10h00',
-    bookingStatus: 'completed',
-  },
-];
+import { bookingService } from '@/services/booking.service';
+import { salonService } from '@/services/salon.service';
+import { BookingWithDetails } from '@/types';
 
 export default function CoiffeurMessagesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [conversations] = useState(MOCK_CONVERSATIONS);
+  const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<BookingWithDetails[]>([]);
+
+  const fetchConversations = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        const response = await bookingService.getSalonBookings(salon.id);
+        // On trie pour avoir les plus récents en premier
+        setConversations(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching salon conversations:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      fetchConversations();
+    }
+  }, [isAuthenticated, fetchConversations]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    fetchConversations();
   };
 
   if (!isAuthenticated) {
@@ -106,61 +82,66 @@ export default function CoiffeurMessagesScreen() {
     );
   }
 
-  const getStatusColor = (status: Conversation['bookingStatus']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return colors.success;
       case 'pending': return colors.accent;
       case 'completed': return colors.textMuted;
+      default: return colors.textMuted;
     }
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => (
+  const renderConversation = ({ item }: { item: BookingWithDetails }) => (
     <TouchableOpacity
       style={[styles.conversationCard, { backgroundColor: colors.card }]}
       onPress={() => router.push({
         pathname: '/chat/[bookingId]',
-        params: { bookingId: item.bookingId },
+        params: { bookingId: item.id },
       })}
       activeOpacity={0.7}
     >
       <View style={styles.avatarWrapper}>
-        <Image source={{ uri: item.clientImage }} style={styles.avatar} contentFit="cover" />
-        <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.bookingStatus) }]} />
+        <Image 
+          source={{ uri: item.client?.avatar_url || 'https://via.placeholder.com/100' }} 
+          style={styles.avatar} 
+          contentFit="cover" 
+        />
+        <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
           <Text style={[styles.clientName, { color: colors.text }]} numberOfLines={1}>
-            {item.clientName}
+            {item.client?.full_name || 'Client'}
           </Text>
           <Text style={[styles.timeText, { color: colors.textMuted }]}>
-            {item.lastMessageTime}
+            {item.start_time.substring(0, 5)}
           </Text>
         </View>
         <Text style={[styles.serviceLabel, { color: colors.primary }]} numberOfLines={1}>
-          {item.service} - {item.bookingDate}
+          {item.service?.name} - {item.booking_date}
         </Text>
         <View style={styles.lastMessageRow}>
           <Text
             style={[
               styles.lastMessage,
-              {
-                color: item.unreadCount > 0 ? colors.text : colors.textSecondary,
-                fontWeight: item.unreadCount > 0 ? '600' : '400',
-              },
+              { color: colors.textSecondary },
             ]}
             numberOfLines={1}
           >
-            {item.lastMessage}
+            {item.notes || "Cliquer pour discuter avec le client"}
           </Text>
-          {item.unreadCount > 0 && (
-            <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.unreadText}>{item.unreadCount}</Text>
-            </View>
-          )}
         </View>
       </View>
     </TouchableOpacity>
   );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>

@@ -328,12 +328,14 @@ export default function CoiffeurDashboard() {
     router.replace('/(tabs)');
   };
 
-  const [stats] = useState({
-    todayBookings: 3,
-    pendingBookings: 5,
-    totalRevenue: 450,
-    totalClients: 28,
-  });
+  const pendingBookingsCount = todayBookings.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
+
+  const stats = {
+    todayBookings: todayBookings.length,
+    pendingBookings: pendingBookingsCount,
+    totalRevenue: todayBookings.filter(b => b.status === 'confirmed' || b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0),
+    totalClients: [...new Set(todayBookings.map(b => b.client_id))].length,
+  };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -653,9 +655,11 @@ export default function CoiffeurDashboard() {
               onPress={() => router.push('/(coiffeur)/messages' as any)}
             >
               <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>2</Text>
-              </View>
+              {pendingBookingsCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{pendingBookingsCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}>
               <Ionicons name="notifications-outline" size={24} color={colors.text} />
@@ -874,9 +878,11 @@ export default function CoiffeurDashboard() {
                             <Text style={[styles.quickActionText, { color: colors.text }]}>
                               Messages clients
                             </Text>
-                            <View style={styles.messageBadge}>
-                              <Text style={styles.messageBadgeText}>2 nouveaux</Text>
-                            </View>
+                            {pendingBookingsCount > 0 && (
+                              <View style={styles.messageBadge}>
+                                <Text style={styles.messageBadgeText}>{pendingBookingsCount} nouveau{pendingBookingsCount > 1 ? 'x' : ''}</Text>
+                              </View>
+                            )}
                             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>

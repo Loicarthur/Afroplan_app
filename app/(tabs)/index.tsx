@@ -18,7 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
@@ -173,13 +173,33 @@ function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeA
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated, profile } = useAuth();
+  const { isAuthenticated, profile, user } = useAuth();
   const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
   const { t, language } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [activeBookingsCount, setActiveBookingsCount] = useState(0);
+
+  const fetchActiveBookingsCount = React.useCallback(async () => {
+    if (isAuthenticated && user) {
+      try {
+        const { bookingService } = await import('@/services/booking.service');
+        const response = await bookingService.getClientBookings(user.id);
+        const count = response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
+        setActiveBookingsCount(count);
+      } catch (e) {
+        setActiveBookingsCount(0);
+      }
+    }
+  }, [isAuthenticated, user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchActiveBookingsCount();
+    }, [fetchActiveBookingsCount])
+  );
 
   const handleSwitchToCoiffeur = async () => {
     await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur');
@@ -270,12 +290,14 @@ export default function HomeScreen() {
               <View style={styles.authButtons}>
                 <TouchableOpacity
                   style={[styles.notificationButton, { backgroundColor: colors.card }]}
-                  onPress={() => router.push('/(tabs)/bookings')}
+                  onPress={() => router.push('/(tabs)/reservations')}
                 >
                   <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>1</Text>
-                  </View>
+                  {activeBookingsCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>{activeBookingsCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]}>
                   <Ionicons name="notifications-outline" size={24} color={colors.text} />

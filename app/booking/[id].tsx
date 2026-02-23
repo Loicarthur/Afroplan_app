@@ -199,6 +199,10 @@ export default function BookingScreen() {
       const startDateTime = `${selectedSlot.start}:00`;
       const endDateTime = `${selectedSlot.end}:00`;
 
+      if (!params.serviceId) {
+        throw new Error('Informations du service manquantes');
+      }
+
       // 1. Créer la réservation initiale (statut pending)
       const { data: booking, error: bookingError } = await supabase
         .from('bookings')
@@ -289,10 +293,7 @@ export default function BookingScreen() {
       [
         {
           text: 'Envoyer un message',
-          onPress: () => router.replace({
-            pathname: '/chat/[bookingId]',
-            params: { bookingId },
-          }),
+          onPress: () => router.replace(`/chat/${bookingId}`),
         },
         {
           text: t('booking.yourBookings'),
