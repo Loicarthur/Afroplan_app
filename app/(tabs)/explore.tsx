@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -35,7 +35,7 @@ const HAIRSTYLE_FILTERS = [
   { id: 'all', nameKey: 'common.seeAll', icon: 'grid-outline' },
   { id: 'tresses', nameKey: 'hairstyle.tresses', icon: 'cut-outline' },
   { id: 'locks', nameKey: 'hairstyle.locks', icon: 'ribbon-outline' },
-  { id: 'coupe', nameKey: 'hairstyle.coupe', icon: 'scissors-outline' },
+  { id: 'coupe', nameKey: 'hairstyle.coupe', icon: 'cut-outline' },
   { id: 'soins', nameKey: 'hairstyle.soins', icon: 'heart-outline' },
   { id: 'coloration', nameKey: 'hairstyle.coloration', icon: 'color-palette-outline' },
 ];
@@ -138,9 +138,10 @@ export default function SearchScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { t, language } = useLanguage();
+  const params = useLocalSearchParams();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(params.category as string || 'all');
   const [selectedQuickFilters, setSelectedQuickFilters] = useState<string[]>(['nearby']);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -149,12 +150,25 @@ export default function SearchScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   const [filters, setFilters] = useState<AdvancedFilters>({
-    maxDistance: 10,
+    maxDistance: params.distance ? parseInt(params.distance as string, 10) : 10,
     minRating: 4.0,
-    maxPrice: 200,
-    location: 'both',
+    maxPrice: params.budget ? parseInt(params.budget as string, 10) : 200,
+    location: (params.location as any) || 'both',
     onlyPromos: false,
   });
+
+  // Mettre à jour les filtres si les params changent
+  useEffect(() => {
+    if (params.category) setSelectedCategory(params.category as string);
+    if (params.distance || params.budget || params.location) {
+      setFilters(prev => ({
+        ...prev,
+        maxDistance: params.distance ? parseInt(params.distance as string, 10) : prev.maxDistance,
+        maxPrice: params.budget ? parseInt(params.budget as string, 10) : prev.maxPrice,
+        location: (params.location as any) || prev.location,
+      }));
+    }
+  }, [params]);
 
   // Filtrer les salons
   const filteredSalons = SALONS_DATA.filter((salon) => {

@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,7 +29,7 @@ import { salonService } from '@/services/salon.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
-type SalonLocationType = 'salon' | 'domicile' | 'both';
+type SalonLocationType = 'salon' | 'coiffeur_home' | 'domicile' | 'both';
 
 // Liste des spécialités synchronisée avec les catégories globales de l'app
 const AFRO_SPECIALTIES = HAIRSTYLE_CATEGORIES.map(cat => ({
@@ -88,8 +89,10 @@ export default function SalonManagementScreen() {
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
 
-  // Photos du salon (max 4)
-  const [photos, setPhotos] = useState<string[]>([]);
+  // Médias du salon
+  const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
+  const [videos, setVideos] = useState<string[]>([]);
 
   // Specialites selectionnees
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
@@ -119,6 +122,19 @@ export default function SalonManagementScreen() {
           setCity(salon.city || '');
           setPostalCode(salon.postal_code || '');
           setIsPublished(salon.is_active === true);
+          
+          // Répartir les photos avec repli intelligent
+          const initialCover = salon.cover_image_url || salon.image_url || (salon.photos && salon.photos.length > 0 ? salon.photos[0] : null);
+          if (initialCover) {
+            setCoverPhoto(initialCover);
+          }
+          
+          if (salon.photos && salon.photos.length > 0) {
+            // Si la première photo du tableau est la cover, on l'ignore pour la galerie ambiance
+            const galleryStartIdx = (salon.photos[0] === initialCover) ? 1 : 0;
+            setGalleryPhotos(salon.photos.slice(galleryStartIdx, galleryStartIdx + 2));
+          }
+          
           // Déduire le type de localisation depuis les données existantes
           if (salon.offers_home_service) {
             setServiceLocationType('both');
@@ -144,78 +160,44 @@ export default function SalonManagementScreen() {
     loadExistingSalon();
   }, [user?.id]);
 
-  const pickImage = async (index?: number) => {
-    if (photos.length >= MAX_PHOTOS && index === undefined) {
-      Alert.alert(t('common.error'), `Vous ne pouvez ajouter que ${MAX_PHOTOS} photos maximum.`);
-      return;
-    }
-
-    if (Platform.OS === 'web') {
-      Alert.alert('Info', 'La sélection d\'image n\'est pas encore supportée sur le web dans cette démo.');
-      return;
-    }
-
+  const pickMedia = async (type: 'cover' | 'gallery', index?: number) => {
     try {
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.7,
+      };
+
       Alert.alert(
         'Ajouter une photo',
         'Choisissez la source',
         [
           {
-            text: 'Prendre une photo',
+            text: 'Appareil photo',
             onPress: async () => {
-              try {
-                const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-                if (!cameraPermission.granted) {
-                  Alert.alert('Permission requise', 'Autorisez l\'accès à la caméra pour prendre des photos.');
-                  return;
-                }
-                const result = await ImagePicker.launchCameraAsync({
-                  allowsEditing: true,
-                  aspect: [16, 9],
-                  quality: 0.8,
-                });
-                if (!result.canceled && result.assets[0]) {
-                  const newPhotos = [...photos];
-                  if (index !== undefined) {
-                    newPhotos[index] = result.assets[0].uri;
-                  } else {
-                    newPhotos.push(result.assets[0].uri);
-                  }
-                  setPhotos(newPhotos);
-                }
-              } catch (e) {
-                console.error(e);
-                Alert.alert('Erreur', 'Impossible d\'ouvrir la caméra.');
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission requise', 'Accès caméra refusé');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync(options);
+              if (!result.canceled && result.assets[0]) {
+                handleMediaSelection(result.assets[0].uri, type, index);
               }
             },
           },
           {
-            text: 'Choisir depuis la galerie',
+            text: 'Galerie',
             onPress: async () => {
-              try {
-                const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (!permissionResult.granted) {
-                  Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour ajouter des photos.');
-                  return;
-                }
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                  allowsEditing: true,
-                  aspect: [16, 9],
-                  quality: 0.8,
-                });
-                if (!result.canceled && result.assets[0]) {
-                  const newPhotos = [...photos];
-                  if (index !== undefined) {
-                    newPhotos[index] = result.assets[0].uri;
-                  } else {
-                    newPhotos.push(result.assets[0].uri);
-                  }
-                  setPhotos(newPhotos);
-                }
-              } catch (e) {
-                console.error(e);
-                Alert.alert('Erreur', 'Impossible d\'ouvrir la galerie.');
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission requise', 'Accès galerie refusé');
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync(options);
+              if (!result.canceled && result.assets[0]) {
+                handleMediaSelection(result.assets[0].uri, type, index);
               }
             },
           },
@@ -223,26 +205,27 @@ export default function SalonManagementScreen() {
         ]
       );
     } catch (e) {
-      console.error(e);
+      if (__DEV__) console.warn('Media pick error:', e);
     }
   };
 
-  const removePhoto = (index: number) => {
-    Alert.alert(
-      'Supprimer la photo',
-      'Voulez-vous vraiment supprimer cette photo?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => {
-            const newPhotos = photos.filter((_, i) => i !== index);
-            setPhotos(newPhotos);
-          },
-        },
-      ]
-    );
+  const handleMediaSelection = (uri: string, type: 'cover' | 'gallery', index?: number) => {
+    if (type === 'cover') {
+      setCoverPhoto(uri);
+    } else if (type === 'gallery') {
+      const newGallery = [...galleryPhotos];
+      if (index !== undefined && index < newGallery.length) {
+        newGallery[index] = uri;
+      } else if (newGallery.length < 2) {
+        newGallery.push(uri);
+      }
+      setGalleryPhotos(newGallery);
+    }
+  };
+
+  const removeMedia = (type: 'cover' | 'gallery', index?: number) => {
+    if (type === 'cover') setCoverPhoto(null);
+    else if (type === 'gallery') setGalleryPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const toggleSpecialty = (specialtyId: string) => {
@@ -282,41 +265,91 @@ export default function SalonManagementScreen() {
 
     if (!isSupabaseConfigured()) {
       Alert.alert(
-        'Configuration requise',
-        'La connexion au serveur n\'est pas configuree. Verifiez votre fichier .env.'
+        'Mode Démo',
+        'Supabase n\'est pas configuré. Les données ne seront pas sauvegardées sur le serveur.'
       );
+      setIsSaving(false);
       return;
     }
 
     if (!user?.id) {
-      Alert.alert(t('common.error'), 'Vous devez etre connecte pour creer un salon.');
+      Alert.alert(t('common.error'), 'Vous devez être connecté pour créer un salon.');
       return;
     }
 
     setIsSaving(true);
 
     try {
-      // Upload photos to Supabase Storage
-      const photoUrls: string[] = [];
-      for (const photoUri of photos) {
-        if (photoUri.startsWith('http')) {
-          photoUrls.push(photoUri);
-          continue;
-        }
-        const fileName = `salon_${user.id}_${Date.now()}_${photoUrls.length}.jpg`;
-        const response = await fetch(photoUri);
-        const blob = await response.blob();
-        const { data, error } = await supabase.storage
-          .from('salon-photos')
-          .upload(fileName, blob, { contentType: 'image/jpeg' });
+      // Helper pour upload ultra-stable (Base64 -> ArrayBuffer)
+      const uploadFile = async (uri: string, prefix: string) => {
+        if (uri.startsWith('http')) return uri;
+        
+        try {
+          const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${user?.id}/${prefix}_${Date.now()}.${extension}`;
+          const contentType = prefix === 'video' ? 'video/mp4' : `image/${extension === 'png' ? 'png' : 'jpeg'}`;
 
-        if (data) {
-          const { data: urlData } = supabase.storage
+          // 1. Lire le fichier en Base64 via XHR (le plus compatible)
+          const base64: string = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              const reader = new FileReader();
+              reader.onloadend = function () {
+                const result = reader.result as string;
+                // Extraire uniquement la partie data
+                resolve(result.split(',')[1]);
+              };
+              reader.readAsDataURL(xhr.response);
+            };
+            xhr.onerror = () => reject(new Error('Erreur lecture fichier local'));
+            xhr.open('GET', uri);
+            xhr.responseType = 'blob';
+            xhr.send();
+          });
+
+          // 2. Décoder le base64 en ArrayBuffer (données binaires pures)
+          const arrayBuffer = base64js.toByteArray(base64);
+
+          // 3. Envoyer à Supabase
+          const { data, error } = await supabase.storage
             .from('salon-photos')
-            .getPublicUrl(data.path);
-          photoUrls.push(urlData.publicUrl);
+            .upload(fileName, arrayBuffer, {
+              contentType,
+              upsert: true
+            });
+
+          if (error) throw error;
+          
+          const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
+          return urlData.publicUrl;
+        } catch (err: any) {
+          console.error('Stable Upload Error:', err);
+          throw new Error(`Upload échoué: ${err.message || 'Problème réseau'}`);
         }
-        if (error && __DEV__) console.warn('Photo upload error:', error);
+      };
+
+      // 1. Upload Cover
+      let finalCoverUrl = null;
+      if (coverPhoto) {
+        finalCoverUrl = await uploadFile(coverPhoto, 'cover');
+      }
+
+      // 2. Upload Gallery
+      const finalGalleryUrls = [];
+      for (const uri of galleryPhotos) {
+        const url = await uploadFile(uri, 'gallery');
+        finalGalleryUrls.push(url);
+      }
+
+      // Préparer le tableau photos final (Cover + Gallery)
+      const allPhotos = finalCoverUrl ? [finalCoverUrl, ...finalGalleryUrls] : finalGalleryUrls;
+
+      // 3. Upload Videos (simple mapping for now as storage bucket might need config)
+      const finalVideoUrls = [];
+      for (const uri of videos) {
+        // En prod, on uploaderait dans un bucket 'salon-videos'
+        const url = await uploadFile(uri, 'video'); 
+        finalVideoUrls.push(url);
       }
 
       const salonPayload = {
@@ -328,10 +361,12 @@ export default function SalonManagementScreen() {
         city: city.trim(),
         postal_code: postalCode.trim(),
         specialties: selectedSpecialties,
-        cover_image_url: photoUrls.length > 0 ? photoUrls[0] : null,
-        photos: photoUrls,
+        cover_image_url: finalCoverUrl,
+        image_url: finalCoverUrl, 
+        photos: allPhotos,
+        // On pourrait stocker les vidéos dans une colonne 'videos' si on l'ajoute plus tard
         opening_hours: openingHours,
-        offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
+        offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both' || serviceLocationType === 'coiffeur_home',
         service_location: serviceLocationType,
         min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both')
           ? parseFloat(homeServiceFee || '0')
@@ -350,9 +385,18 @@ export default function SalonManagementScreen() {
       }
 
       Alert.alert(
-        t('salon.saved'),
-        t('salon.savedDesc'),
-        [{ text: 'OK' }]
+        'Salon enregistré !',
+        'Votre vitrine est prête. Prochaine étape : définissez vos tarifs pour être visible des clients.',
+        [
+          { 
+            text: 'Plus tard', 
+            style: 'cancel' 
+          },
+          { 
+            text: 'Configurer mes tarifs', 
+            onPress: () => router.push('/(coiffeur)/services') 
+          }
+        ]
       );
     } catch (err: any) {
       const errorMessage = err?.message || t('common.errorOccurred');
@@ -476,57 +520,39 @@ export default function SalonManagementScreen() {
           </View>
         )}
 
-        {/* Photos du salon */}
+        {/* Section Médias du salon */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Photos du salon ({photos.length}/{MAX_PHOTOS})
-          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Photo de face professionnelle</Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Ajoutez jusqu&apos;a {MAX_PHOTOS} photos de votre salon
+            Cette photo sera l&apos;image principale de votre salon. Elle doit être de haute qualité pour attirer les clients.
           </Text>
 
-          <View style={styles.photosGrid}>
-            {[0, 1, 2, 3].map((index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.photoCard,
-                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                ]}
-                onPress={() => photos[index] ? null : pickImage()}
-              >
-                {photos[index] ? (
-                  <View style={styles.photoWrapper}>
-                    <Image
-                      source={{ uri: photos[index] }}
-                      style={styles.photo}
-                      contentFit="cover"
-                    />
-                    <View style={styles.photoActions}>
-                      <TouchableOpacity
-                        style={[styles.photoActionButton, { backgroundColor: colors.primary }]}
-                        onPress={() => pickImage(index)}
-                      >
-                        <Ionicons name="camera" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.photoActionButton, { backgroundColor: colors.error }]}
-                        onPress={() => removePhoto(index)}
-                      >
-                        <Ionicons name="trash" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="add-circle-outline" size={32} color={colors.textMuted} />
-                    <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>
-                      Ajouter
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          {/* Photo de Couverture (Unique et Professionnelle) */}
+          <TouchableOpacity
+            style={[styles.coverPhotoCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, height: 220 }]}
+            onPress={() => pickMedia('cover')}
+          >
+            {coverPhoto ? (
+              <View style={styles.photoWrapper}>
+                <Image source={{ uri: coverPhoto }} style={styles.photo} contentFit="cover" />
+                <TouchableOpacity style={[styles.removeBadge, { backgroundColor: colors.error }]} onPress={() => removeMedia('cover')}>
+                  <Ionicons name="trash" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera-outline" size={48} color={colors.textMuted} />
+                <Text style={{ color: colors.textMuted, marginTop: 12, fontWeight: '600' }}>Ajouter la photo de face</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>Format paysage recommandé</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <View style={[styles.infoBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+            <Ionicons name="sparkles" size={18} color={colors.primary} />
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+              Conseil : Les photos de vos styles de coiffure doivent être ajoutées dans la rubrique &quot;Services&quot; pour être visibles par les clients.
+            </Text>
           </View>
         </View>
 
@@ -548,10 +574,17 @@ export default function SalonManagementScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+            <View style={styles.labelRow}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+              <TouchableOpacity 
+                onPress={() => setDescription("Bienvenue dans notre salon, où l’art de la coiffure afro rencontre l’excellence. Spécialistes des tresses de précision, des locks sculpturales et des soins profonds, nous mettons notre savoir-faire au service de votre couronne naturelle. Dans un cadre raffiné et chaleureux, chaque prestation est une expérience unique pensée pour sublimer votre beauté et préserver la santé de vos cheveux. Venez révéler tout l'éclat de votre style avec nos experts.")}
+              >
+                <Text style={[styles.templateLink, { color: colors.primary }]}>Utiliser un modèle</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Decrivez votre salon, vos specialites..."
+              placeholder="Décrivez votre savoir-faire, l'ambiance de votre salon..."
               placeholderTextColor={colors.textMuted}
               value={description}
               onChangeText={setDescription}
@@ -908,38 +941,51 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginBottom: Spacing.md,
   },
-  photosGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+  mediaLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
   },
-  photoCard: {
-    width: '48%',
-    aspectRatio: 16 / 9,
+  coverPhotoCard: {
+    width: '100%',
+    height: 180,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderStyle: 'dashed',
     overflow: 'hidden',
+    marginBottom: 12,
+  },
+  galleryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  galleryCard: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   photoWrapper: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     position: 'relative',
   },
   photo: {
     width: '100%',
     height: '100%',
   },
-  photoActions: {
+  removeBadge: {
     position: 'absolute',
-    bottom: Spacing.sm,
-    right: Spacing.sm,
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  photoActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -959,6 +1005,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: '600',
     marginBottom: Spacing.xs,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  templateLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   input: {
     borderWidth: 1,
@@ -1064,6 +1121,20 @@ const styles = StyleSheet.create({
   locationTypeLabel: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 20,
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   locationTypeDesc: {
     fontSize: FontSizes.sm,

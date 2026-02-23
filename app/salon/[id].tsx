@@ -15,6 +15,16 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+// Import sécurisé de expo-av
+let Video: any = null;
+let ResizeMode: any = { COVER: 'cover', CONTAIN: 'contain' };
+try {
+  const ExpoAV = require('expo-av');
+  Video = ExpoAV.Video;
+  ResizeMode = ExpoAV.ResizeMode;
+} catch (e) {
+  console.warn("Module expo-av non chargé sur cet appareil.");
+}
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +34,7 @@ import { useFavorite } from '@/hooks/use-favorites';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button, Rating } from '@/components/ui';
 import { Service } from '@/types';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const HEADER_HEIGHT = 300;
 
@@ -44,12 +55,6 @@ export default function SalonDetailScreen() {
   const handleCall = () => {
     if (salon?.phone) {
       Linking.openURL(`tel:${salon.phone}`);
-    }
-  };
-
-  const handleEmail = () => {
-    if (salon?.email) {
-      Linking.openURL(`mailto:${salon.email}`);
     }
   };
 
@@ -153,13 +158,36 @@ export default function SalonDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header Image */}
         <View style={styles.headerImage}>
-          <Image
-            source={{
-              uri: salon.cover_image_url || salon.image_url || 'https://via.placeholder.com/400x300',
-            }}
-            style={styles.coverImage}
-            contentFit="cover"
-          />
+          {(() => {
+            const imageUri = (salon.cover_image_url && salon.cover_image_url !== '') 
+              ? salon.cover_image_url 
+              : (salon.image_url && salon.image_url !== '')
+                ? salon.image_url
+                : (salon.photos && salon.photos.length > 0)
+                  ? salon.photos[0]
+                  : (salon.gallery && salon.gallery.length > 0)
+                    ? salon.gallery[0].image_url
+                    : null;
+
+            return (
+              <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }}>
+                <Image
+                  source={{ uri: imageUri || 'https://via.placeholder.com/400x300' }}
+                  style={styles.coverImage}
+                  contentFit="cover"
+                  transition={500}
+                />
+                {!imageUri && (
+                  <View style={StyleSheet.absoluteFill}>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="image-outline" size={48} color={colors.textMuted} />
+                      <Text style={{ color: colors.textMuted, marginTop: 8 }}>Aucune photo</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })()}
           <View style={styles.headerOverlay} />
           <TouchableOpacity
             style={[styles.favoriteButton, { backgroundColor: colors.card }]}
@@ -172,6 +200,17 @@ export default function SalonDetailScreen() {
               color={isFavorite ? colors.error : colors.text}
             />
           </TouchableOpacity>
+
+          {/* Bouton Modifier (visible uniquement par le proprio) */}
+          {isAuthenticated && user?.id === salon.owner_id && (
+            <TouchableOpacity
+              style={[styles.editButton, { backgroundColor: '#191919' }]}
+              onPress={() => router.push('/(coiffeur)/salon')}
+            >
+              <Ionicons name="pencil" size={20} color="#FFFFFF" />
+              <Text style={styles.editButtonText}>Modifier mon salon</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Salon Info */}
@@ -218,15 +257,6 @@ export default function SalonDetailScreen() {
                 <Text style={[styles.actionText, { color: colors.text }]}>Appeler</Text>
               </TouchableOpacity>
             )}
-            {salon.email && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={handleEmail}
-              >
-                <Ionicons name="mail-outline" size={20} color={colors.primary} />
-                <Text style={[styles.actionText, { color: colors.text }]}>Email</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
               onPress={handleDirections}
@@ -236,85 +266,84 @@ export default function SalonDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Description */}
-          {salon.description && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {language === 'fr' ? 'À propos' : 'About'}
-              </Text>
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
-                {salon.description}
-              </Text>
-            </View>
-          )}
-
-          {/* Services */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {language === 'fr' ? 'Services' : 'Services'}
-            </Text>
-            {Object.keys(servicesByCategory).length > 0 ? (
-              Object.entries(servicesByCategory).map(([category, services]) => (
-                <View key={category} style={styles.serviceCategory}>
-                  <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
-                    {category}
-                  </Text>
-                  {services.map((service) => (
-                    <TouchableOpacity
-                      key={service.id}
-                      style={[
-                        styles.serviceCard,
-                        { backgroundColor: colors.card },
-                        selectedService?.id === service.id && {
-                          borderColor: colors.primary,
-                          borderWidth: 2,
-                        },
-                        Shadows.sm,
-                      ]}
-                      onPress={() => setSelectedService(service)}
-                    >
-                      <View style={styles.serviceInfo}>
-                        <Text style={[styles.serviceName, { color: colors.text }]}>
-                          {service.name}
+                    {/* Description */}
+                    {salon.description && (
+                      <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                          {language === 'fr' ? 'À propos' : 'About'}
                         </Text>
-                        {service.requires_extensions && (
-                          <View style={styles.extensionBadge}>
-                            <Ionicons 
-                              name="sparkles-outline" 
-                              size={12} 
-                              color={service.extensions_included ? colors.success : colors.warning} 
-                            />
-                            <Text style={[
-                              styles.extensionText, 
-                              { color: service.extensions_included ? colors.success : colors.warning }
-                            ]}>
-                              {service.extensions_included 
-                                ? t('service.extensionsIncluded') 
-                                : t('service.extensionsNotIncluded')}
-                            </Text>
-                          </View>
-                        )}
-                        {service.description && (
-                          <Text
-                            style={[styles.serviceDescription, { color: colors.textSecondary }]}
-                            numberOfLines={2}
-                          >
-                            {service.description}
-                          </Text>
-                        )}
-                        <Text style={[styles.serviceDuration, { color: colors.textMuted }]}>
-                          {service.duration_minutes} min
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>
+                          {salon.description}
                         </Text>
                       </View>
-                      <Text style={[styles.servicePrice, { color: colors.primary }]}>
-                        {service.price} EUR
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))
-            ) : (
-              <Text style={[styles.noServices, { color: colors.textMuted }]}>
+                    )}
+          
+                              {/* Services - C'est ici que le client voit TOUT */}
+                              <View style={styles.section}>
+                                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                                  {language === 'fr' ? 'Mes prestations & Styles' : 'My Styles'}
+                                </Text>
+                                {Object.keys(servicesByCategory).length > 0 ? (
+                                  Object.entries(servicesByCategory).map(([category, services]) => (
+                                    <View key={category} style={styles.serviceCategory}>
+                                      <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
+                                        {category}
+                                      </Text>
+                                      <View style={styles.servicesGrid}>
+                                        {services.map((service) => (
+                                          <View key={service.id} style={[
+                                            styles.serviceCardGrid,
+                                            { backgroundColor: colors.card },
+                                            selectedService?.id === service.id && {
+                                              borderColor: colors.primary,
+                                              borderWidth: 2,
+                                            },
+                                            Shadows.sm,
+                                          ]}>
+                                                                    <TouchableOpacity
+                                                                      style={styles.serviceMainContentGrid}
+                                                                      onPress={() => setSelectedService(service)}
+                                                                    >
+                                                                      {/* Photo spécifique ou photo du catalogue par défaut */}
+                                                                      {(() => {
+                                                                        const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
+                                                                        const imageSource = service.image_url 
+                                                                          ? { uri: service.image_url } 
+                                                                          : catalogStyle?.image;
+                                            
+                                                                        return (
+                                                                          <Image
+                                                                            source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
+                                                                            style={styles.serviceImageGrid}
+                                                                            contentFit="cover"
+                                                                            transition={300}
+                                                                          />
+                                                                        );
+                                                                      })()}
+                                                                      
+                                                                      <View style={styles.serviceInfoGrid}>                                                <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
+                                                  {service.name}
+                                                </Text>
+                                                <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
+                                                  {service.duration_minutes} min
+                                                </Text>
+                                                <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
+                                                  {service.price}€
+                                                </Text>
+                                              </View>
+                                              
+                                              {selectedService?.id === service.id && (
+                                                <View style={styles.selectedOverlay}>
+                                                  <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
+                                                </View>
+                                              )}
+                                            </TouchableOpacity>
+                                          </View>
+                                        ))}
+                                      </View>
+                                    </View>
+                                  ))
+                                ) : (              <Text style={[styles.noServices, { color: colors.textMuted }]}>
                 {language === 'fr' ? 'Aucun service disponible' : 'No services available'}
               </Text>
             )}
@@ -327,20 +356,40 @@ export default function SalonDetailScreen() {
                 {language === 'fr' ? 'Nos réalisations' : 'Our creations'}
               </Text>
               <View style={styles.galleryGrid}>
-                {salon.gallery.map((image) => (
-                  <View key={image.id} style={[styles.galleryItem, { backgroundColor: colors.card }]}>
-                    <Image
-                      source={{ uri: image.image_url }}
-                      style={styles.galleryImage}
-                      contentFit="cover"
-                    />
-                    {image.caption ? (
-                      <Text style={[styles.galleryCaption, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {image.caption}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                {salon.gallery.map((image) => {
+                  const isVideo = image.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/);
+                  
+                  return (
+                    <View key={image.id} style={[styles.galleryItem, { backgroundColor: colors.card }]}>
+                      {isVideo ? (
+                        Video ? (
+                          <Video
+                            source={{ uri: image.image_url }}
+                            style={styles.galleryImage}
+                            useNativeControls
+                            resizeMode={ResizeMode.COVER}
+                            isLooping
+                          />
+                        ) : (
+                          <View style={[styles.galleryImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="videocam" size={32} color="#FFF" />
+                          </View>
+                        )
+                      ) : (
+                        <Image
+                          source={{ uri: image.image_url }}
+                          style={styles.galleryImage}
+                          contentFit="cover"
+                        />
+                      )}
+                      {image.caption ? (
+                        <Text style={[styles.galleryCaption, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {image.caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -431,6 +480,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  editButton: {
+    position: 'absolute',
+    top: 60,
+    left: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 25,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   content: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.lg,
@@ -507,13 +577,61 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: Spacing.sm,
   },
-  serviceCard: {
+  servicesGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  serviceCardGrid: {
+    width: '48%',
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
+    overflow: 'hidden',
+  },
+  serviceMainContentGrid: {
+    position: 'relative',
+  },
+  serviceImageGrid: {
+    width: '100%',
+    height: 150, // Hauteur fixe pour garantir la visibilité
+    backgroundColor: '#F3F4F6',
+  },
+  serviceInfoGrid: {
+    padding: Spacing.sm,
+  },
+  serviceNameGrid: {
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  servicePriceGrid: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  selectedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  serviceCard: {
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+    overflow: 'hidden',
+  },
+  serviceMainContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  serviceImage: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
+    backgroundColor: '#F3F4F6',
   },
   serviceInfo: {
     flex: 1,
@@ -530,10 +648,14 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginTop: Spacing.xs,
   },
+  servicePriceContainer: {
+    alignItems: 'flex-end',
+    marginLeft: Spacing.sm,
+    gap: 4,
+  },
   servicePrice: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    marginLeft: Spacing.md,
   },
   extensionBadge: {
     flexDirection: 'row',
@@ -549,6 +671,21 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     textAlign: 'center',
     paddingVertical: Spacing.lg,
+  },
+  salonPhotosScroll: {
+    gap: Spacing.md,
+    paddingRight: Spacing.md,
+  },
+  salonPhotoItem: {
+    width: 240,
+    height: 160,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  salonPhoto: {
+    width: '100%',
+    height: '100%',
   },
   galleryGrid: {
     flexDirection: 'row',

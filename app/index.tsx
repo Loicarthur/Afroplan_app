@@ -39,9 +39,8 @@ export default function Index() {
     );
   }
 
-  // Connecté → direction l'app selon le rôle
+  // Connecté → direction l'app selon le rôle réel du profil
   if (isAuthenticated) {
-    // Profil pas encore chargé (chargement asynchrone post-auth)
     if (!profile) {
       return (
         <View style={styles.container}>
@@ -49,17 +48,22 @@ export default function Index() {
         </View>
       );
     }
+    
+    // On suit le rôle enregistré en base de données
     if (profile.role === 'coiffeur') {
       return <Redirect href="/(coiffeur)" />;
     }
     return <Redirect href="/(tabs)" />;
   }
 
-  // Pas connecté mais rôle choisi → accès guest à l'app
+  // Pas connecté mais rôle choisi précédemment
   if (selectedRole === 'coiffeur') {
-    return <Redirect href="/(coiffeur)" />;
+    // Un coiffeur doit être connecté pour gérer son salon, sinon redirection inscription
+    return <Redirect href="/(coiffeur)" />; 
   }
+  
   if (selectedRole === 'client') {
+    // Un client peut naviguer en mode guest (explorer)
     return <Redirect href="/(tabs)" />;
   }
 

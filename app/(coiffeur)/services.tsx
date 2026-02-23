@@ -14,18 +14,21 @@ import {
   Alert,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
-import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
+import { HAIRSTYLE_CATEGORIES, findStyleById } from '@/constants/hairstyleCategories';
 import { salonService } from '@/services/salon.service';
 
 // ─── CATALOGUE DES STYLES AFRO PRÉDÉFINIS ───────────────────────────────────
@@ -69,6 +72,7 @@ type ConfiguredStyle = {
   requiresExtensions: boolean;
   extensionsIncluded: boolean;
   image?: any;
+  customImage?: string; // Nouvelle photo choisie par le coiffeur
   customDescription?: string;
 };
 
@@ -92,6 +96,43 @@ export default function CoiffeurServicesScreen() {
   // Vue catalogue ou vue "mes styles"
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
 
+  const loadConfiguredStyles = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        const services = await salonService.getSalonServices(salon.id);
+        const mapped: ConfiguredStyle[] = services.map(s => {
+          // Trouver le style correspondant dans le catalogue pour l'image par défaut
+          const catalogStyle = STYLE_CATALOG.flatMap(c => c.styles).find(cs => cs.name === s.name);
+          
+          return {
+            styleId: s.id, // On utilise l'ID réel du service
+            styleName: s.name,
+            categoryLabel: s.category,
+            price: s.price.toString(),
+            duration: s.duration_minutes.toString(),
+            location: s.service_location as ServiceLocation,
+            requiresExtensions: s.requires_extensions,
+            extensionsIncluded: s.extensions_included,
+            image: catalogStyle?.image,
+            customImage: s.image_url || undefined,
+            customDescription: s.description || '',
+          };
+        });
+        setConfiguredStyles(mapped);
+      }
+    } catch (error) {
+      console.error('Erreur chargement services:', error);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      loadConfiguredStyles();
+    }
+  }, [isAuthenticated, loadConfiguredStyles]);
+
   const isStyleConfigured = (styleId: string) =>
     configuredStyles.some((s) => s.styleId === styleId);
 
@@ -113,10 +154,23 @@ export default function CoiffeurServicesScreen() {
       if (existing) {
         initialData[id] = { ...existing };
       } else {
-        const styleEntry = STYLE_CATALOG.flatMap(c => c.styles).find(s => s.id === id);
+        // Trouver l'entrée du style et sa catégorie parente
+        let parentCategoryLabel = '';
+        let styleEntry = null;
+        
+        for (const cat of STYLE_CATALOG) {
+          const found = cat.styles.find(s => s.id === id);
+          if (found) {
+            styleEntry = found;
+            parentCategoryLabel = cat.label;
+            break;
+          }
+        }
+
         initialData[id] = {
           styleId: id,
-          styleName: styleEntry?.name,
+          styleName: styleEntry?.name || 'Style inconnu',
+          categoryLabel: parentCategoryLabel,
           location: 'salon',
           price: '',
           duration: '',
@@ -138,11 +192,50 @@ export default function CoiffeurServicesScreen() {
     }));
   };
 
+  const pickServiceImage = async (styleId: string) => {
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    };
+
+    Alert.alert(
+      'Photo de la prestation',
+      'Comment souhaitez-vous ajouter la photo ?',
+      [
+        {
+          text: 'Prendre une photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission requise', 'Accès caméra refusé');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync(options);
+            if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+          },
+        },
+        {
+          text: 'Choisir dans la galerie',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync(options);
+            if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  };
+
   const handleSaveBatch = async () => {
     if (!user) return;
 
-    // Validation simple
-    const stylesToSave = Object.values(batchData) as ConfiguredStyle[];
+    // Validation : on ne valide que les styles actuellement sélectionnés dans la liste
+    const stylesToSave = selectedStyleIds
+      .map(id => batchData[id])
+      .filter(s => !!s) as ConfiguredStyle[];
+    
     const invalid = stylesToSave.find(s => !s.price || !s.duration);
     
     if (invalid) {
@@ -152,29 +245,79 @@ export default function CoiffeurServicesScreen() {
 
     setIsSaving(true);
     try {
-      // 1. Récupérer le salon du coiffeur
+      const { supabase } = await import('@/lib/supabase');
       let salon = await salonService.getSalonByOwnerId(user.id);
       
-      // Si pas de salon, on devrait normalement en créer un ou rediriger, 
-      // mais pour l'instant on suppose que l'onboarding l'a fait.
       if (!salon) {
         Alert.alert('Erreur', 'Aucun salon associé à ce compte.');
         setIsSaving(false);
         return;
       }
 
-      // 2. Préparer les données pour Supabase
-      const servicesPayload = stylesToSave.map(style => ({
-        salon_id: salon!.id,
-        name: style.styleName,
-        category: style.categoryLabel,
-        price: parseFloat(style.price),
-        duration_minutes: parseInt(style.duration, 10),
-        description: style.customDescription || null, // On stocke la note dans description
-        service_location: style.location,
-        is_active: true,
-        // On pourrait stocker l'ID du style original dans une colonne metadata si besoin
-      }));
+      // 2. Upload des images et préparation du payload
+      const servicesPayload = [];
+      
+      for (const style of stylesToSave) {
+        // On garde l'image actuelle par défaut
+        let finalImageUrl = style.customImage || null;
+
+        // Si une NOUVELLE photo locale a été choisie, on l'uploade via ArrayBuffer (stable)
+        if (style.customImage && !style.customImage.startsWith('http')) {
+          const extension = style.customImage.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${user.id}/service_${Date.now()}.${extension}`;
+          
+          const uploadUrl = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              const reader = new FileReader();
+              reader.onloadend = async function () {
+                try {
+                  const base64 = (reader.result as string).split(',')[1];
+                  const arrayBuffer = base64js.toByteArray(base64);
+
+                  const { data, error } = await supabase.storage
+                    .from('salon-photos')
+                    .upload(fileName, arrayBuffer, {
+                      contentType: `image/${extension === 'png' ? 'png' : 'jpeg'}`,
+                      upsert: true
+                    });
+
+                  if (error) throw error;
+                  
+                  const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
+                  resolve(urlData.publicUrl);
+                } catch (err) {
+                  reject(err);
+                }
+              };
+              reader.readAsDataURL(xhr.response);
+            };
+            xhr.onerror = () => reject(new Error('Erreur lecture photo service.'));
+            xhr.responseType = 'blob';
+            xhr.open('GET', style.customImage!, true);
+            xhr.send(null);
+          });
+          finalImageUrl = uploadUrl;
+        }
+
+        let categoryName = style.categoryLabel;
+        if (!categoryName) {
+          const found = findStyleById(style.styleId);
+          categoryName = found?.category.title || 'Autre';
+        }
+
+        servicesPayload.push({
+          salon_id: salon!.id,
+          name: style.styleName,
+          category: categoryName,
+          price: parseFloat(style.price),
+          duration_minutes: parseInt(style.duration, 10),
+          description: style.customDescription || null,
+          service_location: style.location,
+          image_url: finalImageUrl, // URL conservée ou nouvelle
+          is_active: true,
+        });
+      }
 
       // 3. Sauvegarder
       await salonService.upsertServicesBatch(servicesPayload);
@@ -190,9 +333,12 @@ export default function CoiffeurServicesScreen() {
       setActiveTab('my_styles');
       Alert.alert('Succès', `${selectedStyleIds.length} style(s) configuré(s) et sauvegardé(s).`);
 
-    } catch (error) {
-      if (__DEV__) console.error(error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder les services. Vérifiez votre connexion.');
+    } catch (error: any) {
+      if (__DEV__) console.error('Save Batch Error:', error);
+      Alert.alert(
+        'Erreur', 
+        `Impossible de sauvegarder : ${error?.message || 'Vérifiez votre connexion.'}`
+      );
     } finally {
       setIsSaving(false);
     }
@@ -207,8 +353,18 @@ export default function CoiffeurServicesScreen() {
         {
           text: 'Retirer',
           style: 'destructive',
-          onPress: () =>
-            setConfiguredStyles((prev) => prev.filter((s) => s.styleId !== styleId)),
+          onPress: async () => {
+            try {
+              // Si c'est un UUID (déjà en base), on le supprime
+              if (styleId.length > 20) {
+                await salonService.deleteService(styleId);
+              }
+              setConfiguredStyles((prev) => prev.filter((s) => s.styleId !== styleId));
+              loadConfiguredStyles();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de supprimer le service.');
+            }
+          }
         },
       ]
     );
@@ -478,14 +634,18 @@ export default function CoiffeurServicesScreen() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Configuration ({selectedStyleIds.length})
             </Text>
-            <TouchableOpacity onPress={handleSaveBatch}>
-              <Text style={[styles.modalSave, { color: colors.primary }]}>Enregistrer</Text>
+            <TouchableOpacity onPress={handleSaveBatch} disabled={isSaving}>
+              {isSaving ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[styles.modalSave, { color: colors.primary }]}>Enregistrer</Text>
+              )}
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={[styles.batchIntro, { color: colors.textSecondary }]}>
-              Définissez vos tarifs et durées pour chaque style sélectionné.
+              Définissez vos tarifs, durées et ajoutez une photo pour chaque style.
             </Text>
 
             {selectedStyleIds.map((id, index) => {
@@ -496,7 +656,21 @@ export default function CoiffeurServicesScreen() {
               return (
                 <View key={id} style={[styles.batchItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.batchItemHeader}>
-                    <Image source={styleEntry.image} style={styles.batchItemImage} contentFit="cover" />
+                    {/* Sélecteur d'image personnalisé */}
+                    <TouchableOpacity 
+                      style={styles.batchItemImageContainer} 
+                      onPress={() => pickServiceImage(id)}
+                    >
+                      <Image 
+                        source={data.customImage ? { uri: data.customImage } : styleEntry.image} 
+                        style={styles.batchItemImage} 
+                        contentFit="cover" 
+                      />
+                      <View style={styles.imageEditBadge}>
+                        <Ionicons name="camera" size={12} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
+
                     <View style={styles.batchItemTitleWrap}>
                       <Text style={[styles.batchItemName, { color: colors.text }]}>{styleEntry.name}</Text>
                       <TouchableOpacity 
@@ -871,6 +1045,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.md,
     gap: Spacing.md,
+  },
+  batchItemImageContainer: {
+    position: 'relative',
+  },
+  imageEditBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#191919',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   batchItemImage: {
     width: 50,

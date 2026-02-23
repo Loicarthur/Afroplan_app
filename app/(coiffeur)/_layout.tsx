@@ -47,6 +47,15 @@ export default function CoiffeurLayout() {
         }}
       />
       <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: 'Mon Portfolio',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="images-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="reservations"
         options={{
           title: 'Reservations',

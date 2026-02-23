@@ -196,8 +196,17 @@ export default function HomeScreen() {
   };
 
   const handleSearch = (filters: any) => {
-    // TODO: appliquer les filtres de recherche
-    router.push('/(tabs)/explore');
+    // Appliquer les filtres de recherche
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { 
+        category: filters.hairstyle,
+        budget: filters.maxBudget,
+        distance: filters.maxDistance,
+        location: filters.location,
+        showAll: filters.showAll ? 'true' : 'false'
+      }
+    });
   };
 
   const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);

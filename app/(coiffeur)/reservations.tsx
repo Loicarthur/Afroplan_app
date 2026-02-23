@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Button } from '@/components/ui';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
@@ -99,8 +100,19 @@ export default function CoiffeurReservationsScreen() {
   const { isAuthenticated } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'availability'>('all');
   const [bookings, setBookings] = useState<BookingItem[]>(MOCK_BOOKINGS);
+
+  // État pour les horaires (Simplifié pour la démo)
+  const [weeklySchedule, setWeeklySchedule] = useState({
+    monday: { active: true, start: '09:00', end: '18:00' },
+    tuesday: { active: true, start: '09:00', end: '18:00' },
+    wednesday: { active: true, start: '09:00', end: '18:00' },
+    thursday: { active: true, start: '09:00', end: '18:00' },
+    friday: { active: true, start: '09:00', end: '19:00' },
+    saturday: { active: true, start: '10:00', end: '17:00' },
+    sunday: { active: false, start: '00:00', end: '00:00' },
+  });
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -242,7 +254,21 @@ export default function CoiffeurReservationsScreen() {
           onPress={() => setActiveTab('confirmed')}
         >
           <Text style={[styles.tabText, { color: activeTab === 'confirmed' ? colors.primary : colors.textSecondary }]}>
-            Confirmees
+            Confirmées
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'availability' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+          onPress={() => setActiveTab('availability')}
+        >
+          <Ionicons 
+            name="time-outline" 
+            size={18} 
+            color={activeTab === 'availability' ? colors.primary : colors.textSecondary} 
+            style={{ marginRight: 4 }}
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'availability' ? colors.primary : colors.textSecondary }]}>
+            Dispo.
           </Text>
         </TouchableOpacity>
       </View>
@@ -254,7 +280,63 @@ export default function CoiffeurReservationsScreen() {
         }
       >
         <View style={styles.content}>
-          {filteredBookings.length === 0 ? (
+          {activeTab === 'availability' ? (
+            <View style={styles.availabilityContainer}>
+              <View style={[styles.infoBox, { backgroundColor: colors.primary + '08', borderColor: colors.border }]}>
+                <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  Définissez vos horaires habituels pour que les clients sachent quand réserver.
+                </Text>
+              </View>
+
+              {Object.entries(weeklySchedule).map(([day, config]) => (
+                <View key={day} style={[styles.dayRow, { borderBottomColor: colors.border }]}>
+                  <View style={styles.dayMain}>
+                    <TouchableOpacity 
+                      style={[styles.checkbox, config.active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      onPress={() => setWeeklySchedule(prev => ({
+                        ...prev,
+                        [day]: { ...config, active: !config.active }
+                      }))}
+                    >
+                      {config.active && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                    </TouchableOpacity>
+                    <Text style={[styles.dayLabel, { color: config.active ? colors.text : colors.textMuted }]}>
+                      {day.charAt(0).toUpperCase() + day.slice(1)}
+                    </Text>
+                  </View>
+
+                  {config.active ? (
+                    <View style={styles.hoursRow}>
+                      <View style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Text style={{ fontSize: 13 }}>{config.start}</Text>
+                      </View>
+                      <Text style={{ marginHorizontal: 8, color: colors.textMuted }}>-</Text>
+                      <View style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary }]}>
+                        <Text style={{ fontSize: 13 }}>{config.end}</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={[styles.closedText, { color: colors.textMuted }]}>Fermé</Text>
+                  )}
+                </View>
+              ))}
+
+              <TouchableOpacity 
+                style={[styles.pauseButton, { borderColor: colors.error }]}
+                onPress={() => Alert.alert('Mode Pause', 'Toutes vos réservations en ligne seront bloquées pour aujourd\'hui.')}
+              >
+                <Ionicons name="pause-circle-outline" size={20} color={colors.error} />
+                <Text style={[styles.pauseButtonText, { color: colors.error }]}>Bloquer ma journée (Urgence)</Text>
+              </TouchableOpacity>
+
+              <Button 
+                title="Enregistrer mes horaires" 
+                onPress={() => Alert.alert('Succès', 'Vos disponibilités ont été mises à jour.')}
+                style={{ marginTop: 24 }}
+              />
+            </View>
+          ) : filteredBookings.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color={colors.textMuted} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>
@@ -497,6 +579,79 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  /* Availability Styles */
+  availabilityContainer: {
+    paddingBottom: 20,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  dayMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hourInput: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  closedText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  pauseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 32,
+    gap: 8,
+  },
+  pauseButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   /* Auth Prompt */

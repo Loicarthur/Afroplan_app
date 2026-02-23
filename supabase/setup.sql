@@ -146,6 +146,7 @@ CREATE TABLE salons (
     is_verified BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     opening_hours JSONB,
+    service_location service_location_type DEFAULT 'salon',
     offers_home_service BOOLEAN DEFAULT false,
     home_service_description TEXT,
     min_home_service_amount DECIMAL(10, 2) DEFAULT 30,
@@ -619,8 +620,15 @@ CREATE POLICY "salon_categories_manage" ON salon_categories FOR ALL USING (
 -- SERVICES
 ALTER TABLE services ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_full_access_services" ON services FOR ALL USING (is_admin());
-CREATE POLICY "services_select" ON services FOR SELECT USING (is_active = true);
+CREATE POLICY "services_select" ON services FOR SELECT USING (true);
 CREATE POLICY "services_manage" ON services FOR ALL USING (
+    EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
+);
+-- Ajouter une politique explicite pour l'insertion si la condition EXISTS est trop stricte au début
+CREATE POLICY "services_insert_owner" ON services FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
+);
+CREATE POLICY "services_update_owner" ON services FOR UPDATE USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
 );
 
@@ -1084,15 +1092,14 @@ ORDER BY month DESC;
 
 -- Catégories 100% afro (alignées avec HAIRSTYLE_CATEGORIES du frontend)
 INSERT INTO categories (name, slug, description, icon, "order") VALUES
-    ('Naturels / Cheveux libres', 'naturels', 'Wash & Go, styles naturels définis sur cheveux crépus et frisés', 'leaf-outline', 1),
-    ('Tresses et Nattes', 'tresses-nattes', 'Box Braids, Knotless Braids, Cornrows, Boho Braids, Fulani Braids, Crochet Braids', 'git-branch-outline', 2),
-    ('Vanilles et Twists', 'vanilles-twists', 'Vanilles, Barrel Twist — torsades naturelles ou avec extensions', 'repeat-outline', 3),
-    ('Locks', 'locks', 'Création et entretien de locks, Fausse Locks, Dreadlocks, Sisterlocks, Soft Locks, Butterfly Locks', 'infinite-outline', 4),
-    ('Boucles et Ondulations', 'boucles-ondulations', 'Bantu Knots, styles bouclés et ondulés sur cheveux afro', 'sparkles-outline', 5),
-    ('Tissages et Perruques', 'tissages-perruques', 'Tissage, Pose de perruque, Flip Over, Tape-in', 'layers-outline', 6),
-    ('Ponytail', 'ponytail', 'Queues de cheval stylisées, lisses ou bouclées', 'chevron-up-outline', 7),
-    ('Coupe et Restructuration', 'coupe-restructuration', 'Coupes afro femme / homme / enfant, restructuration capillaire', 'cut-outline', 8),
-    ('Soins, Lissage et Coloration', 'soins-lissage-coloration', 'Soins hydratants, lissage brésilien/kératine, coloration et balayage', 'color-palette-outline', 9);
+    ('Tresses et Nattes', 'tresses-nattes', 'Box Braids, Knotless Braids, Cornrows, Boho Braids, Fulani Braids, Crochet Braids', 'git-branch-outline', 1),
+    ('Vanilles et Twists', 'vanilles-twists', 'Vanilles, Barrel Twist — torsades naturelles ou avec extensions', 'repeat-outline', 2),
+    ('Locks', 'locks', 'Création et entretien de locks, Fausse Locks, Dreadlocks, Sisterlocks, Soft Locks, Butterfly Locks', 'infinite-outline', 3),
+    ('Boucles et Ondulations', 'boucles-ondulations', 'Bantu Knots, styles bouclés et ondulés sur cheveux afro', 'sparkles-outline', 4),
+    ('Tissages et Perruques', 'tissages-perruques', 'Tissage, Pose de perruque, Flip Over, Tape-in', 'layers-outline', 5),
+    ('Ponytail', 'ponytail', 'Queues de cheval stylisées, lisses ou bouclées', 'chevron-up-outline', 6),
+    ('Coupe et Restructuration', 'coupe-restructuration', 'Coupes afro femme / homme / enfant, restructuration capillaire', 'cut-outline', 7),
+    ('Soins, Lissage et Coloration', 'soins-lissage-coloration', 'Soins hydratants, lissage brésilien/kératine, coloration et balayage', 'color-palette-outline', 8);
 
 -- ============================================
 -- EXEMPLES DE SEED DATA : salons afro
@@ -1121,6 +1128,19 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
 -- 2. salons   (public)
 -- 3. gallery  (public)
 -- 4. salon-photos (public)
+
+-- Politiques de sécurité pour le stockage (Storage)
+-- Autoriser les utilisateurs connectés à uploader dans salon-photos
+CREATE POLICY "Allow authenticated uploads" ON storage.objects
+    FOR INSERT TO authenticated WITH CHECK (bucket_id = 'salon-photos');
+
+-- Autoriser tout le monde à voir les photos
+CREATE POLICY "Allow public viewing" ON storage.objects
+    FOR SELECT TO public USING (bucket_id = 'salon-photos');
+
+-- Autoriser les propriétaires à supprimer leurs photos
+CREATE POLICY "Allow individual deletes" ON storage.objects
+    FOR DELETE TO authenticated USING (bucket_id = 'salon-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ============================================
 -- ÉTAPE 14: PROMOUVOIR UN ADMIN

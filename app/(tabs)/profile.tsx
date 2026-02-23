@@ -103,10 +103,16 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
 }
 
 /* ---------- BOOKING CARD ---------- */
-function BookingCard({ booking }: { booking: typeof RECENT_BOOKINGS[0] }) {
+function BookingCard({ booking }: { booking: any }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const statusConfig = STATUS_CONFIG[booking.status];
+  
+  // Sécurisation du statut pour éviter le crash
+  const statusKey = (booking.status && STATUS_CONFIG[booking.status as keyof typeof STATUS_CONFIG]) 
+    ? (booking.status as keyof typeof STATUS_CONFIG) 
+    : 'upcoming';
+    
+  const statusConfig = STATUS_CONFIG[statusKey];
 
   return (
     <TouchableOpacity
@@ -118,9 +124,9 @@ function BookingCard({ booking }: { booking: typeof RECENT_BOOKINGS[0] }) {
         <Ionicons name={statusConfig.icon} size={22} color={statusConfig.color} />
       </View>
       <View style={styles.bookingContent}>
-        <Text style={[styles.bookingSalon, { color: colors.text }]}>{booking.salon}</Text>
+        <Text style={[styles.bookingSalon, { color: colors.text }]}>{booking.salon || 'Salon'}</Text>
         <Text style={[styles.bookingService, { color: colors.textSecondary }]}>
-          {booking.service} · {booking.date}
+          {booking.service || 'Service'} · {booking.date || 'Date'}
         </Text>
       </View>
       <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '15' }]}>
