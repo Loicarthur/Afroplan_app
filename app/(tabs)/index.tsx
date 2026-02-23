@@ -348,7 +348,7 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <SectionHeader
-            title={t('home.hairstyles')}
+            title={language === 'fr' ? 'Catégories de coiffures' : 'Hairstyle Categories'}
             onSeeAll={() => setShowAllStyles(!showAllStyles)}
             seeAllLabel={showAllStyles ? (language === 'fr' ? 'Voir moins' : 'See less') : t('common.seeAll')}
           />
@@ -369,7 +369,7 @@ export default function HomeScreen() {
                 }}
               >
                 <Image source={style.image} style={styles.styleImage} contentFit="cover" />
-                <View style={[styles.styleOverlay, { backgroundColor: (style.color ?? '#191919') + '99' }]}>
+                <View style={styles.styleOverlay}>
                   <Text style={styles.styleName} numberOfLines={2}>{style.name}</Text>
                 </View>
               </TouchableOpacity>
@@ -783,9 +783,12 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   styleOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 10,
+    justifyContent: 'flex-end',
   },
   styleEmoji: {
     fontSize: 18,
@@ -796,6 +799,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 17,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   showLessButton: {
     alignItems: 'center',
