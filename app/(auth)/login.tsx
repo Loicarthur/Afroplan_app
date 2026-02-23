@@ -90,16 +90,22 @@ export default function LoginScreen() {
     }
   };
 
-  const redirectToApp = useCallback(() => {
+  const redirectToApp = useCallback(async () => {
     if (hasRedirected.current) return;
     hasRedirected.current = true;
-    const role = profile?.role || selectedRole;
-    if (role === 'coiffeur') {
+
+    // On respecte le mode choisi par l'utilisateur à l'écran (Espace Client ou Coiffeur)
+    const roleToUse = selectedRole;
+    
+    // Sauvegarder ce choix localement pour que l'app s'en souvienne
+    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
+
+    if (roleToUse === 'coiffeur') {
       router.replace('/(coiffeur)');
     } else {
       router.replace('/(tabs)');
     }
-  }, [profile?.role, selectedRole]);
+  }, [selectedRole]);
 
   // Rediriger quand le profil se charge après connexion
   useEffect(() => {

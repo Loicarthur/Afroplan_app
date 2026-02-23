@@ -39,7 +39,7 @@ export default function Index() {
     );
   }
 
-  // Connecté → direction l'app selon le rôle réel du profil
+  // Connecté → direction l'app selon le choix manuel de l'utilisateur (Priorité au Switch)
   if (isAuthenticated) {
     if (!profile) {
       return (
@@ -49,8 +49,11 @@ export default function Index() {
       );
     }
     
-    // On suit le rôle enregistré en base de données
-    if (profile.role === 'coiffeur') {
+    // On utilise le rôle sauvegardé localement par le bouton "Switch"
+    // Si aucun choix n'a été fait, on prend le rôle par défaut du profil
+    const roleToUse = selectedRole || profile.role;
+
+    if (roleToUse === 'coiffeur') {
       return <Redirect href="/(coiffeur)" />;
     }
     return <Redirect href="/(tabs)" />;

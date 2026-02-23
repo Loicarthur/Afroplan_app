@@ -123,11 +123,17 @@ export default function RegisterScreen() {
     }
   };
 
-  const redirectToApp = () => {
+  const redirectToApp = async () => {
     if (hasRedirected.current) return;
     hasRedirected.current = true;
-    const role = profile?.role || selectedRole;
-    if (role === 'coiffeur') {
+
+    // On respecte le mode choisi lors de l'inscription
+    const roleToUse = selectedRole;
+    
+    // Sauvegarder ce choix localement
+    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
+
+    if (roleToUse === 'coiffeur') {
       router.replace('/(coiffeur)');
     } else {
       router.replace('/(tabs)');

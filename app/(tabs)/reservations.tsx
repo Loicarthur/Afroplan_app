@@ -108,30 +108,58 @@ export default function ClientReservationsScreen() {
     }
   };
 
-  const handleCancelBooking = (booking: Booking) => {
-    if (booking.status === 'confirmed' || booking.status === 'completed') {
+  const handleCancelBooking = (booking: BookingWithDetails) => {
+    // Cas 1: Rendez-vous avec acompte (partiellement payé)
+    if (booking.status === 'confirmed' && booking.payment_method === 'deposit') {
       Alert.alert(
         'Annulation impossible',
-        'Ce rendez-vous a fait l\'objet d\'un paiement (acompte ou total). Conformément à nos conditions, il ne peut plus être annulé via l\'application. Veuillez contacter directement le salon en cas d\'imprévu.'
+        'Ce rendez-vous a été validé par un acompte. Pour toute modification ou annulation, veuillez contacter directement le salon. L\'acompte n\'est pas remboursable via l\'application.'
       );
       return;
     }
 
-    Alert.alert(
-      'Annuler le rendez-vous',
-      'Voulez-vous vraiment annuler ce rendez-vous ?',
-      [
-        { text: 'Non', style: 'cancel' },
-        { 
-          text: 'Oui, annuler', 
-          style: 'destructive', 
-          onPress: () => {
-            // Logique d'annulation pour les RDV non payés uniquement
-            Alert.alert('Succès', 'Rendez-vous annulé.');
-          } 
-        }
-      ]
-    );
+    // Cas 2: Rendez-vous entièrement payé (Pénalité 20%)
+    if (booking.status === 'confirmed' && booking.payment_method === 'full') {
+      Alert.alert(
+        'Annuler et rembourser ?',
+        `Conformément à nos conditions, une pénalité de 20% s'applique pour toute annulation d'une prestation payée d'avance.\n\nMontant payé : ${booking.total_price}€\nFrais d'annulation (20%) : ${(booking.total_price * 0.2).toFixed(2)}€\nMontant qui vous sera remboursé : ${(booking.total_price * 0.8).toFixed(2)}€\n\nVoulez-vous continuer ?`,
+        [
+          { text: 'Conserver mon RDV', style: 'cancel' },
+          { 
+            text: 'Confirmer l\'annulation', 
+            style: 'destructive', 
+            onPress: () => {
+              // Logique de remboursement partiel (Stripe) et annulation base de données
+              Alert.alert('Succès', 'Votre rendez-vous a été annulé. Votre remboursement de 80% est en cours de traitement.');
+            } 
+          }
+        ]
+      );
+      return;
+    }
+
+    // Cas 3: Rendez-vous en attente (Gratuit)
+    if (booking.status === 'pending') {
+      Alert.alert(
+        'Annuler le rendez-vous',
+        'Voulez-vous vraiment annuler ce rendez-vous ? Cette action est immédiate et gratuite car aucun paiement n\'a été effectué.',
+        [
+          { text: 'Non', style: 'cancel' },
+          { 
+            text: 'Oui, annuler', 
+            style: 'destructive', 
+            onPress: () => {
+              // Logique d'annulation simple
+              Alert.alert('Succès', 'Rendez-vous annulé.');
+            } 
+          }
+        ]
+      );
+      return;
+    }
+
+    // Cas par défaut (Déjà terminé ou annulé)
+    Alert.alert('Info', 'Ce rendez-vous ne peut plus être modifié.');
   };
 
   const upcomingBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,7 +118,8 @@ export default function CoiffeurProfilScreen() {
     );
   };
 
-  const handleSwitchToClient = () => {
+  const handleSwitchToClient = async () => {
+    await AsyncStorage.setItem('@afroplan_selected_role', 'client');
     router.replace('/(tabs)');
   };
 

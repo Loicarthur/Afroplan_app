@@ -16,9 +16,10 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
@@ -44,8 +45,9 @@ interface Message {
 const AUTOMATIC_THANK_YOU = (salonName: string, service: string): string =>
   `Bonjour ! Merci pour votre réservation pour "${service}" 🙏\n\nNous sommes ravis de vous accueillir prochainement. N'hésitez pas à nous contacter si vous avez des questions ou des précisions sur votre coiffure.\n\nÀ très bientôt !\nL'équipe ${salonName}`;
 
-const buildInitialMessages = (booking: BookingWithDetails, isCoiffeur: boolean): Message[] => {
+const buildInitialMessages = (booking: BookingWithDetails, isMe: boolean): Message[] => {
   const createdAt = booking.created_at ? new Date(booking.created_at).getTime() : Date.now();
+  const salonOwnerId = booking.salon?.owner_id || 'coiffeur';
   
   return [
     {
@@ -60,10 +62,10 @@ const buildInitialMessages = (booking: BookingWithDetails, isCoiffeur: boolean):
     {
       id: 'auto-1',
       text: AUTOMATIC_THANK_YOU(booking.salon?.name || 'Le Salon', booking.service?.name || 'votre coiffure'),
-      senderId: 'coiffeur',
+      senderId: salonOwnerId,
       senderName: booking.salon?.name || 'Le Salon',
       timestamp: new Date(createdAt + 2000),
-      isMe: isCoiffeur,
+      isMe: isMe, // Basé sur le rôle actif passé en paramètre
       type: 'text',
       isAutomatic: true,
     },
@@ -87,7 +89,7 @@ const QUICK_MESSAGES_COIFFEUR = [
   "Je suis disponible si vous avez des questions",
 ];
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, currentUserId }: { message: Message; currentUserId: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -100,6 +102,7 @@ function MessageBubble({ message }: { message: Message }) {
     );
   }
 
+  const isMe = message.senderId === currentUserId;
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
@@ -109,10 +112,10 @@ function MessageBubble({ message }: { message: Message }) {
       entering={FadeInUp.duration(300)}
       style={[
         styles.messageBubbleContainer,
-        message.isMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+        isMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
       ]}
     >
-      {message.isAutomatic && !message.isMe && (
+      {message.isAutomatic && !isMe && (
         <View style={styles.automaticTag}>
           <Ionicons name="flash" size={10} color="#7C3AED" />
           <Text style={styles.automaticTagText}>Message automatique</Text>
@@ -121,16 +124,16 @@ function MessageBubble({ message }: { message: Message }) {
       <View
         style={[
           styles.messageBubble,
-          message.isMe
+          isMe
             ? styles.messageBubbleMe
             : [styles.messageBubbleOther, { backgroundColor: colors.card }],
-          message.isAutomatic && !message.isMe && styles.messageBubbleAutomatic,
+          message.isAutomatic && !isMe && styles.messageBubbleAutomatic,
         ]}
       >
         <Text
           style={[
             styles.messageText,
-            message.isMe
+            isMe
               ? styles.messageTextMe
               : { color: colors.text },
           ]}
@@ -140,7 +143,7 @@ function MessageBubble({ message }: { message: Message }) {
         <Text
           style={[
             styles.messageTime,
-            message.isMe ? styles.messageTimeMe : { color: colors.textMuted },
+            isMe ? styles.messageTimeMe : { color: colors.textMuted },
           ]}
         >
           {formatTime(message.timestamp)}
@@ -161,18 +164,24 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    const loadBookingData = async () => {
+    const loadBookingAndRole = async () => {
       if (!bookingId || !user) return;
       try {
+        // 1. Charger le rôle actif
+        const role = await AsyncStorage.getItem('@afroplan_selected_role');
+        setActiveRole(role);
+
+        // 2. Charger les données de réservation
         const data = await bookingService.getBookingById(bookingId);
         if (data) {
           setBooking(data);
-          // On vérifie si l'utilisateur actuel est le coiffeur propriétaire du salon
-          const isSalonOwner = user.id === data.salon?.owner_id;
-          setMessages(buildInitialMessages(data, isSalonOwner));
+          // Le message automatique vient du salon. 
+          // "isMe" est vrai si le rôle actif est 'coiffeur'
+          setMessages(buildInitialMessages(data, role === 'coiffeur'));
         }
       } catch (error) {
         console.error('Error loading chat booking:', error);
@@ -181,22 +190,29 @@ export default function ChatScreen() {
       }
     };
 
-    loadBookingData();
+    loadBookingAndRole();
   }, [bookingId, user?.id]);
 
-  const isCoiffeur = user?.id === booking?.salon?.owner_id;
-  const otherPersonName = isCoiffeur ? (booking?.client?.full_name || 'Client') : (booking?.salon?.name || 'Le Salon');
-  const otherPersonImage = isCoiffeur ? booking?.client?.avatar_url : booking?.salon?.cover_image_url;
-  const quickMessages = isCoiffeur ? QUICK_MESSAGES_COIFFEUR : QUICK_MESSAGES_CLIENT;
+  // Déterminer qui est l'interlocuteur selon mon rôle ACTIF
+  const isCoiffeurView = activeRole === 'coiffeur';
+  const otherPersonName = isCoiffeurView 
+    ? (booking?.client?.full_name || 'Client') 
+    : (booking?.salon?.name || 'Le Salon');
+  
+  const otherPersonImage = isCoiffeurView 
+    ? booking?.client?.avatar_url 
+    : (booking?.salon?.cover_image_url || booking?.salon?.image_url);
+
+  const quickMessages = isCoiffeurView ? QUICK_MESSAGES_COIFFEUR : QUICK_MESSAGES_CLIENT;
 
   const sendMessage = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !user || !booking) return;
 
     const newMessage: Message = {
       id: Date.now().toString(),
       text: inputText.trim(),
-      senderId: isCoiffeur ? 'coiffeur' : 'client',
-      senderName: isCoiffeur ? (booking?.salon?.name || 'Le Salon') : (profile?.full_name || 'Moi'),
+      senderId: user.id,
+      senderName: isCoiffeurView ? (booking.salon?.name || 'Le Salon') : (profile?.full_name || 'Moi'),
       timestamp: new Date(),
       isMe: true,
       type: 'text',
@@ -226,44 +242,20 @@ export default function ChatScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
+      
+      {/* Header Natif Dynamique */}
+      <Stack.Screen 
+        options={{ 
+          headerTitle: otherPersonName,
+          headerShown: true,
+          headerBackTitle: 'Retour',
+        }} 
+      />
 
-      {/* Custom Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#191919" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.headerProfile}>
-          <Image
-            source={{ uri: otherPersonImage || 'https://via.placeholder.com/100' }}
-            style={styles.headerAvatar}
-            contentFit="cover"
-          />
-          <View style={styles.headerInfo}>
-            <Text style={[styles.headerName, { color: colors.text }]}>
-              {otherPersonName}
-            </Text>
-            <View style={styles.headerOnline}>
-              <View style={styles.onlineDot} />
-              <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>
-                En ligne
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={20} color="#191919" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Booking Info Card */}
+      {/* Booking Info Card - Remonté car le header est maintenant natif */}
       <Animated.View
         entering={FadeIn.delay(200).duration(400)}
-        style={[styles.bookingCard, { backgroundColor: colors.card }]}
+        style={[styles.bookingCard, { backgroundColor: colors.card, marginTop: 16 }]}
       >
         <View style={styles.bookingIcon}>
           <Ionicons name="calendar" size={20} color="#7C3AED" />
@@ -286,7 +278,7 @@ export default function ChatScreen() {
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MessageBubble message={item} />}
+        renderItem={({ item }) => <MessageBubble message={item} currentUserId={user?.id || ''} />}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
       />

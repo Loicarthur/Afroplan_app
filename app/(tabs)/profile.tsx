@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -192,8 +193,9 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleSwitchToCoiffeur = () => {
-    router.push('/(coiffeur)');
+  const handleSwitchToCoiffeur = async () => {
+    await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur');
+    router.replace('/(coiffeur)');
   };
 
   const displayName = profile?.full_name || 'Utilisateur';
