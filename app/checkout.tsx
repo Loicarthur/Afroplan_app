@@ -1,9 +1,11 @@
 /**
  * Page de Checkout - AfroPlan
  * Paiement sécurisé pour les réservations
+ * Supporte acompte (10€) ou paiement intégral
+ * Commission AfroPlan: 20% sur le montant en ligne
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +14,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +23,18 @@ import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { paymentService, BOOKING_DEPOSIT } from '@/services/payment.service';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Colors, Shadows } from '@/constants/theme';
+import { DEPOSIT_RATE, AFROPLAN_COMMISSION_RATE, paymentService } from '@/services/payment.service';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface BookingDetails {
   salonName: string;
   salonImage: string;
   serviceName: string;
   servicePrice: number;
+  salonId: string;
+  bookingId: string;
   date: string;
   time: string;
   duration: number;
@@ -36,26 +43,35 @@ interface BookingDetails {
 export default function CheckoutScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile } = useAuth();
+  const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const params = useLocalSearchParams();
 
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple' | 'google'>('card');
+  const [paymentType, setPaymentType] = useState<'deposit' | 'full'>('deposit');
 
-  // Données de réservation (simulées - en réalité viendraient des params)
+  // Données de réservation
   const bookingDetails: BookingDetails = {
     salonName: params.salonName as string || 'Bella Coiffure',
     salonImage: params.salonImage as string || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
     serviceName: params.serviceName as string || 'Box Braids',
     servicePrice: parseInt(params.servicePrice as string) || 12000, // en centimes
+    salonId: params.salonId as string || '',
+    bookingId: params.bookingId as string || '',
     date: params.date as string || '2026-02-05',
     time: params.time as string || '14:00',
     duration: parseInt(params.duration as string) || 180,
   };
 
-  // Acompte fixe de 10€
-  const depositAmount = BOOKING_DEPOSIT; // 1000 centimes = 10€
-  const remainingAmount = bookingDetails.servicePrice - depositAmount;
+  // Calcul des montants
+  const depositAmount = Math.round(bookingDetails.servicePrice * DEPOSIT_RATE); // 20% du prix
+  const commissionRate = AFROPLAN_COMMISSION_RATE; // 20%
+
+  const isFullPayment = paymentType === 'full';
+  const payAmount = isFullPayment ? bookingDetails.servicePrice : depositAmount;
+  const commission = Math.round(payAmount * commissionRate);
+  const remainingAmount = isFullPayment ? 0 : bookingDetails.servicePrice - depositAmount;
 
   const formatAmount = (cents: number) => {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
@@ -79,31 +95,73 @@ export default function CheckoutScreen() {
   };
 
   const handlePayment = async () => {
-    setIsLoading(true);
-
-    try {
-      // Simuler le processus de paiement
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // En production, on appellerait :
-      // 1. paymentService.createPaymentIntent(bookingId, totalAmount, salonId)
-      // 2. Stripe SDK pour confirmer le paiement
-      // 3. paymentService.confirmPayment(paymentId, stripePaymentIntentId)
-
+    if (!isAuthenticated) {
       Alert.alert(
-        'Paiement réussi !',
-        'Votre réservation est confirmée. Vous recevrez un email de confirmation.',
+        t('auth.loginRequired'),
+        t('auth.loginRequiredMessage'),
         [
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Voir ma réservation',
-            onPress: () => router.replace('/(tabs)/bookings'),
+            text: t('auth.login'),
+            onPress: () => router.push('/(auth)/login'),
           },
         ]
       );
-    } catch (error) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (isSupabaseConfigured() && bookingDetails.bookingId && bookingDetails.salonId) {
+        // Create payment intent via service
+        const paymentIntent = await paymentService.createPaymentIntent(
+          bookingDetails.bookingId,
+          bookingDetails.servicePrice,
+          bookingDetails.salonId,
+          paymentType
+        );
+
+        // In production with Stripe SDK:
+        // 1. Call Supabase Edge Function to create Stripe PaymentIntent with application_fee_amount
+        // 2. Use Stripe SDK's confirmPayment with the clientSecret
+        // 3. On success, call paymentService.confirmPayment()
+
+        // For now, simulate successful payment
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Confirm payment
+        await paymentService.confirmPayment(paymentIntent.id, 'pi_simulated_' + Date.now());
+
+        Alert.alert(
+          t('checkout.paymentSuccess'),
+          t('checkout.paymentSuccessDesc'),
+          [
+            {
+              text: t('checkout.viewBooking'),
+              onPress: () => router.replace('/(tabs)/bookings'),
+            },
+          ]
+        );
+      } else {
+        // Demo mode without Supabase
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        Alert.alert(
+          t('checkout.paymentSuccess'),
+          t('checkout.paymentSuccessDesc'),
+          [
+            {
+              text: t('checkout.viewBooking'),
+              onPress: () => router.replace('/(tabs)/bookings'),
+            },
+          ]
+        );
+      }
+    } catch {
       Alert.alert(
-        'Erreur de paiement',
-        'Une erreur est survenue. Veuillez réessayer.',
+        t('checkout.paymentError'),
+        t('checkout.paymentErrorDesc'),
         [{ text: 'OK' }]
       );
     } finally {
@@ -122,11 +180,11 @@ export default function CheckoutScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Paiement
+          {t('checkout.title')}
         </Text>
         <View style={styles.secureIndicator}>
           <Ionicons name="lock-closed" size={14} color="#22C55E" />
-          <Text style={styles.secureText}>Sécurisé</Text>
+          <Text style={styles.secureText}>{t('checkout.secure')}</Text>
         </View>
       </View>
 
@@ -134,7 +192,7 @@ export default function CheckoutScreen() {
         {/* Résumé de la réservation */}
         <View style={[styles.summaryCard, { backgroundColor: colors.card }, Shadows.md]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Votre réservation
+            {t('checkout.yourBooking')}
           </Text>
 
           <View style={styles.bookingInfo}>
@@ -166,10 +224,69 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
+        {/* Choix du type de paiement */}
+        <View style={[styles.paymentTypeCard, { backgroundColor: colors.card }, Shadows.md]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('checkout.choosePaymentType')}
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentTypeOption,
+              paymentType === 'deposit' && styles.paymentTypeOptionSelected,
+              paymentType === 'deposit' && { borderColor: colors.primary },
+            ]}
+            onPress={() => setPaymentType('deposit')}
+          >
+            <View style={styles.paymentTypeLeft}>
+              <Ionicons name="wallet-outline" size={22} color={paymentType === 'deposit' ? colors.primary : colors.textSecondary} />
+              <View>
+                <Text style={[styles.paymentTypeTitle, { color: colors.text }]}>
+                  {t('checkout.depositOnly')}
+                </Text>
+                <Text style={[styles.paymentTypeSubtitle, { color: colors.textSecondary }]}>
+                  20% = {formatAmount(depositAmount)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.radioButton, paymentType === 'deposit' && { borderColor: colors.primary }]}>
+              {paymentType === 'deposit' && (
+                <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentTypeOption,
+              paymentType === 'full' && styles.paymentTypeOptionSelected,
+              paymentType === 'full' && { borderColor: colors.primary },
+            ]}
+            onPress={() => setPaymentType('full')}
+          >
+            <View style={styles.paymentTypeLeft}>
+              <Ionicons name="card-outline" size={22} color={paymentType === 'full' ? colors.primary : colors.textSecondary} />
+              <View>
+                <Text style={[styles.paymentTypeTitle, { color: colors.text }]}>
+                  {t('checkout.fullPayment')}
+                </Text>
+                <Text style={[styles.paymentTypeSubtitle, { color: colors.textSecondary }]}>
+                  {formatAmount(bookingDetails.servicePrice)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.radioButton, paymentType === 'full' && { borderColor: colors.primary }]}>
+              {paymentType === 'full' && (
+                <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Méthodes de paiement */}
         <View style={[styles.paymentMethodsCard, { backgroundColor: colors.card }, Shadows.md]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Moyen de paiement
+            {t('checkout.paymentMethod')}
           </Text>
 
           <TouchableOpacity
@@ -186,57 +303,47 @@ export default function CheckoutScreen() {
               </View>
               <View>
                 <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  Carte bancaire
+                  {t('checkout.creditCard')}
                 </Text>
                 <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
                   Visa, Mastercard, CB
                 </Text>
               </View>
             </View>
-            <View
-              style={[
-                styles.radioButton,
-                paymentMethod === 'card' && { borderColor: colors.primary },
-              ]}
-            >
+            <View style={[styles.radioButton, paymentMethod === 'card' && { borderColor: colors.primary }]}>
               {paymentMethod === 'card' && (
                 <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
               )}
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              paymentMethod === 'apple' && styles.paymentOptionSelected,
-              paymentMethod === 'apple' && { borderColor: colors.primary },
-            ]}
-            onPress={() => setPaymentMethod('apple')}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.cardIcon, { backgroundColor: '#1A1A1A' }]}>
-                <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-              </View>
-              <View>
-                <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  Apple Pay
-                </Text>
-                <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
-                  Paiement rapide
-                </Text>
-              </View>
-            </View>
-            <View
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
               style={[
-                styles.radioButton,
+                styles.paymentOption,
+                paymentMethod === 'apple' && styles.paymentOptionSelected,
                 paymentMethod === 'apple' && { borderColor: colors.primary },
               ]}
+              onPress={() => setPaymentMethod('apple')}
             >
-              {paymentMethod === 'apple' && (
-                <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
-              )}
-            </View>
-          </TouchableOpacity>
+              <View style={styles.paymentOptionLeft}>
+                <View style={[styles.cardIcon, { backgroundColor: '#1A1A1A' }]}>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>Apple Pay</Text>
+                  <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
+                    {t('search.quickPay')}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.radioButton, paymentMethod === 'apple' && { borderColor: colors.primary }]}>
+                {paymentMethod === 'apple' && (
+                  <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[
@@ -251,20 +358,13 @@ export default function CheckoutScreen() {
                 <Ionicons name="logo-google" size={20} color="#4285F4" />
               </View>
               <View>
-                <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  Google Pay
-                </Text>
+                <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>Google Pay</Text>
                 <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
-                  Paiement rapide
+                  {t('search.quickPay')}
                 </Text>
               </View>
             </View>
-            <View
-              style={[
-                styles.radioButton,
-                paymentMethod === 'google' && { borderColor: colors.primary },
-              ]}
-            >
+            <View style={[styles.radioButton, paymentMethod === 'google' && { borderColor: colors.primary }]}>
               {paymentMethod === 'google' && (
                 <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
               )}
@@ -275,12 +375,12 @@ export default function CheckoutScreen() {
         {/* Détail du prix */}
         <View style={[styles.priceCard, { backgroundColor: colors.card }, Shadows.md]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Détail du prix
+            {t('checkout.priceDetail')}
           </Text>
 
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-              Prix du service ({bookingDetails.serviceName})
+              {t('checkout.servicePrice')} ({bookingDetails.serviceName})
             </Text>
             <Text style={[styles.priceValue, { color: colors.text }]}>
               {formatAmount(bookingDetails.servicePrice)}
@@ -292,53 +392,69 @@ export default function CheckoutScreen() {
           <View style={styles.priceRow}>
             <View style={styles.priceLabelWithInfo}>
               <Text style={[styles.depositLabel, { color: colors.primary }]}>
-                Acompte à payer maintenant
+                {isFullPayment ? t('checkout.payFull') : t('checkout.depositNow')}
               </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  Alert.alert(
-                    'Acompte de réservation',
-                    'Cet acompte de 10€ confirme votre réservation et sera déduit du prix total. Le reste sera payé directement au salon le jour du rendez-vous.'
-                  )
-                }
-              >
-                <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-              </TouchableOpacity>
+              {!isFullPayment && (
+                <TouchableOpacity
+                  onPress={() =>
+                    Alert.alert(
+                      t('checkout.depositNow'),
+                      t('checkout.depositInfo')
+                    )
+                  }
+                >
+                  <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <Text style={[styles.depositValue, { color: colors.primary }]}>
-              {formatAmount(depositAmount)}
+              {formatAmount(payAmount)}
             </Text>
           </View>
 
+          {/* Commission breakdown */}
           <View style={styles.priceRow}>
-            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-              Reste à payer au salon
+            <Text style={[styles.priceLabel, { color: colors.textMuted }]}>
+              {t('checkout.commission')} ({Math.round(commissionRate * 100)}%)
             </Text>
-            <Text style={[styles.priceValue, { color: colors.textSecondary }]}>
-              {formatAmount(remainingAmount)}
+            <Text style={[styles.priceValue, { color: colors.textMuted }]}>
+              {formatAmount(commission)}
             </Text>
           </View>
+
+          {!isFullPayment && (
+            <View style={styles.priceRow}>
+              <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
+                {t('checkout.remainingAtSalon')}
+              </Text>
+              <Text style={[styles.priceValue, { color: colors.textSecondary }]}>
+                {formatAmount(remainingAmount)}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Info acompte */}
-        <View style={[styles.depositInfoCard, { backgroundColor: '#F0FDF4' }]}>
-          <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-          <View style={styles.depositInfoContent}>
-            <Text style={[styles.depositInfoTitle, { color: '#166534' }]}>
-              Paiement sécurisé en 2 étapes
-            </Text>
-            <Text style={[styles.depositInfoText, { color: '#15803D' }]}>
-              1. Payez 10€ d'acompte maintenant{'\n'}
-              2. Réglez le reste ({formatAmount(remainingAmount)}) au salon
-            </Text>
+        {/* Info paiement sécurisé */}
+        {!isFullPayment && (
+          <View style={[styles.depositInfoCard, { backgroundColor: '#F0FDF4' }]}>
+            <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
+            <View style={styles.depositInfoContent}>
+              <Text style={[styles.depositInfoTitle, { color: '#166534' }]}>
+                {t('checkout.securePayment')}
+              </Text>
+              <Text style={[styles.depositInfoText, { color: '#15803D' }]}>
+                1. {t('checkout.step1')}{'\n'}
+                2. {t('checkout.step2')} ({formatAmount(remainingAmount)})
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Conditions */}
         <View style={styles.termsContainer}>
           <Ionicons name="shield-checkmark" size={16} color={colors.textMuted} />
           <Text style={[styles.termsText, { color: colors.textMuted }]}>
-            Paiement sécurisé par Stripe. En payant, vous acceptez nos conditions d'utilisation et notre politique d'annulation.
+            {t('checkout.termsNotice')}
           </Text>
         </View>
 
@@ -353,7 +469,7 @@ export default function CheckoutScreen() {
           disabled={isLoading}
         >
           <LinearGradient
-            colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#8B5CF6', '#7C3AED']}
+            colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#191919', '#4A4A4A']}
             style={styles.payButtonGradient}
           >
             {isLoading ? (
@@ -362,7 +478,10 @@ export default function CheckoutScreen() {
               <>
                 <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
                 <Text style={styles.payButtonText}>
-                  Payer l'acompte de {formatAmount(depositAmount)}
+                  {isFullPayment
+                    ? `${t('checkout.payFull')} ${formatAmount(payAmount)}`
+                    : `${t('checkout.payDeposit')} ${formatAmount(payAmount)}`
+                  }
                 </Text>
               </>
             )}
@@ -446,6 +565,38 @@ const styles = StyleSheet.create({
   dateTime: {
     fontSize: 13,
   },
+  paymentTypeCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+  },
+  paymentTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    marginBottom: 12,
+  },
+  paymentTypeOptionSelected: {
+    backgroundColor: '#F0F0F0',
+  },
+  paymentTypeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  paymentTypeTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  paymentTypeSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   paymentMethodsCard: {
     marginHorizontal: 20,
     marginBottom: 16,
@@ -463,7 +614,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   paymentOptionSelected: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: '#F0F0F0',
   },
   paymentOptionLeft: {
     flexDirection: 'row',

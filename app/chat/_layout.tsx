@@ -2,8 +2,15 @@ import { Stack } from 'expo-router';
 
 export default function ChatLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="[bookingId]" />
+    <Stack>
+      <Stack.Screen 
+        name="[bookingId]" 
+        options={{ 
+          headerTitle: 'Discussion',
+          headerBackTitle: 'Retour',
+          headerShadowVisible: false,
+        }} 
+      />
     </Stack>
   );
 }

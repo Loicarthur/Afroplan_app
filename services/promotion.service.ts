@@ -523,8 +523,8 @@ export const promotionService = {
       .from('promotion_usages')
       .select(`
         *,
-        promotion:promotions!inner(*),
-        user:profiles(full_name, email)
+        promotion:promotions!promotion_usages_promotion_id_fkey!inner(*),
+        user:profiles!promotion_usages_user_id_fkey(full_name, email)
       `, { count: 'exact' })
       .eq('promotions.salon_id', salonId)
       .order('created_at', { ascending: false })
@@ -560,7 +560,7 @@ export const promotionService = {
       .from('promotion_usages')
       .select(`
         *,
-        promotion:promotions(*, salon:salons(*))
+        promotion:promotions!promotion_usages_promotion_id_fkey(*, salon:salons(*))
       `, { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

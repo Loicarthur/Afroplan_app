@@ -8,9 +8,10 @@ export * from './database';
 export type RootStackParamList = {
   '(tabs)': undefined;
   '(auth)': undefined;
+  '(coiffeur)': undefined;
+  '(salon)': undefined;
   'salon/[id]': { id: string };
   'booking/[id]': { id: string };
-  modal: undefined;
 };
 
 // Types pour l'etat de l'application

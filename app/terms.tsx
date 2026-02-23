@@ -100,7 +100,7 @@ export default function TermsScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Conditions d'utilisation
+          Conditions d&apos;utilisation
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -111,7 +111,7 @@ export default function TermsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>
-          Veuillez lire attentivement les conditions suivantes avant d'utiliser AfroPlan.
+          Veuillez lire attentivement les conditions suivantes avant d&apos;utiliser AfroPlan.
         </Text>
 
         {sections.map((section, index) => (

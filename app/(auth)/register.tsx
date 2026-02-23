@@ -1,9 +1,9 @@
 /**
  * Page d'inscription AfroPlan
- * Design responsive amélioré
+ * Après inscription, connexion automatique + modale de succès
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input } from '@/components/ui';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
@@ -37,7 +37,7 @@ type UserRole = 'client' | 'coiffeur';
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signUp, isLoading } = useAuth();
+  const { signUp, signIn, isLoading, profile } = useAuth();
   const params = useLocalSearchParams<{ role?: string }>();
 
   const [fullName, setFullName] = useState('');
@@ -47,6 +47,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -91,18 +92,29 @@ export default function RegisterScreen() {
     if (!validate()) return;
 
     try {
+      // 1. Inscription
       await signUp(email, password, fullName, phone || undefined, selectedRole);
-      Alert.alert(
-        'Inscription réussie',
-        'Un email de confirmation vous a été envoyé. Veuillez vérifier votre boîte de réception.',
-        [{
-          text: 'OK',
-          onPress: () => router.replace({
-            pathname: '/(auth)/login',
-            params: { role: selectedRole }
-          })
-        }]
-      );
+
+      // 2. Connexion automatique après inscription
+      try {
+        await signIn(email, password);
+        // Redirection directe sans modal
+        redirectToApp();
+      } catch {
+        // Si la connexion auto échoue (ex: confirmation email requise),
+        // rediriger vers login
+        Alert.alert(
+          'Inscription réussie',
+          'Veuillez vérifier votre email puis vous connecter.',
+          [{
+            text: 'OK',
+            onPress: () => router.replace({
+              pathname: '/(auth)/login',
+              params: { role: selectedRole }
+            })
+          }]
+        );
+      }
     } catch (error) {
       Alert.alert(
         'Erreur d\'inscription',
@@ -111,11 +123,26 @@ export default function RegisterScreen() {
     }
   };
 
+  const redirectToApp = async () => {
+    if (hasRedirected.current) return;
+    hasRedirected.current = true;
+
+    // On respecte le mode choisi lors de l'inscription
+    const roleToUse = selectedRole;
+    
+    // Sauvegarder ce choix localement
+    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
+
+    if (roleToUse === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
+
   const isClient = selectedRole === 'client';
-  const roleColor = isClient ? '#191919' : '#191919';
-  const roleGradient = isClient
-    ? ['#191919', '#4A4A4A']
-    : ['#191919', '#4A4A4A'];
+  const roleColor = '#191919';
+  const roleGradient: [string, string] = ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -233,14 +260,14 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               loading={isLoading}
               fullWidth
-              style={[styles.registerButton, { backgroundColor: roleColor }]}
+              style={{...styles.registerButton, backgroundColor: roleColor}}
             />
           </View>
 
           {/* Terms */}
           <Text style={[styles.terms, { color: colors.textSecondary }]}>
             En vous inscrivant, vous acceptez nos{' '}
-            <Text style={{ color: roleColor }} onPress={() => router.push('/terms')}>Conditions d'utilisation</Text>
+            <Text style={{ color: roleColor }} onPress={() => router.push('/terms')}>Conditions d&apos;utilisation</Text>
             {' '}et notre{' '}
             <Text style={{ color: roleColor }} onPress={() => router.push('/privacy-policy')}>Politique de confidentialité</Text>
           </Text>
@@ -272,6 +299,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
     </SafeAreaView>
   );
 }

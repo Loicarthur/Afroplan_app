@@ -4,7 +4,7 @@
  * "Rechercher mon salon/coiffeur"
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,27 +19,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeIn,
   FadeInUp,
-  FadeOut,
   SlideInRight,
   SlideOutLeft,
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
-const { width, height } = Dimensions.get('window');
-
-// Types de coiffure
-const HAIRSTYLE_TYPES = [
-  { id: 'tresses', name: 'Tresses', icon: '👩🏾‍🦱', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: 'locks', name: 'Locks', icon: '🧔🏾', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-  { id: 'coupe', name: 'Coupe', icon: '✂️', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: 'soins', name: 'Soins', icon: '💆🏾', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: 'coloration', name: 'Coloration', icon: '🎨', image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200' },
-  { id: 'tissage', name: 'Tissage', icon: '👸🏾', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: 'cornrows', name: 'Cornrows', icon: '🪮', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: 'afro', name: 'Afro', icon: '🌟', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-];
+const { width } = Dimensions.get('window');
 
 // Types de cheveux
 const HAIR_TYPES = [
@@ -53,7 +41,8 @@ const HAIR_TYPES = [
 
 // Lieux
 const LOCATION_OPTIONS = [
-  { id: 'salon', name: 'En salon', icon: 'storefront', description: 'Se déplacer au salon' },
+  { id: 'salon', name: 'En salon', icon: 'storefront', description: 'Se déplacer au salon professionnel' },
+  { id: 'coiffeur', name: 'Chez le coiffeur', icon: 'person', description: 'À son domicile ou son atelier' },
   { id: 'domicile', name: 'À domicile', icon: 'home', description: 'Le coiffeur vient chez vous' },
 ];
 
@@ -72,15 +61,33 @@ interface SearchFilters {
   showAll: boolean;
 }
 
+// Distance presets for quick selection
+const DISTANCE_PRESETS = [
+  { value: 5, label: '5 km' },
+  { value: 10, label: '10 km' },
+  { value: 20, label: '20 km' },
+  { value: 50, label: '50 km' },
+  { value: 60, label: '60 km' },
+];
+
 export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFlowModalProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+
+  // Localisation desactivee (temporairement)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const userLocation = null;
+  const getCurrentLocation = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const locationLoading = false;
+
   const [step, setStep] = useState(1);
   const [filters, setFilters] = useState<SearchFilters>({
     hairstyle: null,
     hairType: [],
     location: null,
     maxBudget: 150,
-    maxDistance: 10,
+    maxDistance: 20,
     showAll: false,
   });
 
@@ -135,7 +142,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
 
   const canProceed = () => {
     if (step === 1) return filters.hairstyle !== null;
-    return true; // Les autres étapes sont optionnelles
+    return true;
   };
 
   // Render step content
@@ -152,25 +159,24 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             <Text style={styles.stepSubtitle}>Quel style te ferait plaisir ?</Text>
 
             <View style={styles.hairstyleGrid}>
-              {HAIRSTYLE_TYPES.map((style) => (
+              {HAIRSTYLE_CATEGORIES.map((cat) => (
                 <TouchableOpacity
-                  key={style.id}
+                  key={cat.id}
                   style={[
                     styles.hairstyleCard,
-                    filters.hairstyle === style.id && styles.hairstyleCardSelected
+                    filters.hairstyle === cat.id && styles.hairstyleCardSelected
                   ]}
-                  onPress={() => selectHairstyle(style.id)}
+                  onPress={() => selectHairstyle(cat.id)}
                 >
                   <Image
-                    source={{ uri: style.image }}
+                    source={cat.styles[0]?.image}
                     style={styles.hairstyleImage}
                     contentFit="cover"
                   />
-                  <View style={styles.hairstyleOverlay}>
-                    <Text style={styles.hairstyleEmoji}>{style.icon}</Text>
-                    <Text style={styles.hairstyleName}>{style.name}</Text>
+                  <View style={[styles.hairstyleOverlay, { backgroundColor: cat.color + 'BB' }]}>
+                    <Text style={styles.hairstyleName} numberOfLines={2}>{cat.title}</Text>
                   </View>
-                  {filters.hairstyle === style.id && (
+                  {filters.hairstyle === cat.id && (
                     <View style={styles.selectedBadge}>
                       <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                     </View>
@@ -228,23 +234,33 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                     ]}
                     onPress={() => selectLocation(loc.id)}
                   >
-                    <Ionicons
-                      name={loc.icon as any}
-                      size={28}
-                      color={filters.location === loc.id ? '#FFFFFF' : '#191919'}
-                    />
-                    <Text style={[
-                      styles.locationName,
-                      filters.location === loc.id && styles.locationNameSelected
+                    <View style={[
+                      styles.locationIconWrap,
+                      filters.location === loc.id && styles.locationIconWrapSelected,
                     ]}>
-                      {loc.name}
-                    </Text>
-                    <Text style={[
-                      styles.locationDesc,
-                      filters.location === loc.id && styles.locationDescSelected
-                    ]}>
-                      {loc.description}
-                    </Text>
+                      <Ionicons
+                        name={loc.icon as any}
+                        size={22}
+                        color={filters.location === loc.id ? '#FFFFFF' : '#191919'}
+                      />
+                    </View>
+                    <View style={styles.locationCardText}>
+                      <Text style={[
+                        styles.locationName,
+                        filters.location === loc.id && styles.locationNameSelected
+                      ]}>
+                        {loc.name}
+                      </Text>
+                      <Text style={[
+                        styles.locationDesc,
+                        filters.location === loc.id && styles.locationDescSelected
+                      ]}>
+                        {loc.description}
+                      </Text>
+                    </View>
+                    {filters.location === loc.id && (
+                      <Ionicons name="checkmark-circle" size={20} color="#191919" />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -259,13 +275,31 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             exiting={SlideOutLeft.duration(300)}
             style={styles.stepContent}
           >
-            <Text style={styles.stepTitle}>Budget & Distance</Text>
-            <Text style={styles.stepSubtitle}>Optionnel - Derniers ajustements</Text>
+            <Text style={styles.stepTitle}>{t('search.budgetDistance')}</Text>
+            <Text style={styles.stepSubtitle}>{t('search.optional')}</Text>
+
+            {/* Geolocation button (désactivé) */}
+            <View style={styles.filterSection}>
+              <TouchableOpacity
+                style={styles.geoButton}
+                onPress={getCurrentLocation}
+                disabled={true}
+              >
+                <Ionicons
+                  name="location-outline"
+                  size={22}
+                  color="#808080"
+                />
+                <Text style={styles.geoButtonTextDisabled}>
+                  Localisation désactivée (temporairement)
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Budget slider */}
             <View style={styles.filterSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.filterLabel}>Budget maximum</Text>
+                <Text style={styles.filterLabel}>{t('search.maxBudget')}</Text>
                 <Text style={styles.sliderValue}>{filters.maxBudget} €</Text>
               </View>
               <Slider
@@ -285,16 +319,37 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
               </View>
             </View>
 
-            {/* Distance slider */}
+            {/* Distance presets */}
             <View style={styles.filterSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.filterLabel}>Distance maximum</Text>
+                <Text style={styles.filterLabel}>{t('search.maxDistance')}</Text>
                 <Text style={styles.sliderValue}>{filters.maxDistance} km</Text>
               </View>
+
+              <View style={styles.distancePresets}>
+                {DISTANCE_PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.value}
+                    style={[
+                      styles.distancePresetChip,
+                      filters.maxDistance === preset.value && styles.distancePresetChipActive,
+                    ]}
+                    onPress={() => setFilters({ ...filters, maxDistance: preset.value })}
+                  >
+                    <Text style={[
+                      styles.distancePresetText,
+                      filters.maxDistance === preset.value && styles.distancePresetTextActive,
+                    ]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Slider
                 style={styles.slider}
                 minimumValue={1}
-                maximumValue={50}
+                maximumValue={100}
                 step={1}
                 value={filters.maxDistance}
                 onValueChange={(value) => setFilters({ ...filters, maxDistance: value })}
@@ -302,9 +357,10 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                 maximumTrackTintColor="#E5E5E5"
                 thumbTintColor="#191919"
               />
+
               <View style={styles.sliderLabels}>
                 <Text style={styles.sliderLabel}>1 km</Text>
-                <Text style={styles.sliderLabel}>50 km</Text>
+                <Text style={styles.sliderLabel}>100 km</Text>
               </View>
             </View>
 
@@ -325,7 +381,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                 )}
               </View>
               <Text style={styles.showAllText}>
-                Je veux voir tous les salons (ignorer les filtres)
+                {t('search.showAllSalons')}
               </Text>
             </TouchableOpacity>
 
@@ -333,7 +389,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             <View style={styles.paymentInfo}>
               <Ionicons name="information-circle" size={20} color="#7C3AED" />
               <Text style={styles.paymentInfoText}>
-                Tu pourras choisir de payer le montant total ou un acompte lors de la réservation.
+                {t('search.paymentInfo')}
               </Text>
             </View>
           </Animated.View>
@@ -499,9 +555,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hairstyleCard: {
-    width: (width - 60) / 2,
-    height: 120,
-    borderRadius: 16,
+    width: (width - 72) / 3,
+    height: 110,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#E5E5E5',
     borderWidth: 2,
@@ -520,13 +576,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hairstyleEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 22,
+    marginBottom: 2,
   },
   hairstyleName: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   selectedBadge: {
     position: 'absolute',
@@ -574,17 +631,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   locationOptions: {
-    flexDirection: 'row',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 10,
   },
   locationCard: {
-    flex: 1,
-    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E5E5E5',
+    gap: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#191919',
@@ -598,26 +656,38 @@ const styles = StyleSheet.create({
     }),
   },
   locationCardSelected: {
-    backgroundColor: '#191919',
+    backgroundColor: '#F0F0F0',
     borderColor: '#191919',
+  },
+  locationIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationIconWrapSelected: {
+    backgroundColor: '#191919',
+  },
+  locationCardText: {
+    flex: 1,
   },
   locationName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#191919',
-    marginTop: 8,
   },
   locationNameSelected: {
-    color: '#FFFFFF',
+    color: '#191919',
   },
   locationDesc: {
     fontSize: 12,
     color: '#808080',
-    marginTop: 4,
-    textAlign: 'center',
+    marginTop: 2,
   },
   locationDescSelected: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#4A4A4A',
   },
   sliderHeader: {
     flexDirection: 'row',
@@ -690,6 +760,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4A4A4A',
     lineHeight: 18,
+  },
+  geoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    gap: 8,
+  },
+  geoButtonTextDisabled: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#808080',
+  },
+  distancePresets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  distancePresetChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  distancePresetChipActive: {
+    backgroundColor: '#191919',
+    borderColor: '#191919',
+  },
+  distancePresetText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  distancePresetTextActive: {
+    color: '#FFFFFF',
   },
   footer: {
     paddingHorizontal: 24,

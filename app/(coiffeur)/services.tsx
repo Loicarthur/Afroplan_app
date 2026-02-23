@@ -1,5 +1,6 @@
 /**
- * Page de gestion des services - Espace Coiffeur AfroPlan
+ * Page de gestion des styles - Espace Coiffeur AfroPlan
+ * Catalogue de styles afro prédéfinis avec configuration prix/durée/lieu
  */
 
 import React, { useState } from 'react';
@@ -12,392 +13,743 @@ import {
   TextInput,
   Alert,
   Modal,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
+import { HAIRSTYLE_CATEGORIES, findStyleById } from '@/constants/hairstyleCategories';
+import { salonService } from '@/services/salon.service';
 
-type ServiceItem = {
+// ─── CATALOGUE DES STYLES AFRO PRÉDÉFINIS ───────────────────────────────────
+
+type StyleEntry = {
   id: string;
   name: string;
-  description: string;
-  price: number;
-  duration: number;
-  category: string;
-  isActive: boolean;
+  image?: any;
 };
 
-const CATEGORIES = [
-  'Tresses',
-  'Locks',
-  'Coupe',
-  'Coloration',
-  'Soins',
-  'Extensions',
-  'Barber',
-  'Autre',
-];
+type StyleCategory = {
+  id: string;
+  label: string;
+  emoji: string;
+  styles: StyleEntry[];
+};
 
-// Mock data
-const MOCK_SERVICES: ServiceItem[] = [
-  {
-    id: '1',
-    name: 'Tresses africaines',
-    description: 'Tresses traditionnelles africaines, style au choix',
-    price: 80,
-    duration: 120,
-    category: 'Tresses',
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: 'Box Braids',
-    description: 'Box braids de toutes tailles',
-    price: 150,
-    duration: 240,
-    category: 'Tresses',
-    isActive: true,
-  },
-  {
-    id: '3',
-    name: 'Coupe homme',
-    description: 'Coupe + degrade + finitions',
-    price: 25,
-    duration: 45,
-    category: 'Coupe',
-    isActive: true,
-  },
-  {
-    id: '4',
-    name: 'Entretien locks',
-    description: 'Reprise des racines et soins',
-    price: 60,
-    duration: 90,
-    category: 'Locks',
-    isActive: true,
-  },
-];
+// On mappe les catégories et styles globaux vers le catalogue du coiffeur
+const STYLE_CATALOG: StyleCategory[] = HAIRSTYLE_CATEGORIES.map(cat => ({
+  id: cat.id,
+  label: cat.title,
+  emoji: cat.emoji,
+  styles: cat.styles.map(s => ({
+    id: s.id,
+    name: s.name,
+    image: s.image
+  }))
+}));
+
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
+type ServiceLocation = 'salon' | 'domicile' | 'both';
+
+type ConfiguredStyle = {
+  styleId: string;
+  styleName: string;
+  categoryLabel: string;
+  price: string;
+  duration: string;
+  location: ServiceLocation;
+  requiresExtensions: boolean;
+  extensionsIncluded: boolean;
+  image?: any;
+  customImage?: string; // Nouvelle photo choisie par le coiffeur
+  customDescription?: string;
+};
+
+// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
 
 export default function CoiffeurServicesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { isAuthenticated, user } = useAuth();
+  const { language } = useLanguage();
 
-  const [services, setServices] = useState<ServiceItem[]>(MOCK_SERVICES);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
+  // Styles sélectionnés et configurés
+  const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
+  
+  // Nouveaux états pour la sélection par lot
+  const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([]);
+  const [isBatchConfiguring, setIsBatchConfiguring] = useState(false);
+  const [batchData, setBatchData] = useState<Record<string, Partial<ConfiguredStyle>>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [duration, setDuration] = useState('');
-  const [category, setCategory] = useState('');
+  // Vue catalogue ou vue "mes styles"
+  const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
 
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setPrice('');
-    setDuration('');
-    setCategory('');
-    setEditingService(null);
+  const loadConfiguredStyles = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        const services = await salonService.getSalonServices(salon.id);
+        const mapped: ConfiguredStyle[] = services.map(s => {
+          // Trouver le style correspondant dans le catalogue pour l'image par défaut
+          const catalogStyle = STYLE_CATALOG.flatMap(c => c.styles).find(cs => cs.name === s.name);
+          
+          return {
+            styleId: s.id, // On utilise l'ID réel du service
+            styleName: s.name,
+            categoryLabel: s.category,
+            price: s.price.toString(),
+            duration: s.duration_minutes.toString(),
+            location: s.service_location as ServiceLocation,
+            requiresExtensions: s.requires_extensions,
+            extensionsIncluded: s.extensions_included,
+            image: catalogStyle?.image,
+            customImage: s.image_url || undefined,
+            customDescription: s.description || '',
+          };
+        });
+        setConfiguredStyles(mapped);
+      }
+    } catch (error) {
+      console.error('Erreur chargement services:', error);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      loadConfiguredStyles();
+    }
+  }, [isAuthenticated, loadConfiguredStyles]);
+
+  const isStyleConfigured = (styleId: string) =>
+    configuredStyles.some((s) => s.styleId === styleId);
+
+  const toggleStyleSelection = (styleId: string) => {
+    setSelectedStyleIds(prev => 
+      prev.includes(styleId) 
+        ? prev.filter(id => id !== styleId) 
+        : [...prev, styleId]
+    );
   };
 
-  const openAddModal = () => {
-    resetForm();
-    setModalVisible(true);
+  const startBatchConfiguration = () => {
+    if (selectedStyleIds.length === 0) return;
+    
+    // Initialiser les données pour les nouveaux styles
+    const initialData: Record<string, Partial<ConfiguredStyle>> = {};
+    selectedStyleIds.forEach(id => {
+      const existing = configuredStyles.find(s => s.styleId === id);
+      if (existing) {
+        initialData[id] = { ...existing };
+      } else {
+        // Trouver l'entrée du style et sa catégorie parente
+        let parentCategoryLabel = '';
+        let styleEntry = null;
+        
+        for (const cat of STYLE_CATALOG) {
+          const found = cat.styles.find(s => s.id === id);
+          if (found) {
+            styleEntry = found;
+            parentCategoryLabel = cat.label;
+            break;
+          }
+        }
+
+        initialData[id] = {
+          styleId: id,
+          styleName: styleEntry?.name || 'Style inconnu',
+          categoryLabel: parentCategoryLabel,
+          location: 'salon',
+          price: '',
+          duration: '',
+          requiresExtensions: false,
+          extensionsIncluded: false,
+          customDescription: ''
+        };
+      }
+    });
+    
+    setBatchData(initialData);
+    setIsBatchConfiguring(true);
   };
 
-  const openEditModal = (service: ServiceItem) => {
-    setEditingService(service);
-    setName(service.name);
-    setDescription(service.description);
-    setPrice(service.price.toString());
-    setDuration(service.duration.toString());
-    setCategory(service.category);
-    setModalVisible(true);
+  const updateBatchItem = (styleId: string, updates: Partial<ConfiguredStyle>) => {
+    setBatchData(prev => ({
+      ...prev,
+      [styleId]: { ...prev[styleId], ...updates }
+    }));
   };
 
-  const handleSave = () => {
-    if (!name.trim() || !price.trim() || !duration.trim() || !category) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+  const pickServiceImage = async (styleId: string) => {
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    };
+
+    Alert.alert(
+      'Photo de la prestation',
+      'Comment souhaitez-vous ajouter la photo ?',
+      [
+        {
+          text: 'Prendre une photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission requise', 'Accès caméra refusé');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync(options);
+            if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+          },
+        },
+        {
+          text: 'Choisir dans la galerie',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync(options);
+            if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleSaveBatch = async () => {
+    if (!user) return;
+
+    // Validation : on ne valide que les styles actuellement sélectionnés dans la liste
+    const stylesToSave = selectedStyleIds
+      .map(id => batchData[id])
+      .filter(s => !!s) as ConfiguredStyle[];
+    
+    const invalid = stylesToSave.find(s => !s.price || !s.duration);
+    
+    if (invalid) {
+      Alert.alert('Champs requis', 'Veuillez renseigner le prix et la durée pour tous les styles sélectionnés.');
       return;
     }
 
-    if (editingService) {
-      // Update existing service
-      setServices(prev =>
-        prev.map(s =>
-          s.id === editingService.id
-            ? {
-                ...s,
-                name,
-                description,
-                price: parseFloat(price),
-                duration: parseInt(duration, 10),
-                category,
-              }
-            : s
-        )
-      );
-    } else {
-      // Add new service
-      const newService: ServiceItem = {
-        id: Date.now().toString(),
-        name,
-        description,
-        price: parseFloat(price),
-        duration: parseInt(duration, 10),
-        category,
-        isActive: true,
-      };
-      setServices(prev => [...prev, newService]);
-    }
+    setIsSaving(true);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      let salon = await salonService.getSalonByOwnerId(user.id);
+      
+      if (!salon) {
+        Alert.alert('Erreur', 'Aucun salon associé à ce compte.');
+        setIsSaving(false);
+        return;
+      }
 
-    setModalVisible(false);
-    resetForm();
+      // 2. Nettoyage : On supprime les anciens services pour repartir sur une base propre
+      await salonService.deleteServicesBySalonId(salon.id);
+
+      // 3. Upload des images et préparation du payload
+      const servicesPayload = [];
+      
+      for (const style of stylesToSave) {
+        // On garde l'image actuelle par défaut
+        let finalImageUrl = style.customImage || null;
+
+        // Si une NOUVELLE photo locale a été choisie, on l'uploade via ArrayBuffer (stable)
+        if (style.customImage && !style.customImage.startsWith('http')) {
+          const extension = style.customImage.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${user.id}/service_${Date.now()}.${extension}`;
+          
+          const uploadUrl = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              const reader = new FileReader();
+              reader.onloadend = async function () {
+                try {
+                  const base64 = (reader.result as string).split(',')[1];
+                  const arrayBuffer = base64js.toByteArray(base64);
+
+                  const { data, error } = await supabase.storage
+                    .from('salon-photos')
+                    .upload(fileName, arrayBuffer, {
+                      contentType: `image/${extension === 'png' ? 'png' : 'jpeg'}`,
+                      upsert: true
+                    });
+
+                  if (error) throw error;
+                  
+                  const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
+                  resolve(urlData.publicUrl);
+                } catch (err) {
+                  reject(err);
+                }
+              };
+              reader.readAsDataURL(xhr.response);
+            };
+            xhr.onerror = () => reject(new Error('Erreur lecture photo service.'));
+            xhr.responseType = 'blob';
+            xhr.open('GET', style.customImage!, true);
+            xhr.send(null);
+          });
+          finalImageUrl = uploadUrl;
+        }
+
+        let categoryName = style.categoryLabel;
+        if (!categoryName) {
+          const found = findStyleById(style.styleId);
+          categoryName = found?.category.title || 'Autre';
+        }
+
+        servicesPayload.push({
+          salon_id: salon!.id,
+          name: style.styleName,
+          category: categoryName,
+          price: parseFloat(style.price),
+          duration_minutes: parseInt(style.duration, 10),
+          description: style.customDescription || null,
+          service_location: style.location,
+          image_url: finalImageUrl, // URL conservée ou nouvelle
+          is_active: true,
+        });
+      }
+
+      // 3. Sauvegarder
+      await salonService.upsertServicesBatch(servicesPayload);
+
+      // 4. Mettre à jour l'état local
+      setConfiguredStyles(prev => {
+        const filtered = prev.filter(s => !selectedStyleIds.includes(s.styleId));
+        return [...filtered, ...stylesToSave];
+      });
+
+      setIsBatchConfiguring(false);
+      setSelectedStyleIds([]);
+      setActiveTab('my_styles');
+      Alert.alert('Succès', `${selectedStyleIds.length} style(s) configuré(s) et sauvegardé(s).`);
+
+    } catch (error: any) {
+      if (__DEV__) console.error('Save Batch Error:', error);
+      Alert.alert(
+        'Erreur', 
+        `Impossible de sauvegarder : ${error?.message || 'Vérifiez votre connexion.'}`
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (serviceId: string) => {
+  const handleRemoveStyle = (styleId: string) => {
     Alert.alert(
-      'Supprimer le service',
-      'Voulez-vous vraiment supprimer ce service?',
+      'Retirer ce style',
+      'Voulez-vous retirer ce style de vos prestations ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Retirer',
           style: 'destructive',
-          onPress: () => {
-            setServices(prev => prev.filter(s => s.id !== serviceId));
-          },
+          onPress: async () => {
+            try {
+              // Si c'est un UUID (déjà en base), on le supprime
+              if (styleId.length > 20) {
+                await salonService.deleteService(styleId);
+              }
+              setConfiguredStyles((prev) => prev.filter((s) => s.styleId !== styleId));
+              loadConfiguredStyles();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de supprimer le service.');
+            }
+          }
         },
       ]
     );
   };
 
-  const toggleServiceActive = (serviceId: string) => {
-    setServices(prev =>
-      prev.map(s =>
-        s.id === serviceId ? { ...s, isActive: !s.isActive } : s
-      )
-    );
+  const formatDuration = (minutes: string) => {
+    const m = parseInt(minutes, 10);
+    if (isNaN(m)) return `${minutes}min`;
+    if (m < 60) return `${m}min`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `${h}h${rem}` : `${h}h`;
   };
 
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes}min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h${mins}` : `${hours}h`;
+  const locationLabel = (loc: ServiceLocation) => {
+    if (loc === 'salon') return 'En salon';
+    if (loc === 'domicile') return 'À domicile';
+    return 'Salon & Domicile';
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            Mes services
+  const locationIcon = (loc: ServiceLocation): 'storefront-outline' | 'home-outline' | 'swap-horizontal-outline' => {
+    if (loc === 'salon') return 'storefront-outline';
+    if (loc === 'domicile') return 'home-outline';
+    return 'swap-horizontal-outline';
+  };
+
+  // ─── AUTH GUARD ────────────────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+        <View style={styles.authPrompt}>
+          <View style={styles.authIconContainer}>
+            <Ionicons name="cut" size={48} color={colors.textMuted} />
+          </View>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Mes styles</Text>
+          <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
+            Connectez-vous pour sélectionner vos styles et gérer vos prestations
           </Text>
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={openAddModal}
+            style={styles.authButton}
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
+            activeOpacity={0.8}
           >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Text style={styles.authButtonText}>Se connecter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
+            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte Pro</Text>
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        {/* Services List */}
-        <View style={styles.servicesList}>
-          {services.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="cut-outline" size={64} color={colors.textMuted} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                Aucun service
+  // ─── RENDU PRINCIPAL ───────────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+      {/* Tabs */}
+      <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'catalog' && styles.tabActive]}
+          onPress={() => setActiveTab('catalog')}
+        >
+          <Text style={[styles.tabText, { color: activeTab === 'catalog' ? colors.primary : colors.textSecondary }]}>
+            Catalogue
+          </Text>
+          {activeTab === 'catalog' && <View style={[styles.tabUnderline, { backgroundColor: colors.primary }]} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'my_styles' && styles.tabActive]}
+          onPress={() => setActiveTab('my_styles')}
+        >
+          <Text style={[styles.tabText, { color: activeTab === 'my_styles' ? colors.primary : colors.textSecondary }]}>
+            Mes prestations ({configuredStyles.length})
+          </Text>
+          {activeTab === 'my_styles' && <View style={[styles.tabUnderline, { backgroundColor: colors.primary }]} />}
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+
+          {/* ─── ONGLET CATALOGUE ─────────────────────────────────────────────── */}
+          {activeTab === 'catalog' && (
+            <View style={styles.catalogContainer}>
+              <Text style={[styles.catalogHint, { color: colors.textSecondary }]}>
+                Cochez tous les styles que vous proposez, puis cliquez sur le bouton de configuration en bas.
               </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Ajoutez vos services pour que les clients puissent les reserver
-              </Text>
-              <Button
-                title="Ajouter un service"
-                onPress={openAddModal}
-                style={{ marginTop: Spacing.lg }}
-              />
+
+              {STYLE_CATALOG.map((category) => (
+                <View key={category.id} style={styles.categorySection}>
+                  <View style={styles.categoryHeader}>
+                    <Text style={[styles.categoryLabel, { color: colors.text }]}>{category.label}</Text>
+                  </View>
+
+                  <View style={styles.stylesGrid}>
+                    {category.styles.map((style) => {
+                      const isSelected = selectedStyleIds.includes(style.id);
+                      const isSaved = isStyleConfigured(style.id);
+                      
+                      return (
+                        <TouchableOpacity
+                          key={style.id}
+                          style={[
+                            styles.styleChip,
+                            { backgroundColor: colors.card, borderColor: colors.border },
+                            isSelected && { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+                            isSaved && !isSelected && { borderColor: colors.success + '50' }
+                          ]}
+                          onPress={() => toggleStyleSelection(style.id)}
+                          activeOpacity={0.7}
+                        >
+                          {style.image && (
+                            <Image
+                              source={style.image}
+                              style={styles.styleChipImage}
+                              contentFit="cover"
+                            />
+                          )}
+                          <View style={styles.styleChipContent}>
+                            <View style={styles.styleChipTop}>
+                              <View style={[
+                                styles.styleCheck, 
+                                { backgroundColor: isSelected ? colors.primary : colors.backgroundSecondary, borderColor: isSelected ? colors.primary : colors.border },
+                                !isSelected && { borderWidth: 1 }
+                              ]}>
+                                {isSelected && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+                              </View>
+                              <Text
+                                style={[
+                                  styles.styleChipName,
+                                  { color: isSelected ? colors.primary : colors.text },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {style.name}
+                              </Text>
+                            </View>
+                            {isSaved && !isSelected && (
+                              <View style={styles.styleChipSavedBadge}>
+                                <Text style={styles.styleChipSavedText}>Déjà configuré</Text>
+                              </View>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+
+              <View style={{ height: 120 }} />
             </View>
-          ) : (
-            services.map((service) => (
-              <View
-                key={service.id}
-                style={[
-                  styles.serviceCard,
-                  { backgroundColor: colors.card },
-                  !service.isActive && styles.serviceCardInactive,
-                  Shadows.sm,
-                ]}
-              >
-                <View style={styles.serviceHeader}>
-                  <View style={styles.serviceInfo}>
-                    <Text style={[styles.serviceName, { color: colors.text }]}>
-                      {service.name}
-                    </Text>
-                    <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.categoryText, { color: colors.primary }]}>
-                        {service.category}
-                      </Text>
+          )}
+
+          {/* ─── ONGLET MES PRESTATIONS ───────────────────────────────────────── */}
+          {activeTab === 'my_styles' && (
+            <View style={styles.myStylesContainer}>
+              {configuredStyles.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="cut-outline" size={64} color={colors.textMuted} />
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Aucune prestation</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                    Allez dans le catalogue et cochez les styles que vous maîtrisez
+                  </Text>
+                  <Button
+                    title="Voir le catalogue"
+                    onPress={() => setActiveTab('catalog')}
+                    style={{ marginTop: Spacing.lg }}
+                  />
+                </View>
+              ) : (
+                configuredStyles.map((cs) => (
+                  <View
+                    key={cs.styleId}
+                    style={[styles.myStyleCard, { backgroundColor: colors.card }, Shadows.sm]}
+                  >
+                    <View style={styles.myStyleCardHeader}>
+                      {cs.image && (
+                        <Image
+                          source={cs.image}
+                          style={styles.myStyleImage}
+                          contentFit="cover"
+                        />
+                      )}
+                      <View style={styles.myStyleInfo}>
+                        <Text style={[styles.myStyleName, { color: colors.text }]}>{cs.styleName}</Text>
+                        <Text style={[styles.myStyleCategory, { color: colors.textMuted }]}>{cs.categoryLabel}</Text>
+                        {cs.customDescription ? (
+                          <Text style={[styles.myStyleDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {cs.customDescription}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.myStyleActions}>
+                        <TouchableOpacity
+                          style={[styles.myStyleEditBtn, { backgroundColor: colors.backgroundSecondary }]}
+                          onPress={() => {
+                            setSelectedStyleIds([cs.styleId]);
+                            startBatchConfiguration();
+                          }}
+                        >
+                          <Ionicons name="pencil" size={16} color={colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.myStyleDeleteBtn, { borderColor: colors.error }]}
+                          onPress={() => handleRemoveStyle(cs.styleId)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.myStyleDetails}>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#22C55E20' }]}>
+                        <Ionicons name="cash-outline" size={14} color="#22C55E" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#22C55E' }]}>{cs.price} €</Text>
+                      </View>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#3B82F620' }]}>
+                        <Ionicons name="time-outline" size={14} color="#3B82F6" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#3B82F6' }]}>{formatDuration(cs.duration)}</Text>
+                      </View>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#7C3AED20' }]}>
+                        <Ionicons name={locationIcon(cs.location)} size={14} color="#7C3AED" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#7C3AED' }]}>{locationLabel(cs.location)}</Text>
+                      </View>
                     </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.toggleButton}
-                    onPress={() => toggleServiceActive(service.id)}
-                  >
-                    <Ionicons
-                      name={service.isActive ? 'toggle' : 'toggle-outline'}
-                      size={32}
-                      color={service.isActive ? colors.success : colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {service.description && (
-                  <Text style={[styles.serviceDescription, { color: colors.textSecondary }]}>
-                    {service.description}
-                  </Text>
-                )}
-
-                <View style={styles.serviceDetails}>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="cash-outline" size={18} color={colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: colors.text }]}>
-                      {service.price} EUR
-                    </Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: colors.text }]}>
-                      {formatDuration(service.duration)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.serviceActions}>
-                  <TouchableOpacity
-                    style={[styles.editButton, { backgroundColor: colors.backgroundSecondary }]}
-                    onPress={() => openEditModal(service)}
-                  >
-                    <Ionicons name="pencil" size={18} color={colors.primary} />
-                    <Text style={[styles.editButtonText, { color: colors.primary }]}>Modifier</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.deleteButton, { borderColor: colors.error }]}
-                    onPress={() => handleDelete(service.id)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.error} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+                ))
+              )}
+              <View style={{ height: Spacing.xxl }} />
+            </View>
           )}
-        </View>
+        </ScrollView>
 
-        <View style={{ height: Spacing.xxl }} />
-      </ScrollView>
+        {/* Floating Configuration Button */}
+        {activeTab === 'catalog' && selectedStyleIds.length > 0 && (
+          <View style={[styles.floatingAction, { backgroundColor: colors.background }]}>
+            <TouchableOpacity 
+              style={[styles.batchConfigBtn, { backgroundColor: '#191919' }]}
+              onPress={startBatchConfiguration}
+              activeOpacity={0.9}
+            >
+              <View style={styles.batchBadge}>
+                <Text style={styles.batchBadgeText}>{selectedStyleIds.length}</Text>
+              </View>
+              <Text style={styles.batchConfigBtnText}>
+                {selectedStyleIds.length > 1 ? 'Configurer les styles' : 'Configurer le style'}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
-      {/* Add/Edit Modal */}
+      {/* ─── MODAL CONFIGURATION PAR LOT ─────────────────────────────────────── */}
       <Modal
-        visible={modalVisible}
+        visible={isBatchConfiguring}
         animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setModalVisible(false)}
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsBatchConfiguring(false)}
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
+            <TouchableOpacity onPress={() => setIsBatchConfiguring(false)}>
               <Text style={[styles.modalCancel, { color: colors.textSecondary }]}>Annuler</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {editingService ? 'Modifier le service' : 'Nouveau service'}
+              Configuration ({selectedStyleIds.length})
             </Text>
-            <TouchableOpacity onPress={handleSave}>
-              <Text style={[styles.modalSave, { color: colors.primary }]}>Enregistrer</Text>
+            <TouchableOpacity onPress={handleSaveBatch} disabled={isSaving}>
+              {isSaving ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[styles.modalSave, { color: colors.primary }]}>Enregistrer</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Nom du service *</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="Ex: Tresses africaines"
-                placeholderTextColor={colors.textMuted}
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.batchIntro, { color: colors.textSecondary }]}>
+              Définissez vos tarifs, durées et ajoutez une photo pour chaque style.
+            </Text>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Description</Text>
-              <TextInput
-                style={[styles.formInput, styles.formTextArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="Description du service..."
-                placeholderTextColor={colors.textMuted}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
+            {selectedStyleIds.map((id, index) => {
+              const data = batchData[id];
+              const styleEntry = STYLE_CATALOG.flatMap(c => c.styles).find(s => s.id === id);
+              if (!data || !styleEntry) return null;
 
-            <View style={styles.formRow}>
-              <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>Prix (EUR) *</Text>
-                <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                  placeholder="0"
-                  placeholderTextColor={colors.textMuted}
-                  value={price}
-                  onChangeText={setPrice}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={[styles.formGroup, { flex: 1, marginLeft: Spacing.md }]}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>Duree (min) *</Text>
-                <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                  placeholder="60"
-                  placeholderTextColor={colors.textMuted}
-                  value={duration}
-                  onChangeText={setDuration}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Categorie *</Text>
-              <View style={styles.categoriesGrid}>
-                {CATEGORIES.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryOption,
-                      { backgroundColor: colors.card, borderColor: colors.border },
-                      category === cat && { backgroundColor: colors.primary, borderColor: colors.primary },
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryOptionText,
-                        { color: category === cat ? '#FFFFFF' : colors.text },
-                      ]}
+              return (
+                <View key={id} style={[styles.batchItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.batchItemHeader}>
+                    {/* Sélecteur d'image personnalisé */}
+                    <TouchableOpacity 
+                      style={styles.batchItemImageContainer} 
+                      onPress={() => pickServiceImage(id)}
                     >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                      <Image 
+                        source={data.customImage ? { uri: data.customImage } : styleEntry.image} 
+                        style={styles.batchItemImage} 
+                        contentFit="cover" 
+                      />
+                      <View style={styles.imageEditBadge}>
+                        <Ionicons name="camera" size={12} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.batchItemTitleWrap}>
+                      <Text style={[styles.batchItemName, { color: colors.text }]}>{styleEntry.name}</Text>
+                      <TouchableOpacity 
+                        style={styles.batchItemRemove} 
+                        onPress={() => setSelectedStyleIds(prev => prev.filter(sid => sid !== id))}
+                      >
+                        <Ionicons name="close-circle" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.batchItemForm}>
+                    <View style={styles.batchRow}>
+                      <View style={styles.batchField}>
+                        <Text style={[styles.batchLabel, { color: colors.textSecondary }]}>Prix (€)</Text>
+                        <TextInput
+                          style={[styles.batchInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                          placeholder="ex: 80"
+                          value={data.price}
+                          onChangeText={(val) => updateBatchItem(id, { price: val })}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                      <View style={styles.batchField}>
+                        <Text style={[styles.batchLabel, { color: colors.textSecondary }]}>Durée (min)</Text>
+                        <TextInput
+                          style={[styles.batchInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                          placeholder="ex: 120"
+                          value={data.duration}
+                          onChangeText={(val) => updateBatchItem(id, { duration: val })}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.batchField}>
+                      <Text style={[styles.batchLabel, { color: colors.textSecondary }]}>Lieu</Text>
+                      <View style={styles.batchLocationRow}>
+                        {(['salon', 'domicile', 'both'] as ServiceLocation[]).map((loc) => (
+                          <TouchableOpacity
+                            key={loc}
+                            style={[
+                              styles.batchLocBtn,
+                              { backgroundColor: colors.background, borderColor: colors.border },
+                              data.location === loc && { backgroundColor: colors.primary, borderColor: colors.primary }
+                            ]}
+                            onPress={() => updateBatchItem(id, { location: loc })}
+                          >
+                            <Ionicons 
+                              name={locationIcon(loc)} 
+                              size={14} 
+                              color={data.location === loc ? '#FFFFFF' : colors.textSecondary} 
+                            />
+                            <Text style={[
+                              styles.batchLocText, 
+                              { color: data.location === loc ? '#FFFFFF' : colors.textSecondary }
+                            ]}>
+                              {loc === 'salon' ? 'Salon' : loc === 'domicile' ? 'Domi.' : 'Les 2'}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <TextInput
+                      style={[styles.batchNoteInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                      placeholder="Note ou précision (optionnel)"
+                      value={data.customDescription}
+                      onChangeText={(val) => updateBatchItem(id, { customDescription: val })}
+                      multiline
+                    />
+                  </View>
+                </View>
+              );
+            })}
+            <View style={{ height: 40 }} />
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -405,31 +757,239 @@ export default function CoiffeurServicesScreen() {
   );
 }
 
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+
+  /* Tabs */
+  tabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    paddingHorizontal: Spacing.md,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    position: 'relative',
+  },
+  tabActive: {},
+  tabText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: '10%',
+    right: '10%',
+    height: 2,
+    borderRadius: 2,
+  },
+
+  /* Catalogue */
+  catalogContainer: { padding: Spacing.md },
+  catalogHint: {
+    fontSize: FontSizes.sm,
+    marginBottom: Spacing.lg,
+    lineHeight: 20,
+  },
+  categorySection: { marginBottom: Spacing.lg },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  categoryEmoji: { fontSize: 20 },
+  categoryLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
     flex: 1,
   },
-  header: {
+  stylesGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  styleChip: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    minWidth: 100,
+    maxWidth: '47%',
+    flex: 1,
+  },
+  styleChipImage: {
+    width: '100%',
+    height: 100,
+  },
+  styleChipContent: {
+    padding: Spacing.sm,
+  },
+  styleChipTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  styleCheck: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
   },
-  title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: '700',
+  styleChipName: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    flex: 1,
   },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  styleChipMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  styleChipMetaText: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
+  },
+  styleChipLocBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  servicesList: {
-    paddingHorizontal: Spacing.md,
+  styleChipSavedBadge: {
+    backgroundColor: '#22C55E15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
   },
+  styleChipSavedText: {
+    fontSize: 9,
+    color: '#22C55E',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+
+  /* Floating Action */
+  floatingAction: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: Spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? 30 : Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  batchConfigBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 12,
+  },
+  batchConfigBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  batchBadge: {
+    backgroundColor: '#FFFFFF',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchBadgeText: {
+    color: '#191919',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  /* Mes styles */
+  myStylesContainer: { padding: Spacing.md },
+  myStyleCard: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  myStyleCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  myStyleImage: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
+  },
+  myStyleInfo: { flex: 1 },
+  myStyleName: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+  },
+  myStyleCategory: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  myStyleDesc: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  myStyleActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginLeft: Spacing.md,
+  },
+  myStyleEditBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myStyleDeleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myStyleDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  myStyleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.md,
+    gap: 4,
+  },
+  myStyleBadgeText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+
+  /* Empty state */
   emptyState: {
     alignItems: 'center',
     paddingVertical: Spacing.xxl,
@@ -443,88 +1003,11 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     textAlign: 'center',
     marginTop: Spacing.sm,
+    lineHeight: 22,
   },
-  serviceCard: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  serviceCardInactive: {
-    opacity: 0.6,
-  },
-  serviceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  serviceInfo: {
-    flex: 1,
-  },
-  serviceName: {
-    fontSize: FontSizes.lg,
-    fontWeight: '700',
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.xs,
-  },
-  categoryText: {
-    fontSize: FontSizes.xs,
-    fontWeight: '600',
-  },
-  toggleButton: {
-    padding: Spacing.xs,
-  },
-  serviceDescription: {
-    fontSize: FontSizes.sm,
-    marginTop: Spacing.sm,
-  },
-  serviceDetails: {
-    flexDirection: 'row',
-    marginTop: Spacing.md,
-    gap: Spacing.lg,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  detailText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  serviceActions: {
-    flexDirection: 'row',
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  editButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.xs,
-  },
-  editButtonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-  },
+
+  /* Modal */
+  modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -533,12 +1016,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
   },
-  modalCancel: {
-    fontSize: FontSizes.md,
-  },
+  modalCancel: { fontSize: FontSizes.md },
   modalTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: Spacing.sm,
   },
   modalSave: {
     fontSize: FontSizes.md,
@@ -548,9 +1032,107 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
-  formGroup: {
+  batchIntro: {
+    fontSize: 14,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+  },
+  batchItem: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
+  batchItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  batchItemImageContainer: {
+    position: 'relative',
+  },
+  imageEditBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#191919',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  batchItemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: BorderRadius.md,
+  },
+  batchItemTitleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  batchItemName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  batchItemRemove: {
+    padding: 4,
+  },
+  batchItemForm: {
+    gap: Spacing.md,
+  },
+  batchRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  batchField: {
+    flex: 1,
+  },
+  batchLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  batchInput: {
+    height: 44,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 15,
+  },
+  batchLocationRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  batchLocBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: 4,
+  },
+  batchLocText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  batchNoteInput: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: 10,
+    fontSize: 14,
+    height: 60,
+    textAlignVertical: 'top',
+  },
+  formGroup: { marginBottom: Spacing.lg },
   formLabel: {
     fontSize: FontSizes.md,
     fontWeight: '600',
@@ -563,26 +1145,97 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     fontSize: FontSizes.md,
   },
-  formTextArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
+  formHint: {
+    fontSize: FontSizes.sm,
+    marginTop: Spacing.xs,
   },
-  formRow: {
-    flexDirection: 'row',
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  locationPicker: {
     gap: Spacing.sm,
   },
-  categoryOption: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+  locationOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
   },
-  categoryOptionText: {
+  locationOptionLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  locationOptionDesc: {
     fontSize: FontSizes.sm,
-    fontWeight: '500',
+    marginTop: 2,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  toggleText: {
+    flex: 1,
+  },
+  toggleLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  toggleDesc: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  toggleSwitch: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Auth prompt */
+  authPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  authIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  authTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  authMessage: {
+    fontSize: FontSizes.md,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  authButton: {
+    backgroundColor: '#191919',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+  },
+  authLink: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
   },
 });

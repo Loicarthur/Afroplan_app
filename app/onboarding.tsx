@@ -12,11 +12,11 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
-  ImageBackground,
   FlatList,
   ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -26,45 +26,32 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
-  interpolate,
-  FadeIn,
-  FadeInUp,
 } from 'react-native-reanimated';
+import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
+
+const ONBOARDING_DONE_KEY = '@afroplan_onboarding_done';
 
 const { width, height } = Dimensions.get('window');
 
-// Données des slides onboarding
-const ONBOARDING_SLIDES = [
-  {
-    id: '1',
-    image: require('@/assets/images/afro_image1.jpg'),
-    title: 'Des coiffeurs passionnés',
-    subtitle: 'Spécialistes des cheveux afro près de chez toi',
-  },
-  {
-    id: '2',
-    image: require('@/assets/images/afro_image2.jpg'),
-    title: 'Trouve ton style parfait',
-    subtitle: 'Des centaines de coiffures afro à portée de main',
-  },
-  {
-    id: '3',
-    image: require('@/assets/images/afro_image3.jpg'),
-    title: 'Réserve en quelques clics',
-    subtitle: 'Simple, rapide et sans stress',
-  },
+// Images des slides onboarding
+const SLIDE_IMAGES = [
+  require('@/assets/images/afro_image1.jpg'),
+  require('@/assets/images/afro_image2.jpg'),
+  require('@/assets/images/afro_image3.jpg'),
 ];
 
 interface SlideProps {
-  item: typeof ONBOARDING_SLIDES[0];
-  index: number;
+  image: any;
+  title: string;
+  subtitle: string;
 }
 
-function Slide({ item, index }: SlideProps) {
+function Slide({ image, title, subtitle }: SlideProps) {
   return (
     <View style={styles.slide}>
       <Image
-        source={item.image}
+        source={image}
         style={styles.slideImage}
         contentFit="cover"
       />
@@ -87,8 +74,8 @@ function Slide({ item, index }: SlideProps) {
 
         {/* Texte en bas */}
         <View style={styles.textSection}>
-          <Text style={styles.slideTitle}>{item.title}</Text>
-          <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
+          <Text style={styles.slideTitle}>{title}</Text>
+          <Text style={styles.slideSubtitle}>{subtitle}</Text>
         </View>
       </View>
     </View>
@@ -108,9 +95,17 @@ function PaginationDot({ active }: { active: boolean }) {
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const pulseOpacity = useSharedValue(0.5);
+
+  // Build translated slides
+  const slides = [
+    { id: '1', image: SLIDE_IMAGES[0], title: t('onboarding.slide1Title'), subtitle: t('onboarding.slide1Subtitle') },
+    { id: '2', image: SLIDE_IMAGES[1], title: t('onboarding.slide2Title'), subtitle: t('onboarding.slide2Subtitle') },
+    { id: '3', image: SLIDE_IMAGES[2], title: t('onboarding.slide3Title'), subtitle: t('onboarding.slide3Subtitle') },
+  ];
 
   // Animation du texte "Touchez l'écran"
   useEffect(() => {
@@ -122,7 +117,7 @@ export default function OnboardingScreen() {
       -1,
       false
     );
-  }, []);
+  }, [pulseOpacity]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     opacity: pulseOpacity.value,
@@ -143,14 +138,13 @@ export default function OnboardingScreen() {
 
   // Navigation au touch
   const handlePress = () => {
-    if (currentIndex < ONBOARDING_SLIDES.length - 1) {
-      // Passer au slide suivant
+    if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
         animated: true,
       });
     } else {
-      // Dernier slide -> aller à la sélection de rôle
+      AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
       router.replace('/role-selection');
     }
   };
@@ -160,11 +154,16 @@ export default function OnboardingScreen() {
       <View style={styles.container}>
         <StatusBar style="light" />
 
+        {/* Language selector overlay */}
+        <View style={[styles.languageOverlay, { top: insets.top + 8 }]}>
+          <LanguageSelector compact />
+        </View>
+
         {/* Carousel */}
         <FlatList
           ref={flatListRef}
-          data={ONBOARDING_SLIDES}
-          renderItem={({ item, index }) => <Slide item={item} index={index} />}
+          data={slides}
+          renderItem={({ item }) => <Slide image={item.image} title={item.title} subtitle={item.subtitle} />}
           keyExtractor={(item) => item.id}
           horizontal
           pagingEnabled
@@ -176,7 +175,7 @@ export default function OnboardingScreen() {
 
         {/* Pagination dots */}
         <View style={[styles.pagination, { bottom: insets.bottom + 80 }]}>
-          {ONBOARDING_SLIDES.map((_, index) => (
+          {slides.map((_, index) => (
             <PaginationDot key={index} active={index === currentIndex} />
           ))}
         </View>
@@ -189,7 +188,7 @@ export default function OnboardingScreen() {
             pulseStyle
           ]}
         >
-          <Text style={styles.touchText}>Touchez l'écran pour continuer</Text>
+          <Text style={styles.touchText}>{t('onboarding.touchToContinue')}</Text>
         </Animated.View>
       </View>
     </TouchableWithoutFeedback>
@@ -287,5 +286,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '400',
+  },
+  languageOverlay: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 10,
   },
 });

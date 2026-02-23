@@ -240,7 +240,7 @@ export const clientService = {
         *,
         salon:salons(*),
         service:services(*),
-        coiffeur:profiles(*)
+        coiffeur:profiles!bookings_coiffeur_id_fkey(*)
       `, { count: 'exact' })
       .eq('client_id', userId)
       .order('booking_date', { ascending: false })

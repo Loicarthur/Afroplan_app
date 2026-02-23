@@ -20,7 +20,7 @@ export { favoriteService } from './favorite.service';
 export { reviewService } from './review.service';
 
 // Service de gestion des paiements
-export { paymentService, COMMISSION_RATES, SUBSCRIPTION_PLANS, BOOKING_DEPOSIT } from './payment.service';
+export { paymentService, COMMISSION_RATES, SUBSCRIPTION_PLANS, DEPOSIT_RATE } from './payment.service';
 export type { PaymentIntent, StripeAccount, SubscriptionPlan } from './payment.service';
 
 // Service de gestion des promotions

@@ -3,7 +3,7 @@
  * Design responsive amélioré
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button, Input } from '@/components/ui';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
 
 const SELECTED_ROLE_KEY = '@afroplan_selected_role';
@@ -44,6 +44,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -79,7 +80,8 @@ export default function LoginScreen() {
 
     try {
       await signIn(email, password);
-      // La redirection sera gérée après le chargement du profil
+      // Redirection directe vers la page d'accueil sans modal
+      redirectToApp();
     } catch (error) {
       Alert.alert(
         'Erreur de connexion',
@@ -88,27 +90,33 @@ export default function LoginScreen() {
     }
   };
 
-  // Rediriger après connexion en fonction du rôle du profil
-  useEffect(() => {
-    const handleRedirectAfterLogin = async () => {
-      if (profile?.role) {
-        // Utiliser le rôle du profil utilisateur
-        if (profile.role === 'coiffeur') {
-          router.replace('/(coiffeur)');
-        } else {
-          router.replace('/(tabs)');
-        }
-      }
-    };
+  const redirectToApp = useCallback(async () => {
+    if (hasRedirected.current) return;
+    hasRedirected.current = true;
 
-    handleRedirectAfterLogin();
-  }, [profile]);
+    // On respecte le mode choisi par l'utilisateur à l'écran (Espace Client ou Coiffeur)
+    const roleToUse = selectedRole;
+    
+    // Sauvegarder ce choix localement pour que l'app s'en souvienne
+    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
+
+    if (roleToUse === 'coiffeur') {
+      router.replace('/(coiffeur)');
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [selectedRole]);
+
+  // Rediriger quand le profil se charge après connexion
+  useEffect(() => {
+    if (profile?.role && hasRedirected.current === false) {
+      redirectToApp();
+    }
+  }, [profile, redirectToApp]);
 
   const isClient = selectedRole === 'client';
-  const roleColor = isClient ? '#191919' : '#191919';
-  const roleGradient = isClient
-    ? ['#191919', '#4A4A4A']
-    : ['#191919', '#4A4A4A'];
+  const roleColor = '#191919';
+  const roleGradient: [string, string] = ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -204,7 +212,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={isLoading}
               fullWidth
-              style={[styles.loginButton, { backgroundColor: roleColor }]}
+              style={{...styles.loginButton, backgroundColor: roleColor}}
             />
           </View>
 
@@ -227,28 +235,30 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-              onPress={() => Alert.alert('Info', 'Connexion Apple à venir')}
-            >
-              <Ionicons name="logo-apple" size={20} color={colors.text} />
-              <Text style={[styles.socialButtonText, { color: colors.text }]}>
-                Apple
-              </Text>
-            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                onPress={() => Alert.alert('Info', 'Connexion Apple à venir')}
+              >
+                <Ionicons name="logo-apple" size={20} color={colors.text} />
+                <Text style={[styles.socialButtonText, { color: colors.text }]}>
+                  Apple
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Register Link */}
           <View style={styles.registerContainer}>
             <Text style={[styles.registerText, { color: colors.textSecondary }]}>
-              Vous n'avez pas de compte?
+              Vous n&apos;avez pas de compte?
             </Text>
             <TouchableOpacity onPress={() => router.push({
               pathname: '/(auth)/register',
               params: { role: selectedRole }
             })}>
               <Text style={[styles.registerLink, { color: roleColor }]}>
-                {' '}S'inscrire
+                {' '}S&apos;inscrire
               </Text>
             </TouchableOpacity>
           </View>
@@ -265,6 +275,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
     </SafeAreaView>
   );
 }

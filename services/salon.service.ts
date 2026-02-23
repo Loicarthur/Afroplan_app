@@ -43,13 +43,14 @@ export const salonService = {
   async getSalons(
     page: number = 1,
     filters?: SalonFilters
-  ): Promise<PaginatedResponse<Salon>> {
+  ): Promise<PaginatedResponse<Salon & { min_price?: number }>> {
     checkSupabaseConfig();
+    
+    // On récupère les salons et leurs services actifs pour calculer le prix min
     let query = supabase
       .from('salons')
-      .select('*', { count: 'exact' })
-      .eq('is_active', true)
-      .order('rating', { ascending: false });
+      .select('*, services(price, is_active)', { count: 'exact' })
+      .eq('is_active', true);
 
     // Appliquer les filtres
     if (filters?.city) {
@@ -58,8 +59,8 @@ export const salonService = {
     if (filters?.minRating) {
       query = query.gte('rating', filters.minRating);
     }
-    if (filters?.isVerified) {
-      query = query.eq('is_verified', true);
+    if (filters?.isVerified !== undefined) {
+      query = query.eq('is_verified', filters.isVerified);
     }
     if (filters?.searchQuery) {
       query = query.or(
@@ -71,6 +72,7 @@ export const salonService = {
     const from = (page - 1) * SALONS_PER_PAGE;
     const to = from + SALONS_PER_PAGE - 1;
     query = query.range(from, to);
+    query = query.order('rating', { ascending: false });
 
     const { data, error, count } = await query;
 
@@ -78,11 +80,23 @@ export const salonService = {
       throw new Error(error.message);
     }
 
+    // Calculer le prix min pour chaque salon
+    const processedData = (data || []).map(salon => {
+      const allServices = (salon as any).services || [];
+      // On ne garde que les services vraiment actifs
+      const activeServices = allServices.filter((s: any) => s.is_active);
+      const prices = activeServices.map((s: any) => s.price).filter((p: any) => p != null);
+      const minPrice = prices.length > 0 ? Math.min(...prices) : undefined;
+      
+      const { services: _, ...salonData } = salon as any;
+      return { ...salonData, min_price: minPrice };
+    });
+
     const total = count || 0;
     const totalPages = Math.ceil(total / SALONS_PER_PAGE);
 
     return {
-      data: data || [],
+      data: processedData,
       total,
       page,
       totalPages,
@@ -128,7 +142,7 @@ export const salonService = {
       throw new Error(error.message);
     }
 
-    // Recuperer les services
+    // Recuperer les services (silencieux si vide)
     const { data: services } = await supabase
       .from('services')
       .select('*')
@@ -136,7 +150,7 @@ export const salonService = {
       .eq('is_active', true)
       .order('category', { ascending: true });
 
-    // Recuperer les categories
+    // Recuperer les categories (silencieux si vide)
     const { data: salonCategories } = await supabase
       .from('salon_categories')
       .select('category_id')
@@ -152,14 +166,14 @@ export const salonService = {
       categories = cats || [];
     }
 
-    // Recuperer la galerie
+    // Recuperer la galerie (silencieux si vide)
     const { data: gallery } = await supabase
       .from('gallery_images')
       .select('*')
       .eq('salon_id', id)
       .order('order', { ascending: true });
 
-    // Recuperer le proprietaire
+    // Recuperer le proprietaire (essentiel)
     const { data: owner } = await supabase
       .from('profiles')
       .select('*')
@@ -169,7 +183,7 @@ export const salonService = {
     return {
       ...salon,
       services: services || [],
-      categories,
+      categories: categories || [],
       gallery: gallery || [],
       owner: owner || undefined,
     };
@@ -292,7 +306,7 @@ export const salonService = {
 
     const { data: reviews, error, count } = await supabase
       .from('reviews')
-      .select('*, client:profiles(*)', { count: 'exact' })
+      .select('*, client:profiles!reviews_client_id_fkey(*)', { count: 'exact' })
       .eq('salon_id', salonId)
       .order('created_at', { ascending: false })
       .range(from, to);
@@ -661,6 +675,42 @@ export const salonService = {
     }
 
     return data;
+  },
+
+  /**
+   * Supprimer tous les services d'un salon (utile avant une mise a jour globale)
+   */
+  async deleteServicesBySalonId(salonId: string): Promise<void> {
+    const { error } = await supabase
+      .from('services')
+      .delete()
+      .eq('salon_id', salonId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Creer ou mettre a jour plusieurs services en une fois
+   */
+  async upsertServicesBatch(services: (ServiceInsert & {
+    service_location?: ServiceLocationType;
+    home_service_additional_fee?: number;
+    min_booking_notice_hours?: number;
+  })[]): Promise<Service[]> {
+    if (services.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('services')
+      .upsert(services, { onConflict: 'id' }) // Assurez-vous que 'id' est bien la clé primaire ou contrainte unique
+      .select();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
   },
 
   /**

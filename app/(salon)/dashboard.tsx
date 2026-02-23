@@ -16,13 +16,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { paymentService, SUBSCRIPTION_PLANS, SubscriptionPlan } from '@/services/payment.service';
+import { Colors, Shadows } from '@/constants/theme';
+import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '@/services/payment.service';
 
 const { width } = Dimensions.get('window');
 
@@ -56,7 +55,7 @@ export default function SalonDashboard() {
   const [balance, setBalance] = useState({ availableBalance: 0, currency: 'eur' });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>('free');
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
-  const [isStripeConnected, setIsStripeConnected] = useState(false);
+  const [, setIsStripeConnected] = useState(false);
 
   // Données de démonstration
   const mockStats: PaymentStats = {
@@ -100,10 +99,6 @@ export default function SalonDashboard() {
     },
   ];
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [period]);
-
   const loadDashboardData = async () => {
     // Pour le moment, utiliser les données de démo
     setStats(mockStats);
@@ -112,6 +107,11 @@ export default function SalonDashboard() {
     setCurrentPlan('free');
     setIsStripeConnected(true);
   };
+
+  useEffect(() => {
+    loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -123,23 +123,12 @@ export default function SalonDashboard() {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
   };
 
-  const handleConnectStripe = () => {
-    Alert.alert(
-      'Connecter Stripe',
-      'Vous allez être redirigé vers Stripe pour configurer vos paiements.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Continuer', onPress: () => console.log('Redirect to Stripe onboarding') },
-      ]
-    );
-  };
-
   const handleUpgradePlan = () => {
     router.push('/(salon)/subscription');
   };
 
   const handleViewPayments = () => {
-    router.push('/(salon)/payments');
+    router.push('/(salon)/payments' as any);
   };
 
   const handleWithdraw = () => {
@@ -254,7 +243,7 @@ export default function SalonDashboard() {
             {stats ? formatAmount(stats.totalRevenue) : '--'}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-            Chiffre d'affaires
+            Chiffre d&apos;affaires
           </Text>
         </View>
 
@@ -378,7 +367,7 @@ export default function SalonDashboard() {
         <View style={styles.actionsGrid}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/reservations')}
+            onPress={() => router.push('/(salon)/reservations' as any)}
           >
             <Ionicons name="calendar-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>
@@ -388,7 +377,7 @@ export default function SalonDashboard() {
 
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/services')}
+            onPress={() => router.push('/(salon)/services' as any)}
           >
             <Ionicons name="pricetag-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>
@@ -398,7 +387,7 @@ export default function SalonDashboard() {
 
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.card }, Shadows.sm]}
-            onPress={() => router.push('/(salon)/reviews')}
+            onPress={() => router.push('/(salon)/reviews' as any)}
           >
             <Ionicons name="star-outline" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text }]}>

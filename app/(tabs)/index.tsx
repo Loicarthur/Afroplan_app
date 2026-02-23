@@ -1,6 +1,6 @@
 /**
  * Page d'accueil AfroPlan - Client
- * Enrichie avec flow de recherche, promotions, et plus de contenu
+ * Enrichie avec flow de recherche et plus de contenu
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
@@ -18,57 +18,38 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Colors } from '@/constants/theme';
+import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
+import LanguageSelector from '@/components/LanguageSelector';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
 
 /* -------------------- Données mock -------------------- */
 
-// Tous les styles de coiffure
-const ALL_STYLES = [
-  { id: '1', name: 'Tresses', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: '2', name: 'Twists', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: '3', name: 'Natural', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: '4', name: 'Locs', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-  { id: '5', name: 'Weave', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200' },
-  { id: '6', name: 'Braids', image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200' },
-  { id: '7', name: 'Cornrows', image: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?w=200' },
-  { id: '8', name: 'Afro', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200' },
-];
+// Catégories de styles de coiffure (depuis la source unique)
+const ALL_STYLES = HAIRSTYLE_CATEGORIES.map((cat) => ({
+  id: cat.id,
+  name: cat.title,
+  emoji: cat.emoji,
+  color: cat.color,
+  // use first sub-style image as preview
+  image: cat.styles[0]?.image,
+  firstStyleId: cat.styles[0]?.id,
+}));
 
-// Promotions
-const PROMOTIONS = [
-  {
-    id: '1',
-    title: '-20% sur les tresses',
-    subtitle: 'Valable ce weekend',
-    salon: 'Bella Coiffure',
-    color: '#7C3AED',
-  },
-  {
-    id: '2',
-    title: 'Première visite offerte',
-    subtitle: 'Consultation gratuite',
-    salon: 'Afro Style Studio',
-    color: '#22C55E',
-  },
-  {
-    id: '3',
-    title: '-15% pour les étudiants',
-    subtitle: 'Sur présentation carte',
-    salon: 'Natural Beauty',
-    color: '#F59E0B',
-  },
-];
 
 // Coiffeurs à proximité
 const NEARBY_COIFFEURS = [
@@ -79,18 +60,18 @@ const NEARBY_COIFFEURS = [
     rating: 4.9,
     reviews: 127,
     distance: '0.8 km',
-    image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200',
+    image: require('@/assets/images/Tissage.jpg'),
     available: true,
     price: 'À partir de 45€',
   },
   {
     id: '2',
     name: 'Fatou Diallo',
-    specialty: 'Twists & Locs',
+    specialty: 'Twists & Locks',
     rating: 4.8,
     reviews: 89,
     distance: '1.2 km',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=200',
+    image: require('@/assets/images/Vanille.jpg'),
     available: true,
     price: 'À partir de 35€',
   },
@@ -101,7 +82,7 @@ const NEARBY_COIFFEURS = [
     rating: 4.7,
     reviews: 64,
     distance: '2.1 km',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200',
+    image: require('@/assets/images/Wash_and_Go.jpg'),
     available: false,
     price: 'À partir de 30€',
   },
@@ -116,18 +97,18 @@ const POPULAR_SALONS = [
     priceRange: '30€ - 150€',
     rating: 4.9,
     reviews: 234,
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/Box_Braids.jpg'),
     location: 'Paris 18e',
     openNow: true,
   },
   {
     id: '2',
     name: 'Afro Style Studio',
-    services: ['Locs', 'Coupe homme', 'Entretien'],
+    services: ['Locks', 'Coupe homme', 'Entretien'],
     priceRange: '20€ - 100€',
     rating: 4.8,
     reviews: 156,
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    image: require('@/assets/images/Fausse_Locks.jpg'),
     location: 'Paris 11e',
     openNow: true,
   },
@@ -138,7 +119,7 @@ const POPULAR_SALONS = [
     priceRange: '25€ - 80€',
     rating: 4.7,
     reviews: 98,
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/Soin.jpg'),
     location: 'Paris 10e',
     openNow: false,
   },
@@ -150,28 +131,28 @@ const TIPS_AND_INSPIRATION = [
     id: '1',
     title: 'Comment entretenir ses tresses ?',
     category: 'Conseils',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400',
+    image: require('@/assets/images/afro_image1.jpg'),
     readTime: '3 min',
   },
   {
     id: '2',
     title: 'Les tendances coiffures 2024',
     category: 'Tendances',
-    image: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400',
+    image: require('@/assets/images/afro_image2.jpg'),
     readTime: '5 min',
   },
   {
     id: '3',
     title: 'Routine capillaire cheveux crépus',
     category: 'Tutoriel',
-    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400',
+    image: require('@/assets/images/afro_image3.jpg'),
     readTime: '4 min',
   },
 ];
 
 /* -------------------- Composants -------------------- */
 
-function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeAll?: () => void; seeAllLabel?: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -180,7 +161,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll}>
-          <Text style={[styles.seeAll, { color: '#191919' }]}>Voir tout</Text>
+          <Text style={[styles.seeAll, { color: '#191919' }]}>{seeAllLabel ?? 'Voir tout'}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -192,11 +173,38 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated, profile } = useAuth();
+  const { isAuthenticated, profile, user } = useAuth();
+  const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
+  const { t, language } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [activeBookingsCount, setActiveBookingsCount] = useState(0);
+
+  const fetchActiveBookingsCount = React.useCallback(async () => {
+    if (isAuthenticated && user) {
+      try {
+        const { bookingService } = await import('@/services/booking.service');
+        const response = await bookingService.getClientBookings(user.id);
+        const count = response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
+        setActiveBookingsCount(count);
+      } catch (e) {
+        setActiveBookingsCount(0);
+      }
+    }
+  }, [isAuthenticated, user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchActiveBookingsCount();
+    }, [fetchActiveBookingsCount])
+  );
+
+  const handleSwitchToCoiffeur = async () => {
+    await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur');
+    router.replace('/(coiffeur)');
+  };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -208,11 +216,20 @@ export default function HomeScreen() {
   };
 
   const handleSearch = (filters: any) => {
-    console.log('Search filters:', filters);
-    router.push('/(tabs)/explore');
+    // Appliquer les filtres de recherche
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { 
+        category: filters.hairstyle,
+        budget: filters.maxBudget,
+        distance: filters.maxDistance,
+        location: filters.location,
+        showAll: filters.showAll ? 'true' : 'false'
+      }
+    });
   };
 
-  const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 4);
+  const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -246,32 +263,41 @@ export default function HomeScreen() {
               />
             </View>
 
-            {/* Boutons Inscription/Connexion à droite */}
+            {/* Boutons à droite */}
             {!isAuthenticated ? (
               <View style={styles.authButtons}>
+                <LanguageSelector compact />
+                <TouchableOpacity
+                  style={styles.switchRoleButton}
+                  onPress={handleSwitchToCoiffeur}
+                >
+                  <Ionicons name="swap-horizontal" size={16} color="#191919" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.registerButton}
                   onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'client' } })}
                 >
-                  <Text style={styles.registerButtonText}>Inscription</Text>
+                  <Text style={styles.registerButtonText}>{t('auth.register')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.loginButton}
                   onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}
                 >
-                  <Text style={styles.loginButtonText}>Connexion</Text>
+                  <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.authButtons}>
                 <TouchableOpacity
                   style={[styles.notificationButton, { backgroundColor: colors.card }]}
-                  onPress={() => router.push('/(tabs)/bookings')}
+                  onPress={() => router.push('/(tabs)/reservations')}
                 >
                   <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>1</Text>
-                  </View>
+                  {activeBookingsCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>{activeBookingsCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]}>
                   <Ionicons name="notifications-outline" size={24} color={colors.text} />
@@ -284,10 +310,10 @@ export default function HomeScreen() {
           {isAuthenticated && profile && (
             <View style={styles.welcomeMessage}>
               <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-                Bonjour {profile.full_name?.split(' ')[0] || 'toi'} 👋
+                {language === 'fr' ? 'Bonjour' : 'Hello'} {profile.full_name?.split(' ')[0] || 'toi'} 👋
               </Text>
               <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                Prêt(e) pour une nouvelle coiffure ?
+                {language === 'fr' ? 'Prêt(e) pour une nouvelle coiffure ?' : 'Ready for a new hairstyle?'}
               </Text>
             </View>
           )}
@@ -307,38 +333,14 @@ export default function HomeScreen() {
                 <Ionicons name="search" size={24} color="#FFFFFF" />
               </View>
               <View style={styles.searchTextContainer}>
-                <Text style={styles.searchButtonTitle}>Rechercher mon salon / coiffeur</Text>
-                <Text style={styles.searchButtonSubtitle}>Trouve le style qui te correspond</Text>
+                <Text style={styles.searchButtonTitle}>{t('home.searchSalon')}</Text>
+                <Text style={styles.searchButtonSubtitle}>{t('home.searchSubtitle')}</Text>
               </View>
             </View>
             <Ionicons name="arrow-forward-circle" size={32} color="#191919" />
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ---------------- Promotions ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(300).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader title="Offres du moment" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {PROMOTIONS.map((promo) => (
-              <TouchableOpacity
-                key={promo.id}
-                style={[styles.promoCard, { backgroundColor: promo.color }]}
-              >
-                <Ionicons name="pricetag" size={20} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.promoTitle}>{promo.title}</Text>
-                <Text style={styles.promoSubtitle}>{promo.subtitle}</Text>
-                <Text style={styles.promoSalon}>{promo.salon}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
 
         {/* ---------------- Quick Categories ---------------- */}
         <Animated.View
@@ -346,31 +348,33 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <SectionHeader
-            title="Styles de coiffure"
+            title={t('home.hairstyles')}
             onSeeAll={() => setShowAllStyles(!showAllStyles)}
+            seeAllLabel={showAllStyles ? (language === 'fr' ? 'Voir moins' : 'See less') : t('common.seeAll')}
           />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
               <TouchableOpacity
                 key={style.id}
                 style={styles.styleCard}
-                onPress={() => router.push('/(tabs)/explore')}
+                onPress={() => {
+                  if (style.firstStyleId) {
+                    router.push({
+                      pathname: '/style-salons/[styleId]',
+                      params: { styleId: style.firstStyleId, styleName: style.name },
+                    });
+                  } else {
+                    router.push('/(tabs)/explore');
+                  }
+                }}
               >
-                <Image source={{ uri: style.image }} style={styles.styleImage} contentFit="cover" />
-                <View style={styles.styleOverlay}>
-                  <Text style={styles.styleName}>{style.name}</Text>
+                <Image source={style.image} style={styles.styleImage} contentFit="cover" />
+                <View style={[styles.styleOverlay, { backgroundColor: (style.color ?? '#191919') + '99' }]}>
+                  <Text style={styles.styleName} numberOfLines={2}>{style.name}</Text>
                 </View>
               </TouchableOpacity>
             ))}
           </View>
-          {showAllStyles && (
-            <TouchableOpacity
-              style={styles.showLessButton}
-              onPress={() => setShowAllStyles(false)}
-            >
-              <Text style={[styles.showLessText, { color: '#191919' }]}>Voir moins</Text>
-            </TouchableOpacity>
-          )}
         </Animated.View>
 
         {/* ---------------- Coiffeurs à proximité ---------------- */}
@@ -378,7 +382,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(400).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Coiffeurs à proximité" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -388,20 +392,20 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={coiffeur.id}
                 style={[styles.coiffeurCard, { backgroundColor: colors.card }]}
-                onPress={() => router.push(`/salon/${coiffeur.id}`)}
+                onPress={() => requireAuth(() => router.push(`/salon/${coiffeur.id}`))}
               >
                 <View style={styles.coiffeurImageContainer}>
-                  <Image source={{ uri: coiffeur.image }} style={styles.coiffeurImage} contentFit="cover" />
+                  <Image source={coiffeur.image} style={styles.coiffeurImage} contentFit="cover" />
                   {coiffeur.available && (
                     <View style={styles.availableBadge}>
-                      <Text style={styles.availableText}>Dispo</Text>
+                      <Text style={styles.availableText}>{language === 'fr' ? 'Dispo' : 'Available'}</Text>
                     </View>
                   )}
                 </View>
                 <View style={styles.coiffeurInfo}>
                   <Text style={[styles.coiffeurName, { color: colors.text }]}>{coiffeur.name}</Text>
                   <Text style={[styles.coiffeurSpecialty, { color: colors.textSecondary }]}>{coiffeur.specialty}</Text>
-                  <Text style={[styles.coiffeurPrice, { color: '#7C3AED' }]}>{coiffeur.price}</Text>
+                  <Text style={[styles.coiffeurPrice, { color: '#7C3AED' }]}>{language === 'fr' ? 'À partir de' : 'From'} {coiffeur.price.replace('À partir de ', '')}</Text>
                   <View style={styles.coiffeurMeta}>
                     <View style={styles.ratingContainer}>
                       <Ionicons name="star" size={12} color="#F59E0B" />
@@ -424,20 +428,20 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(450).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Salons populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
           {POPULAR_SALONS.map((salon) => (
             <TouchableOpacity
               key={salon.id}
               style={[styles.salonCard, { backgroundColor: colors.card }]}
-              onPress={() => router.push(`/salon/${salon.id}`)}
+              onPress={() => requireAuth(() => router.push(`/salon/${salon.id}`))}
             >
-              <Image source={{ uri: salon.image }} style={styles.salonImage} contentFit="cover" />
+              <Image source={salon.image} style={styles.salonImage} contentFit="cover" />
               <View style={styles.salonInfo}>
                 <View style={styles.salonHeader}>
                   <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
                   {salon.openNow && (
                     <View style={styles.openBadge}>
-                      <Text style={styles.openBadgeText}>Ouvert</Text>
+                      <Text style={styles.openBadgeText}>{language === 'fr' ? 'Ouvert' : 'Open'}</Text>
                     </View>
                   )}
                 </View>
@@ -465,7 +469,7 @@ export default function HomeScreen() {
           entering={FadeInUp.delay(500).duration(500)}
           style={styles.section}
         >
-          <SectionHeader title="Conseils & Inspiration" />
+          <SectionHeader title={t('home.tipsAndInspiration')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -473,7 +477,7 @@ export default function HomeScreen() {
           >
             {TIPS_AND_INSPIRATION.map((tip) => (
               <TouchableOpacity key={tip.id} style={styles.tipCard}>
-                <Image source={{ uri: tip.image }} style={styles.tipImage} contentFit="cover" />
+                <Image source={tip.image} style={styles.tipImage} contentFit="cover" />
                 <View style={styles.tipOverlay}>
                   <View style={styles.tipCategoryBadge}>
                     <Text style={styles.tipCategoryText}>{tip.category}</Text>
@@ -499,15 +503,15 @@ export default function HomeScreen() {
           <View style={styles.ctaCard}>
             <View style={styles.ctaContent}>
               <Ionicons name="cut" size={32} color="#FFFFFF" />
-              <Text style={styles.ctaTitle}>Tu es coiffeur(se) ?</Text>
+              <Text style={styles.ctaTitle}>{t('home.areYouCoiffeur')}</Text>
               <Text style={styles.ctaSubtitle}>
-                Rejoins AfroPlan Pro et développe ton activité
+                {t('home.joinAfroPlanPro')}
               </Text>
               <TouchableOpacity
                 style={styles.ctaButton}
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
               >
-                <Text style={styles.ctaButtonText}>Découvrir AfroPlan Pro</Text>
+                <Text style={styles.ctaButtonText}>{t('home.discoverPro')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#191919" />
               </TouchableOpacity>
             </View>
@@ -543,12 +547,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => openLink('https://tiktok.com/@afroplan')}
-              >
-                <Ionicons name="logo-tiktok" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
                 onPress={() => openLink('https://www.linkedin.com/company/afro-plan/')}
               >
                 <Ionicons name="logo-linkedin" size={20} color="#FFFFFF" />
@@ -563,6 +561,13 @@ export default function HomeScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Auth Guard Modal */}
+      <AuthGuardModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        message="Connectez-vous pour voir les détails du salon et réserver"
+      />
     </SafeAreaView>
   );
 }
@@ -611,7 +616,16 @@ const styles = StyleSheet.create({
   },
   authButtons: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
+  },
+  switchRoleButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   registerButton: {
     backgroundColor: '#f9f8f8',
@@ -747,33 +761,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Promotions
+  // Horizontal scroll
   horizontalScroll: {
     paddingRight: 16,
     gap: 12,
   },
-  promoCard: {
-    width: 180,
-    padding: 16,
-    borderRadius: 16,
-  },
-  promoTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 12,
-  },
-  promoSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 4,
-  },
-  promoSalon: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 8,
-  },
-
   // Styles grid
   stylesGrid: {
     flexDirection: 'row',
@@ -781,8 +773,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   styleCard: {
-    width: (width - 44) / 2,
-    height: 100,
+    width: (width - 56) / 3,
+    height: 110,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -792,14 +784,18 @@ const styles = StyleSheet.create({
   },
   styleOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(25, 25, 25, 0.4)',
     justifyContent: 'flex-end',
-    padding: 12,
+    padding: 10,
+  },
+  styleEmoji: {
+    fontSize: 18,
+    marginBottom: 2,
   },
   styleName: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   showLessButton: {
     alignItems: 'center',

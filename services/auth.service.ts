@@ -131,8 +131,8 @@ const validateSignUpParams = (params: SignUpParams): ValidationResult => {
   const phoneError = validatePhone(params.phone);
   if (phoneError) errors.phone = phoneError;
 
-  if (params.role && !['client', 'coiffeur'].includes(params.role)) {
-    errors.role = 'Le role doit etre "client" ou "coiffeur"';
+  if (params.role && !['client', 'coiffeur', 'admin'].includes(params.role)) {
+    errors.role = 'Le role doit etre "client", "coiffeur" ou "admin"';
   }
 
   return {
@@ -227,12 +227,46 @@ export const authService = {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return null;
+        // Profil introuvable - tenter de le créer depuis les métadonnées auth
+        return this.createMissingProfile(userId);
       }
       throw new Error(error.message);
     }
 
     return data;
+  },
+
+  /**
+   * Crée un profil manquant à partir des métadonnées de l'utilisateur auth.
+   * Cas de récupération si le trigger handle_new_user n'a pas fonctionné.
+   */
+  async createMissingProfile(userId: string): Promise<Profile | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const meta = user.user_metadata || {};
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: user.email || '',
+          full_name: meta.full_name || '',
+          phone: meta.phone || null,
+          role: meta.role || 'client',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (__DEV__) console.warn('Impossible de créer le profil manquant:', error.message);
+        return null;
+      }
+
+      return data;
+    } catch {
+      return null;
+    }
   },
 
   /**
