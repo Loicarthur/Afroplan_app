@@ -40,7 +40,7 @@ export default function CoiffeurLayout() {
       <Tabs.Screen
         name="salon"
         options={{
-          title: 'Mon Salon',
+          title: 'Ma Vitrine',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="storefront-outline" size={size} color={color} />
           ),
@@ -68,6 +68,7 @@ export default function CoiffeurLayout() {
         name="services"
         options={{
           title: 'Services',
+          href: null, // Masquer du menu tab
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cut-outline" size={size} color={color} />
           ),
