@@ -809,6 +809,51 @@ export default function CoiffeurDashboard() {
                           </TouchableOpacity>
                         </View>
                       </View>
+
+                      {/* Boost & Promotions Section */}
+                      <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="flash" size={22} color="#F59E0B" />
+                            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
+                              Boost & Promotions
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+                          Attirez plus de clients pendant vos heures creuses.
+                        </Text>
+                        
+                        <View style={{ gap: 12 }}>
+                          <TouchableOpacity 
+                            style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#F59E0B10', borderRadius: 16, borderWidth: 1, borderColor: '#F59E0B30' }}
+                            onPress={() => Alert.alert('Promotion Flash', 'Votre promotion de -15% est activée pour les 4 prochaines heures !')}
+                          >
+                            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                              <Ionicons name="pricetag" size={20} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>Créer une Promo Flash</Text>
+                              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>Ex: -15% sur les 3 prochains RDV</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                          </TouchableOpacity>
+
+                          <TouchableOpacity 
+                            style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#EC489910', borderRadius: 16, borderWidth: 1, borderColor: '#EC489930' }}
+                            onPress={() => Alert.alert('Top Position', 'Votre salon apparaîtra en haut des résultats pendant 24h.')}
+                          >
+                            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#EC4899', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                              <Ionicons name="rocket" size={20} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>Sponsoriser mon salon</Text>
+                              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>Apparaître en 1ère position</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
               
                       {/* Gestion Section */}
                       <View style={styles.section}>
