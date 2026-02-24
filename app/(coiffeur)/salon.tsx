@@ -80,6 +80,8 @@ export default function SalonManagementScreen() {
   const [isPublished, setIsPublished] = useState(false);
   const [existingSalonId, setExistingSalonId] = useState<string | null>(null);
   const [servicesCount, setServicesCount] = useState<number | null>(null);
+  // Aperçu des services configurés (affiché dans la section salon)
+  const [servicesSummary, setServicesSummary] = useState<{ name: string; price: number }[]>([]);
 
   // Informations du salon
   const [salonName, setSalonName] = useState('');
@@ -145,10 +147,14 @@ export default function SalonManagementScreen() {
             setOpeningHours(salon.opening_hours as unknown as OpeningHours);
           }
 
-          // Vérifier si des services sont configurés
+          // Charger les services configurés (résumé + compteur)
           try {
             const services = await salonService.getSalonServices(salon.id);
-            setServicesCount(services?.length || 0);
+            const count = services?.length || 0;
+            setServicesCount(count);
+            setServicesSummary(
+              (services || []).slice(0, 3).map((s) => ({ name: s.name, price: s.price }))
+            );
           } catch (e) {
             setServicesCount(0);
           }
@@ -374,6 +380,8 @@ export default function SalonManagementScreen() {
         is_active: isPublished,
       };
 
+      const isNewSalon = !existingSalonId;
+
       if (existingSalonId) {
         await salonService.updateSalon(existingSalonId, salonPayload as any);
       } else {
@@ -384,20 +392,22 @@ export default function SalonManagementScreen() {
         setExistingSalonId(newSalon.id);
       }
 
-      Alert.alert(
-        'Salon enregistré !',
-        'Votre vitrine est prête. Prochaine étape : définissez vos tarifs pour être visible des clients.',
-        [
-          { 
-            text: 'Plus tard', 
-            style: 'cancel' 
-          },
-          { 
-            text: 'Configurer mes tarifs', 
-            onPress: () => router.push('/(coiffeur)/services') 
-          }
-        ]
-      );
+      if (isNewSalon) {
+        // Flux d'onboarding : après la création du salon, aller directement configurer les services
+        Alert.alert(
+          '✓ Salon créé !',
+          'Super ! Maintenant ajoutez vos prestations et tarifs pour que les clients puissent réserver.',
+          [
+            {
+              text: 'Ajouter mes prestations →',
+              onPress: () => router.push({ pathname: '/(coiffeur)/services', params: { from: 'salon' } }),
+            },
+          ]
+        );
+      } else {
+        // Mise à jour d'un salon existant
+        Alert.alert('Salon mis à jour', 'Vos modifications ont été enregistrées.');
+      }
     } catch (err: any) {
       const errorMessage = err?.message || t('common.errorOccurred');
       Alert.alert(t('common.error'), errorMessage);
@@ -500,26 +510,6 @@ export default function SalonManagementScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Bandeau d'alerte si services manquants */}
-        {servicesCount === 0 && (
-          <View style={[styles.warningBanner, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
-            <Ionicons name="warning" size={22} color="#DC2626" />
-            <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>Action requise</Text>
-              <Text style={styles.warningText}>
-                Vous devez configurer vos tarifs dans l&apos;onglet &quot;Services&quot; pour pouvoir être visible.
-              </Text>
-              <TouchableOpacity 
-                style={styles.warningButton}
-                onPress={() => router.push('/(coiffeur)/services')}
-              >
-                <Text style={styles.warningButtonText}>Configurer mes services</Text>
-                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
         {/* Section Médias du salon */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Photo de face professionnelle</Text>
@@ -863,6 +853,82 @@ export default function SalonManagementScreen() {
           )}
         </View>
 
+        {/* ── MES PRESTATIONS — Section intégrée au salon ── */}
+        <View style={styles.section}>
+          <View style={styles.servicesSectionHeader}>
+            <View>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Mes Prestations</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+                {servicesCount === null
+                  ? 'Chargement...'
+                  : servicesCount === 0
+                  ? 'Aucune prestation configurée — requis pour publier'
+                  : `${servicesCount} prestation${servicesCount > 1 ? 's' : ''} configurée${servicesCount > 1 ? 's' : ''}`}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.manageServicesBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/(coiffeur)/services')}
+            >
+              <Ionicons name={servicesCount === 0 ? 'add' : 'pencil'} size={16} color="#FFF" />
+              <Text style={styles.manageServicesBtnText}>
+                {servicesCount === 0 ? 'Ajouter' : 'Gérer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Aperçu des 3 premières prestations */}
+          {servicesSummary.length > 0 ? (
+            <View style={[styles.servicesPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {servicesSummary.map((s, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.servicePreviewRow,
+                    i < servicesSummary.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                  ]}
+                >
+                  <View style={[styles.servicePreviewDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.servicePreviewName, { color: colors.text }]} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  <Text style={[styles.servicePreviewPrice, { color: colors.primary }]}>
+                    {s.price} €
+                  </Text>
+                </View>
+              ))}
+              {(servicesCount ?? 0) > 3 && (
+                <TouchableOpacity
+                  style={styles.servicePreviewMore}
+                  onPress={() => router.push('/(coiffeur)/services')}
+                >
+                  <Text style={[styles.servicePreviewMoreText, { color: colors.primary }]}>
+                    + {(servicesCount ?? 0) - 3} autre{(servicesCount ?? 0) - 3 > 1 ? 's' : ''} prestation{(servicesCount ?? 0) - 3 > 1 ? 's' : ''}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            /* CTA si aucun service */
+            <TouchableOpacity
+              style={[styles.noServiceCTA, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
+              onPress={() => router.push('/(coiffeur)/services')}
+            >
+              <Ionicons name="cut-outline" size={28} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.noServiceCTATitle, { color: colors.text }]}>
+                  Configurez vos tarifs
+                </Text>
+                <Text style={[styles.noServiceCTADesc, { color: colors.textSecondary }]}>
+                  Ajoutez vos prestations (tresses, locks, soins...) avec prix et durée. Obligatoire pour être réservé.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Statut de publication */}
         {isPublished && (
           <View style={[styles.publishedBanner, { backgroundColor: '#F0FDF4' }]}>
@@ -1184,45 +1250,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     marginTop: Spacing.lg,
   },
-  /* Warning Banner */
-  warningBanner: {
-    flexDirection: 'row',
-    margin: Spacing.md,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'flex-start',
-  },
-  warningContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  warningTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#DC2626',
-    marginBottom: 4,
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#4B5563',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  warningButton: {
-    backgroundColor: '#DC2626',
+  /* Section Services intégrée */
+  servicesSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  manageServicesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: BorderRadius.md,
     gap: 6,
   },
-  warningButtonText: {
+  manageServicesBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+  },
+  servicesPreview: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  servicePreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  servicePreviewDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  servicePreviewName: {
+    flex: 1,
+    fontSize: FontSizes.md,
+    fontWeight: '500',
+  },
+  servicePreviewPrice: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+  servicePreviewMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 4,
+  },
+  servicePreviewMoreText: {
+    fontSize: FontSizes.sm,
     fontWeight: '600',
+  },
+  noServiceCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.md,
+  },
+  noServiceCTATitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  noServiceCTADesc: {
+    fontSize: FontSizes.sm,
+    lineHeight: 18,
   },
 
   /* Auth Prompt */

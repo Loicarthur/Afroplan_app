@@ -23,6 +23,8 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as base64js from 'base64-js';
 
+import { useLocalSearchParams } from 'expo-router';
+
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -83,6 +85,9 @@ export default function CoiffeurServicesScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, user } = useAuth();
   const { language } = useLanguage();
+  // Détecter si on vient du flux création de salon (pour afficher le bouton retour)
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const comingFromSalon = from === 'salon';
 
   // Styles sélectionnés et configurés
   const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
@@ -424,6 +429,20 @@ export default function CoiffeurServicesScreen() {
   // ─── RENDU PRINCIPAL ───────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+
+      {/* Bandeau contextuel : flux création salon */}
+      {comingFromSalon && (
+        <TouchableOpacity
+          style={[styles.backToSalonBanner, { backgroundColor: colors.primary + '12', borderBottomColor: colors.primary + '30' }]}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={18} color={colors.primary} />
+          <Text style={[styles.backToSalonText, { color: colors.primary }]}>
+            Étape 2 / 2 — Configurez vos prestations puis revenez publier votre salon
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Tabs */}
       <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
@@ -1193,6 +1212,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Bandeau retour salon */
+  backToSalonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  backToSalonText: {
+    flex: 1,
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    lineHeight: 18,
   },
 
   /* Auth prompt */
