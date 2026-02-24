@@ -104,6 +104,10 @@ export default function SalonManagementScreen() {
   const [serviceLocationType, setServiceLocationType] = useState<SalonLocationType>('salon');
   const [homeServiceFee, setHomeServiceFee] = useState('');
 
+  // Politique d'annulation (No-Show)
+  const [requireDeposit, setRequireDeposit] = useState(false);
+  const [depositPercentage, setDepositPercentage] = useState('20');
+
   // Email par defaut (celui de l'inscription)
   const email = user?.email || '';
 
@@ -861,6 +865,56 @@ export default function SalonManagementScreen() {
               />
             </View>
           )}
+        </View>
+
+        {/* Politique de réservation & Acomptes */}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Politique de Réservation</Text>
+            <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#F59E0B' }}>PRO</Text>
+            </View>
+          </View>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            Protégez-vous contre les absences en exigeant un acompte.
+          </Text>
+
+          <View style={[styles.inputGroup, { backgroundColor: colors.card, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={{ fontSize: FontSizes.md, fontWeight: '600', color: colors.text }}>Exiger un acompte</Text>
+                <Text style={{ fontSize: FontSizes.sm, color: colors.textSecondary, marginTop: 4 }}>
+                  Les clients devront payer une partie de la prestation pour valider leur rendez-vous.
+                </Text>
+              </View>
+              {/* @ts-ignore - Switch import will be added if missing, but typically it is available or we can use a custom toggle. We'll use a standard switch */}
+              <TouchableOpacity 
+                style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: requireDeposit ? colors.primary : colors.border, justifyContent: 'center', padding: 2 }}
+                onPress={() => setRequireDeposit(!requireDeposit)}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF', alignSelf: requireDeposit ? 'flex-end' : 'flex-start' }} />
+              </TouchableOpacity>
+            </View>
+
+            {requireDeposit && (
+              <View style={{ marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Pourcentage de l'acompte (%)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                    placeholder="20"
+                    placeholderTextColor={colors.textMuted}
+                    value={depositPercentage}
+                    onChangeText={setDepositPercentage}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text style={{ marginLeft: 10, fontSize: FontSizes.md, fontWeight: '600', color: colors.textSecondary }}>% du total</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Statut de publication */}
