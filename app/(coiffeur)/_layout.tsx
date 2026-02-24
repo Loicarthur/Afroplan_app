@@ -1,13 +1,22 @@
 /**
  * Layout pour l'espace coiffeur AfroPlan
- * Navigation optimisée : 5 onglets max, badge réservations, responsive
+ * Navigation optimisée : 5 onglets métier, badge réservations, responsive
+ *
+ * Tab bar (ordre métier) :
+ *  ① Accueil   — Dashboard + agenda du jour
+ *  ② Agenda    — Toutes les réservations (badge en attente)
+ *  ③ Services  — Ce que tu proposes aux clients (tarifs, durées)
+ *  ④ Portfolio — Tes réalisations
+ *  ⑤ Profil   — Infos perso + accès Mon Salon (config une fois)
+ *
+ *  Mon Salon → accessible depuis Profil > "Mon Salon"
+ *  Messages  → accessible depuis Dashboard > Raccourcis
  */
 
 import { useState, useEffect } from 'react';
 import { Platform, Dimensions } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
 import React from 'react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -25,20 +34,18 @@ export default function CoiffeurLayout() {
   const { user, isAuthenticated } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Charger le nombre de réservations en attente pour le badge
+  // Badge : nombre de réservations en attente de confirmation
   const loadPendingCount = async () => {
     if (!user || !isAuthenticated) return;
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
         const response = await bookingService.getSalonBookings(salon.id);
-        const pending = response.data.filter(
-          (b) => b.status === 'pending'
-        ).length;
+        const pending = response.data.filter((b) => b.status === 'pending').length;
         setPendingCount(pending);
       }
     } catch {
-      // Silencieux : pas bloquant
+      // Non bloquant
     }
   };
 
@@ -64,9 +71,7 @@ export default function CoiffeurLayout() {
           fontWeight: '600',
           marginTop: 2,
         },
-        headerStyle: {
-          backgroundColor: colors.card,
-        },
+        headerStyle: { backgroundColor: colors.card },
         headerTintColor: colors.text,
         headerShadowVisible: false,
       }}
@@ -82,7 +87,7 @@ export default function CoiffeurLayout() {
         }}
       />
 
-      {/* ② Réservations — avec badge en attente */}
+      {/* ② Agenda / Réservations — badge rouge si réservations en attente */}
       <Tabs.Screen
         name="reservations"
         options={{
@@ -99,18 +104,18 @@ export default function CoiffeurLayout() {
         }}
       />
 
-      {/* ③ Mon Salon + Services (regroupés) */}
+      {/* ③ Services — tes prestations et tarifs proposés aux clients */}
       <Tabs.Screen
-        name="salon"
+        name="services"
         options={{
-          title: 'Mon Salon',
+          title: 'Services',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="storefront-outline" size={size} color={color} />
+            <Ionicons name="cut-outline" size={size} color={color} />
           ),
         }}
       />
 
-      {/* ④ Portfolio */}
+      {/* ④ Portfolio — tes réalisations */}
       <Tabs.Screen
         name="portfolio"
         options={{
@@ -121,7 +126,7 @@ export default function CoiffeurLayout() {
         }}
       />
 
-      {/* ⑤ Profil */}
+      {/* ⑤ Profil — infos + accès Mon Salon */}
       <Tabs.Screen
         name="profil"
         options={{
@@ -133,15 +138,12 @@ export default function CoiffeurLayout() {
         }}
       />
 
-      {/* Onglets cachés de la tab bar — accessibles par navigation directe */}
+      {/* Pages hors tab bar — accessibles par navigation directe */}
       <Tabs.Screen
-        name="services"
+        name="salon"
         options={{
-          title: 'Mes Services',
-          href: null, // Caché de la tab bar, accessible via Dashboard ou Profil
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cut-outline" size={size} color={color} />
-          ),
+          title: 'Mon Salon',
+          href: null, // Accessible depuis Profil > "Mon Salon"
         }}
       />
       <Tabs.Screen

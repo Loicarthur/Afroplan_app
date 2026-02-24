@@ -780,16 +780,16 @@ export default function CoiffeurDashboard() {
                           Raccourcis
                         </Text>
                         <View style={styles.quickActions}>
-                          {/* Services — hors tab bar, lien important */}
+                          {/* Mon Salon — hors tab bar (config initiale) */}
                           <TouchableOpacity
                             style={[styles.quickAction, { backgroundColor: colors.card }]}
-                            onPress={() => router.push('/(coiffeur)/services')}
+                            onPress={() => router.push('/(coiffeur)/salon')}
                           >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#7C3AED' }]}>
-                              <Ionicons name="cut" size={24} color="#FFFFFF" />
+                            <View style={[styles.quickActionIcon, { backgroundColor: '#191919' }]}>
+                              <Ionicons name="storefront" size={24} color="#FFFFFF" />
                             </View>
                             <Text style={[styles.quickActionText, { color: colors.text }]}>
-                              Configurer mes tarifs
+                              Configurer mon salon
                             </Text>
                             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                           </TouchableOpacity>
