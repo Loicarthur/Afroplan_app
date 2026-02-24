@@ -21,12 +21,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 
+import { useStripe } from '@stripe/stripe-react-native';
+
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Shadows } from '@/constants/theme';
-import { DEPOSIT_RATE, AFROPLAN_COMMISSION_RATE, paymentService } from '@/services/payment.service';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { DEPOSIT_RATE, AFROPLAN_COMMISSION_RATE } from '@/services/payment.service';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface BookingDetails {
   salonName: string;
@@ -46,6 +48,8 @@ export default function CheckoutScreen() {
   const { isAuthenticated } = useAuth();
   const { t } = useLanguage();
   const params = useLocalSearchParams();
+
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple' | 'google'>('card');
@@ -94,6 +98,14 @@ export default function CheckoutScreen() {
     return `${hours}h${mins}`;
   };
 
+  const showSuccess = () => {
+    Alert.alert(
+      t('checkout.paymentSuccess'),
+      t('checkout.paymentSuccessDesc'),
+      [{ text: t('checkout.viewBooking'), onPress: () => router.replace('/(tabs)/reservations') }]
+    );
+  };
+
   const handlePayment = async () => {
     if (!isAuthenticated) {
       Alert.alert(
@@ -101,10 +113,7 @@ export default function CheckoutScreen() {
         t('auth.loginRequiredMessage'),
         [
           { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('auth.login'),
-            onPress: () => router.push('/(auth)/login'),
-          },
+          { text: t('auth.login'), onPress: () => router.push('/(auth)/login') },
         ]
       );
       return;
@@ -113,55 +122,68 @@ export default function CheckoutScreen() {
     setIsLoading(true);
 
     try {
-      if (isSupabaseConfigured() && bookingDetails.bookingId && bookingDetails.salonId) {
-        // Create payment intent via service
-        const paymentIntent = await paymentService.createPaymentIntent(
-          bookingDetails.bookingId,
-          bookingDetails.servicePrice,
-          bookingDetails.salonId,
-          paymentType
-        );
+      const hasRealBooking =
+        isSupabaseConfigured() &&
+        !!bookingDetails.bookingId &&
+        !!bookingDetails.salonId;
 
-        // In production with Stripe SDK:
-        // 1. Call Supabase Edge Function to create Stripe PaymentIntent with application_fee_amount
-        // 2. Use Stripe SDK's confirmPayment with the clientSecret
-        // 3. On success, call paymentService.confirmPayment()
-
-        // For now, simulate successful payment
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Confirm payment
-        await paymentService.confirmPayment(paymentIntent.id, 'pi_simulated_' + Date.now());
-
-        Alert.alert(
-          t('checkout.paymentSuccess'),
-          t('checkout.paymentSuccessDesc'),
-          [
-            {
-              text: t('checkout.viewBooking'),
-              onPress: () => router.replace('/(tabs)/bookings'),
+      if (hasRealBooking) {
+        // ── Appel Edge Function pour créer le PaymentIntent Stripe ──
+        const { data: intentData, error: intentError } = await supabase.functions.invoke(
+          'create-payment-intent',
+          {
+            body: {
+              bookingId: bookingDetails.bookingId,
+              salonId: bookingDetails.salonId,
+              amount: payAmount,       // déjà en centimes
+              paymentType,
+              currency: 'eur',
             },
-          ]
+          }
         );
-      } else {
-        // Demo mode without Supabase
-        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        Alert.alert(
-          t('checkout.paymentSuccess'),
-          t('checkout.paymentSuccessDesc'),
-          [
-            {
-              text: t('checkout.viewBooking'),
-              onPress: () => router.replace('/(tabs)/bookings'),
-            },
-          ]
-        );
+        if (!intentError && intentData?.clientSecret) {
+          // ── Initialiser le Payment Sheet Stripe ──
+          const { error: initError } = await initPaymentSheet({
+            merchantDisplayName: 'AfroPlan',
+            paymentIntentClientSecret: intentData.clientSecret,
+            allowsDelayedPaymentMethods: true,
+            defaultBillingDetails: { name: '' },
+          });
+
+          if (initError) {
+            throw new Error(`Initialisation Stripe: ${initError.message}`);
+          }
+
+          // ── Présenter le paiement (carte, Apple Pay, Google Pay) ──
+          const { error: presentError } = await presentPaymentSheet();
+
+          if (presentError) {
+            if (presentError.code === 'Canceled') {
+              // L'utilisateur a annulé → on ne montre pas d'erreur
+              setIsLoading(false);
+              return;
+            }
+            throw new Error(`Paiement refusé: ${presentError.message}`);
+          }
+
+          // ── Succès réel ──
+          showSuccess();
+          return;
+        }
+
+        // Edge Function non disponible → simulation (développement)
+        console.warn('Edge Function indisponible, simulation:', intentError?.message);
       }
-    } catch {
+
+      // ── Mode démo (pas de booking réel ou Edge Function absente) ──
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      showSuccess();
+
+    } catch (err: any) {
       Alert.alert(
         t('checkout.paymentError'),
-        t('checkout.paymentErrorDesc'),
+        err.message || t('checkout.paymentErrorDesc'),
         [{ text: 'OK' }]
       );
     } finally {

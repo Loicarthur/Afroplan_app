@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -47,6 +48,11 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+      <StripeProvider
+        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''}
+        merchantIdentifier="merchant.com.afroplan.app"
+        urlScheme="afroplan"
+      >
       <SafeAreaProvider>
         <AuthProvider>
           <LanguageProvider>
@@ -95,6 +101,7 @@ export default function RootLayout() {
           </LanguageProvider>
         </AuthProvider>
       </SafeAreaProvider>
+      </StripeProvider>
     </ErrorBoundary>
   );
 }
