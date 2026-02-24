@@ -12,6 +12,9 @@ import {
   TextInput,
   Alert,
   Platform,
+  Modal,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -27,9 +30,36 @@ import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
+import { HAIRSTYLE_CATEGORIES, findStyleById } from '@/constants/hairstyleCategories';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type SalonLocationType = 'salon' | 'coiffeur_home' | 'domicile' | 'both';
+
+// ── Types pour la gestion des services inline ─────────────────────────────────
+type ServiceLocation = 'salon' | 'domicile' | 'both';
+
+type ConfiguredStyle = {
+  styleId: string;
+  styleName: string;
+  categoryLabel: string;
+  price: string;
+  duration: string;
+  location: ServiceLocation;
+  requiresExtensions: boolean;
+  extensionsIncluded: boolean;
+  image?: any;
+  customImage?: string;
+  customDescription?: string;
+};
+
+// Catalogue de styles dérivé des catégories globales de l'app
+const STYLE_CATALOG = HAIRSTYLE_CATEGORIES.map(cat => ({
+  id: cat.id,
+  label: cat.title,
+  emoji: cat.emoji,
+  styles: cat.styles.map(s => ({ id: s.id, name: s.name, image: s.image })),
+}));
 
 // Liste des spécialités synchronisée avec les catégories globales de l'app
 const AFRO_SPECIALTIES = HAIRSTYLE_CATEGORIES.map(cat => ({
@@ -79,9 +109,17 @@ export default function SalonManagementScreen() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [existingSalonId, setExistingSalonId] = useState<string | null>(null);
-  const [servicesCount, setServicesCount] = useState<number | null>(null);
-  // Aperçu des services configurés (affiché dans la section salon)
-  const [servicesSummary, setServicesSummary] = useState<{ name: string; price: number }[]>([]);
+
+  // ── État gestion services inline ────────────────────────────────────────────
+  const [configuredStyles, setConfiguredStyles] = useState<ConfiguredStyle[]>([]);
+  const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([]);
+  const [isBatchConfiguring, setIsBatchConfiguring] = useState(false);
+  const [batchData, setBatchData] = useState<Record<string, Partial<ConfiguredStyle>>>({});
+  const [isSavingServices, setIsSavingServices] = useState(false);
+  const [activeServicesTab, setActiveServicesTab] = useState<'catalog' | 'my_styles'>('catalog');
+
+  // Raccourci calculé
+  const servicesCount = configuredStyles.length;
 
   // Informations du salon
   const [salonName, setSalonName] = useState('');
@@ -147,16 +185,28 @@ export default function SalonManagementScreen() {
             setOpeningHours(salon.opening_hours as unknown as OpeningHours);
           }
 
-          // Charger les services configurés (résumé + compteur)
+          // Charger les services existants dans l'état inline
           try {
             const services = await salonService.getSalonServices(salon.id);
-            const count = services?.length || 0;
-            setServicesCount(count);
-            setServicesSummary(
-              (services || []).slice(0, 3).map((s) => ({ name: s.name, price: s.price }))
-            );
+            const mapped: ConfiguredStyle[] = (services || []).map(s => {
+              const catalogStyle = STYLE_CATALOG.flatMap(c => c.styles).find(cs => cs.name === s.name);
+              return {
+                styleId: s.id,
+                styleName: s.name,
+                categoryLabel: s.category,
+                price: s.price.toString(),
+                duration: s.duration_minutes.toString(),
+                location: s.service_location as ServiceLocation,
+                requiresExtensions: s.requires_extensions,
+                extensionsIncluded: s.extensions_included,
+                image: catalogStyle?.image,
+                customImage: s.image_url || undefined,
+                customDescription: s.description || '',
+              };
+            });
+            setConfiguredStyles(mapped);
           } catch (e) {
-            setServicesCount(0);
+            // Non bloquant
           }
         }
       } catch {
@@ -248,6 +298,162 @@ export default function SalonManagementScreen() {
       ...prev,
       [day]: { ...prev[day], [field]: value },
     }));
+  };
+
+  // ── Helpers services ──────────────────────────────────────────────────────
+  const isStyleConfigured = (styleId: string) =>
+    configuredStyles.some(s => s.styleId === styleId);
+
+  const toggleStyleSelection = (styleId: string) =>
+    setSelectedStyleIds(prev =>
+      prev.includes(styleId) ? prev.filter(id => id !== styleId) : [...prev, styleId]
+    );
+
+  const startBatchConfiguration = () => {
+    if (selectedStyleIds.length === 0) return;
+    const initialData: Record<string, Partial<ConfiguredStyle>> = {};
+    selectedStyleIds.forEach(id => {
+      const existing = configuredStyles.find(s => s.styleId === id);
+      if (existing) {
+        initialData[id] = { ...existing };
+      } else {
+        let parentLabel = '';
+        let styleEntry = null;
+        for (const cat of STYLE_CATALOG) {
+          const found = cat.styles.find(s => s.id === id);
+          if (found) { styleEntry = found; parentLabel = cat.label; break; }
+        }
+        initialData[id] = {
+          styleId: id, styleName: styleEntry?.name || 'Style', categoryLabel: parentLabel,
+          location: 'salon', price: '', duration: '', requiresExtensions: false,
+          extensionsIncluded: false, customDescription: '',
+        };
+      }
+    });
+    setBatchData(initialData);
+    setIsBatchConfiguring(true);
+  };
+
+  const updateBatchItem = (styleId: string, updates: Partial<ConfiguredStyle>) =>
+    setBatchData(prev => ({ ...prev, [styleId]: { ...prev[styleId], ...updates } }));
+
+  const pickServiceImage = async (styleId: string) => {
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: 'images', allowsEditing: true, aspect: [1, 1], quality: 0.7 };
+    Alert.alert('Photo de la prestation', 'Source ?', [
+      { text: 'Appareil photo', onPress: async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permission refusée'); return; }
+        const result = await ImagePicker.launchCameraAsync(options);
+        if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+      }},
+      { text: 'Galerie', onPress: async () => {
+        const result = await ImagePicker.launchImageLibraryAsync(options);
+        if (!result.canceled) updateBatchItem(styleId, { customImage: result.assets[0].uri });
+      }},
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const handleSaveBatch = async () => {
+    if (!user || !existingSalonId) {
+      Alert.alert('Enregistrez d\'abord les infos du salon', 'Cliquez sur "Enregistrer" en bas de page avant de configurer les prestations.');
+      return;
+    }
+    const stylesToSave = selectedStyleIds.map(id => batchData[id]).filter(Boolean) as ConfiguredStyle[];
+    if (stylesToSave.find(s => !s.price || !s.duration)) {
+      Alert.alert('Champs requis', 'Prix et durée sont obligatoires pour chaque prestation.');
+      return;
+    }
+    setIsSavingServices(true);
+    try {
+      await salonService.deleteServicesBySalonId(existingSalonId);
+      const servicesPayload = [];
+      for (const style of stylesToSave) {
+        let finalImageUrl = style.customImage || null;
+        if (style.customImage && !style.customImage.startsWith('http')) {
+          const extension = style.customImage.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${user.id}/service_${Date.now()}.${extension}`;
+          finalImageUrl = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              const reader = new FileReader();
+              reader.onloadend = async function () {
+                try {
+                  const b64 = (reader.result as string).split(',')[1];
+                  const buf = base64js.toByteArray(b64);
+                  const { data, error } = await supabase.storage.from('salon-photos').upload(fileName, buf, { contentType: `image/${extension}`, upsert: true });
+                  if (error) throw error;
+                  const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
+                  resolve(urlData.publicUrl);
+                } catch (e) { reject(e); }
+              };
+              reader.readAsDataURL(xhr.response);
+            };
+            xhr.onerror = () => reject(new Error('Erreur lecture photo'));
+            xhr.responseType = 'blob';
+            xhr.open('GET', style.customImage!, true);
+            xhr.send();
+          });
+        }
+        const catName = style.categoryLabel || findStyleById(style.styleId)?.category.title || 'Autre';
+        servicesPayload.push({
+          salon_id: existingSalonId,
+          name: style.styleName,
+          category: catName,
+          price: parseFloat(style.price),
+          duration_minutes: parseInt(style.duration, 10),
+          description: style.customDescription || null,
+          service_location: style.location,
+          image_url: finalImageUrl,
+          is_active: true,
+        });
+      }
+      await salonService.upsertServicesBatch(servicesPayload);
+      setConfiguredStyles(prev => {
+        const filtered = prev.filter(s => !selectedStyleIds.includes(s.styleId));
+        return [...filtered, ...stylesToSave];
+      });
+      setIsBatchConfiguring(false);
+      setSelectedStyleIds([]);
+      setActiveServicesTab('my_styles');
+      Alert.alert('Prestations enregistrées', `${stylesToSave.length} prestation(s) sauvegardée(s).`);
+    } catch (err: any) {
+      Alert.alert('Erreur', err?.message || 'Impossible de sauvegarder.');
+    } finally {
+      setIsSavingServices(false);
+    }
+  };
+
+  const handleRemoveStyle = (styleId: string) => {
+    Alert.alert('Retirer', 'Voulez-vous retirer cette prestation ?', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Retirer', style: 'destructive', onPress: async () => {
+        try {
+          if (styleId.length > 20) await salonService.deleteService(styleId);
+          setConfiguredStyles(prev => prev.filter(s => s.styleId !== styleId));
+        } catch { Alert.alert('Erreur', 'Impossible de supprimer.'); }
+      }},
+    ]);
+  };
+
+  const formatDuration = (minutes: string) => {
+    const m = parseInt(minutes, 10);
+    if (isNaN(m)) return `${minutes}min`;
+    if (m < 60) return `${m}min`;
+    const h = Math.floor(m / 60); const rem = m % 60;
+    return rem > 0 ? `${h}h${rem}` : `${h}h`;
+  };
+
+  const locationLabel = (loc: ServiceLocation) => {
+    if (loc === 'salon') return 'En salon';
+    if (loc === 'domicile') return 'À domicile';
+    return 'Salon & Domicile';
+  };
+
+  const locationIcon = (loc: ServiceLocation): 'storefront-outline' | 'home-outline' | 'swap-horizontal-outline' => {
+    if (loc === 'salon') return 'storefront-outline';
+    if (loc === 'domicile') return 'home-outline';
+    return 'swap-horizontal-outline';
   };
 
   const handleSave = async () => {
@@ -393,19 +599,11 @@ export default function SalonManagementScreen() {
       }
 
       if (isNewSalon) {
-        // Flux d'onboarding : après la création du salon, aller directement configurer les services
         Alert.alert(
           '✓ Salon créé !',
-          'Super ! Maintenant ajoutez vos prestations et tarifs pour que les clients puissent réserver.',
-          [
-            {
-              text: 'Ajouter mes prestations →',
-              onPress: () => router.push({ pathname: '/(coiffeur)/services', params: { from: 'salon' } }),
-            },
-          ]
+          'Faites défiler vers le bas pour ajouter vos prestations et tarifs, puis publiez votre salon.'
         );
       } else {
-        // Mise à jour d'un salon existant
         Alert.alert('Salon mis à jour', 'Vos modifications ont été enregistrées.');
       }
     } catch (err: any) {
@@ -446,11 +644,8 @@ export default function SalonManagementScreen() {
         if (!services || services.length === 0) {
           Alert.alert(
             'Services manquants',
-            'Vous devez configurer au moins un service (prix/durée) avant de publier votre salon.',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Gérer mes services', onPress: () => router.push('/(coiffeur)/services') }
-            ]
+            'Vous devez configurer au moins une prestation avant de publier votre salon. Faites défiler vers la section "Mes Prestations" pour en ajouter.',
+            [{ text: 'OK' }]
           );
           setIsPublishing(false);
           return;
@@ -853,81 +1048,177 @@ export default function SalonManagementScreen() {
           )}
         </View>
 
-        {/* ── MES PRESTATIONS — Section intégrée au salon ── */}
+        {/* ══════════════════════════════════════════════════════════════════
+            MES PRESTATIONS — Catalogue complet inline
+        ══════════════════════════════════════════════════════════════════ */}
         <View style={styles.section}>
-          <View style={styles.servicesSectionHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Mes Prestations</Text>
-              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                {servicesCount === null
-                  ? 'Chargement...'
-                  : servicesCount === 0
-                  ? 'Aucune prestation configurée — requis pour publier'
-                  : `${servicesCount} prestation${servicesCount > 1 ? 's' : ''} configurée${servicesCount > 1 ? 's' : ''}`}
-              </Text>
-            </View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mes Prestations</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            {servicesCount === 0
+              ? 'Cochez les styles que vous proposez, configurez les tarifs et enregistrez.'
+              : `${servicesCount} prestation${servicesCount > 1 ? 's' : ''} configurée${servicesCount > 1 ? 's' : ''}`}
+          </Text>
+
+          {/* Onglets Catalogue / Mes prestations */}
+          <View style={[styles.servicesTabs, { borderBottomColor: colors.border }]}>
             <TouchableOpacity
-              style={[styles.manageServicesBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/(coiffeur)/services')}
+              style={[styles.servicesTab, activeServicesTab === 'catalog' && styles.servicesTabActive]}
+              onPress={() => setActiveServicesTab('catalog')}
             >
-              <Ionicons name={servicesCount === 0 ? 'add' : 'pencil'} size={16} color="#FFF" />
-              <Text style={styles.manageServicesBtnText}>
-                {servicesCount === 0 ? 'Ajouter' : 'Gérer'}
+              <Text style={[styles.servicesTabText, { color: activeServicesTab === 'catalog' ? colors.primary : colors.textSecondary }]}>
+                Catalogue
               </Text>
+              {activeServicesTab === 'catalog' && <View style={[styles.servicesTabUnderline, { backgroundColor: colors.primary }]} />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.servicesTab, activeServicesTab === 'my_styles' && styles.servicesTabActive]}
+              onPress={() => setActiveServicesTab('my_styles')}
+            >
+              <Text style={[styles.servicesTabText, { color: activeServicesTab === 'my_styles' ? colors.primary : colors.textSecondary }]}>
+                Mes prestations ({servicesCount})
+              </Text>
+              {activeServicesTab === 'my_styles' && <View style={[styles.servicesTabUnderline, { backgroundColor: colors.primary }]} />}
             </TouchableOpacity>
           </View>
 
-          {/* Aperçu des 3 premières prestations */}
-          {servicesSummary.length > 0 ? (
-            <View style={[styles.servicesPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {servicesSummary.map((s, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.servicePreviewRow,
-                    i < servicesSummary.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                  ]}
-                >
-                  <View style={[styles.servicePreviewDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.servicePreviewName, { color: colors.text }]} numberOfLines={1}>
-                    {s.name}
+          {/* ─── ONGLET CATALOGUE ───────────────────────────────────────────── */}
+          {activeServicesTab === 'catalog' && (
+            <View>
+              {STYLE_CATALOG.map(category => (
+                <View key={category.id} style={{ marginBottom: Spacing.md }}>
+                  <Text style={[styles.catalogCategoryLabel, { color: colors.text }]}>
+                    {category.emoji}  {category.label}
                   </Text>
-                  <Text style={[styles.servicePreviewPrice, { color: colors.primary }]}>
-                    {s.price} €
-                  </Text>
+                  <View style={styles.catalogStylesGrid}>
+                    {category.styles.map(style => {
+                      const isSelected = selectedStyleIds.includes(style.id);
+                      const isSaved = isStyleConfigured(style.id);
+                      return (
+                        <TouchableOpacity
+                          key={style.id}
+                          style={[
+                            styles.catalogStyleChip,
+                            { backgroundColor: colors.card, borderColor: colors.border },
+                            isSelected && { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+                            isSaved && !isSelected && { borderColor: '#22C55E50' },
+                          ]}
+                          onPress={() => toggleStyleSelection(style.id)}
+                          activeOpacity={0.7}
+                        >
+                          {style.image && (
+                            <Image source={style.image} style={styles.catalogStyleImage} contentFit="cover" />
+                          )}
+                          <View style={styles.catalogStyleContent}>
+                            <View style={styles.catalogStyleTop}>
+                              <View style={[
+                                styles.catalogStyleCheck,
+                                { backgroundColor: isSelected ? colors.primary : colors.backgroundSecondary, borderColor: isSelected ? colors.primary : colors.border },
+                                !isSelected && { borderWidth: 1 },
+                              ]}>
+                                {isSelected && <Ionicons name="checkmark" size={10} color="#FFF" />}
+                              </View>
+                              <Text style={[styles.catalogStyleName, { color: isSelected ? colors.primary : colors.text }]} numberOfLines={1}>
+                                {style.name}
+                              </Text>
+                            </View>
+                            {isSaved && !isSelected && (
+                              <View style={styles.catalogStyleSavedBadge}>
+                                <Text style={styles.catalogStyleSavedText}>Configuré</Text>
+                              </View>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
               ))}
-              {(servicesCount ?? 0) > 3 && (
-                <TouchableOpacity
-                  style={styles.servicePreviewMore}
-                  onPress={() => router.push('/(coiffeur)/services')}
-                >
-                  <Text style={[styles.servicePreviewMoreText, { color: colors.primary }]}>
-                    + {(servicesCount ?? 0) - 3} autre{(servicesCount ?? 0) - 3 > 1 ? 's' : ''} prestation{(servicesCount ?? 0) - 3 > 1 ? 's' : ''}
+              <View style={{ height: selectedStyleIds.length > 0 ? 80 : 0 }} />
+            </View>
+          )}
+
+          {/* ─── ONGLET MES PRESTATIONS ─────────────────────────────────────── */}
+          {activeServicesTab === 'my_styles' && (
+            <View>
+              {configuredStyles.length === 0 ? (
+                <View style={styles.servicesEmptyState}>
+                  <Ionicons name="cut-outline" size={48} color={colors.textMuted} />
+                  <Text style={[styles.servicesEmptyTitle, { color: colors.text }]}>Aucune prestation</Text>
+                  <Text style={[styles.servicesEmptySubtitle, { color: colors.textSecondary }]}>
+                    Allez dans &quot;Catalogue&quot; et cochez les styles que vous maîtrisez
                   </Text>
-                  <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.servicesEmptyBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => setActiveServicesTab('catalog')}
+                  >
+                    <Text style={styles.servicesEmptyBtnText}>Voir le catalogue</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                configuredStyles.map(cs => (
+                  <View key={cs.styleId} style={[styles.myStyleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={styles.myStyleCardHeader}>
+                      {cs.image && (
+                        <Image source={cs.image} style={styles.myStyleImage} contentFit="cover" />
+                      )}
+                      <View style={styles.myStyleInfo}>
+                        <Text style={[styles.myStyleName, { color: colors.text }]}>{cs.styleName}</Text>
+                        <Text style={[styles.myStyleCategory, { color: colors.textMuted }]}>{cs.categoryLabel}</Text>
+                      </View>
+                      <View style={styles.myStyleActions}>
+                        <TouchableOpacity
+                          style={[styles.myStyleEditBtn, { backgroundColor: colors.backgroundSecondary }]}
+                          onPress={() => { setSelectedStyleIds([cs.styleId]); startBatchConfiguration(); }}
+                        >
+                          <Ionicons name="pencil" size={16} color={colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.myStyleDeleteBtn, { borderColor: colors.error }]}
+                          onPress={() => handleRemoveStyle(cs.styleId)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View style={styles.myStyleBadges}>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#22C55E20' }]}>
+                        <Ionicons name="cash-outline" size={12} color="#22C55E" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#22C55E' }]}>{cs.price} €</Text>
+                      </View>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#3B82F620' }]}>
+                        <Ionicons name="time-outline" size={12} color="#3B82F6" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#3B82F6' }]}>{formatDuration(cs.duration)}</Text>
+                      </View>
+                      <View style={[styles.myStyleBadge, { backgroundColor: '#7C3AED20' }]}>
+                        <Ionicons name={locationIcon(cs.location)} size={12} color="#7C3AED" />
+                        <Text style={[styles.myStyleBadgeText, { color: '#7C3AED' }]}>{locationLabel(cs.location)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
               )}
             </View>
-          ) : (
-            /* CTA si aucun service */
-            <TouchableOpacity
-              style={[styles.noServiceCTA, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
-              onPress={() => router.push('/(coiffeur)/services')}
-            >
-              <Ionicons name="cut-outline" size={28} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.noServiceCTATitle, { color: colors.text }]}>
-                  Configurez vos tarifs
-                </Text>
-                <Text style={[styles.noServiceCTADesc, { color: colors.textSecondary }]}>
-                  Ajoutez vos prestations (tresses, locks, soins...) avec prix et durée. Obligatoire pour être réservé.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-            </TouchableOpacity>
           )}
         </View>
+
+        {/* Bouton flottant "Configurer X styles" dans le catalogue */}
+        {activeServicesTab === 'catalog' && selectedStyleIds.length > 0 && (
+          <View style={[styles.floatingConfigBtn, { backgroundColor: colors.background }]}>
+            <TouchableOpacity
+              style={styles.floatingConfigBtnInner}
+              onPress={startBatchConfiguration}
+              activeOpacity={0.9}
+            >
+              <View style={styles.floatingConfigBadge}>
+                <Text style={styles.floatingConfigBadgeText}>{selectedStyleIds.length}</Text>
+              </View>
+              <Text style={styles.floatingConfigBtnText}>
+                {selectedStyleIds.length > 1 ? 'Configurer les styles' : 'Configurer le style'}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Statut de publication */}
         {isPublished && (
@@ -985,6 +1276,188 @@ export default function SalonManagementScreen() {
 
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          MODAL — Configuration par lot des prestations sélectionnées
+      ══════════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={isBatchConfiguring}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsBatchConfiguring(false)}
+      >
+        <SafeAreaView style={[styles.batchModalContainer, { backgroundColor: colors.background }]}>
+          {/* Header */}
+          <View style={[styles.batchModalHeader, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+            <TouchableOpacity onPress={() => setIsBatchConfiguring(false)} style={styles.batchModalClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.batchModalTitle, { color: colors.text }]}>
+              {selectedStyleIds.length > 1
+                ? `Configurer ${selectedStyleIds.length} prestations`
+                : 'Configurer la prestation'}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            <Text style={[styles.batchModalHint, { color: colors.textSecondary }]}>
+              Renseignez le prix et la durée pour chaque prestation sélectionnée.
+            </Text>
+
+            {selectedStyleIds.map(styleId => {
+              const data = batchData[styleId] || {};
+              return (
+                <View key={styleId} style={[styles.batchStyleBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {/* Identité du style */}
+                  <View style={styles.batchStyleHeader}>
+                    {(data as ConfiguredStyle).image && (
+                      <Image source={(data as ConfiguredStyle).image} style={styles.batchStyleThumb} contentFit="cover" />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchStyleName, { color: colors.text }]}>{data.styleName}</Text>
+                      <Text style={[styles.batchStyleCategory, { color: colors.textMuted }]}>{data.categoryLabel}</Text>
+                    </View>
+                  </View>
+
+                  {/* Prix */}
+                  <View style={styles.batchFieldRow}>
+                    <View style={styles.batchFieldIcon}>
+                      <Ionicons name="cash-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchFieldLabel, { color: colors.textSecondary }]}>Prix (€) *</Text>
+                      <TextInput
+                        style={[styles.batchFieldInput, { backgroundColor: colors.backgroundSecondary, color: colors.text, borderColor: colors.border }]}
+                        value={data.price}
+                        onChangeText={v => updateBatchItem(styleId, { price: v })}
+                        placeholder="Ex: 50"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Durée */}
+                  <View style={styles.batchFieldRow}>
+                    <View style={styles.batchFieldIcon}>
+                      <Ionicons name="time-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchFieldLabel, { color: colors.textSecondary }]}>Durée (min) *</Text>
+                      <TextInput
+                        style={[styles.batchFieldInput, { backgroundColor: colors.backgroundSecondary, color: colors.text, borderColor: colors.border }]}
+                        value={data.duration}
+                        onChangeText={v => updateBatchItem(styleId, { duration: v })}
+                        placeholder="Ex: 120"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Lieu */}
+                  <View style={styles.batchFieldRow}>
+                    <View style={styles.batchFieldIcon}>
+                      <Ionicons name="location-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchFieldLabel, { color: colors.textSecondary }]}>Lieu de prestation</Text>
+                      <View style={styles.batchLocationRow}>
+                        {(['salon', 'domicile', 'both'] as ServiceLocation[]).map(loc => (
+                          <TouchableOpacity
+                            key={loc}
+                            style={[
+                              styles.batchLocationPill,
+                              { borderColor: colors.border },
+                              data.location === loc && { backgroundColor: colors.primary, borderColor: colors.primary },
+                            ]}
+                            onPress={() => updateBatchItem(styleId, { location: loc })}
+                          >
+                            <Ionicons
+                              name={locationIcon(loc)}
+                              size={12}
+                              color={data.location === loc ? '#FFF' : colors.textSecondary}
+                            />
+                            <Text style={[styles.batchLocationPillText, { color: data.location === loc ? '#FFF' : colors.text }]}>
+                              {locationLabel(loc)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Photo personnalisée */}
+                  <View style={styles.batchFieldRow}>
+                    <View style={styles.batchFieldIcon}>
+                      <Ionicons name="camera-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchFieldLabel, { color: colors.textSecondary }]}>Photo (optionnel)</Text>
+                      <TouchableOpacity
+                        style={[styles.batchPhotoBtn, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                        onPress={() => pickServiceImage(styleId)}
+                      >
+                        {data.customImage ? (
+                          <Image source={{ uri: data.customImage }} style={styles.batchPhotoBtnImage} contentFit="cover" />
+                        ) : (
+                          <View style={styles.batchPhotoBtnPlaceholder}>
+                            <Ionicons name="image-outline" size={24} color={colors.textMuted} />
+                            <Text style={[styles.batchPhotoBtnText, { color: colors.textMuted }]}>Ajouter une photo</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Description */}
+                  <View style={styles.batchFieldRow}>
+                    <View style={styles.batchFieldIcon}>
+                      <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.batchFieldLabel, { color: colors.textSecondary }]}>Description (optionnel)</Text>
+                      <TextInput
+                        style={[styles.batchFieldInput, styles.batchDescInput, { backgroundColor: colors.backgroundSecondary, color: colors.text, borderColor: colors.border }]}
+                        value={data.customDescription}
+                        onChangeText={v => updateBatchItem(styleId, { customDescription: v })}
+                        placeholder="Informations complémentaires pour vos clients..."
+                        placeholderTextColor={colors.textMuted}
+                        multiline
+                        numberOfLines={3}
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+
+            <View style={{ height: 120 }} />
+          </ScrollView>
+
+          {/* Footer bouton Enregistrer */}
+          <View style={[styles.batchModalFooter, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+            {isSavingServices ? (
+              <View style={styles.batchSavingRow}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.batchSavingText, { color: colors.textSecondary }]}>Enregistrement...</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.batchSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSaveBatch}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#FFF" />
+                <Text style={styles.batchSaveBtnText}>
+                  Enregistrer {selectedStyleIds.length > 1 ? `${selectedStyleIds.length} prestations` : 'la prestation'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1367,5 +1840,382 @@ const styles = StyleSheet.create({
   authLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+
+  /* ── Services inline ──────────────────────────────────────────────────── */
+  servicesTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  servicesTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    position: 'relative',
+  },
+  servicesTabActive: {
+    // handled inline via color
+  },
+  servicesTabText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  servicesTabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: '10%',
+    right: '10%',
+    height: 2,
+    borderRadius: 2,
+  },
+
+  /* Catalogue grid */
+  catalogCategoryLabel: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+    marginTop: 2,
+  },
+  catalogStylesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  catalogStyleChip: {
+    width: (SCREEN_WIDTH - 48 - 8) / 2,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  catalogStyleImage: {
+    width: '100%',
+    height: 72,
+  },
+  catalogStyleContent: {
+    padding: 8,
+  },
+  catalogStyleTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  catalogStyleCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  catalogStyleName: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  catalogStyleSavedBadge: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: '#22C55E20',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  catalogStyleSavedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#22C55E',
+  },
+
+  /* Empty state */
+  servicesEmptyState: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  servicesEmptyTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+  },
+  servicesEmptySubtitle: {
+    fontSize: FontSizes.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: Spacing.lg,
+  },
+  servicesEmptyBtn: {
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+  },
+  servicesEmptyBtnText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+
+  /* My styles cards */
+  myStyleCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+    overflow: 'hidden',
+  },
+  myStyleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  myStyleImage: {
+    width: 52,
+    height: 52,
+    borderRadius: BorderRadius.md,
+  },
+  myStyleInfo: {
+    flex: 1,
+  },
+  myStyleName: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+  myStyleCategory: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  myStyleActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  myStyleEditBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myStyleDeleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  myStyleBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  myStyleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 4,
+  },
+  myStyleBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  /* Floating configure button (inside ScrollView, at bottom of catalog) */
+  floatingConfigBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  floatingConfigBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#191919',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    gap: 10,
+  },
+  floatingConfigBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingConfigBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  floatingConfigBtnText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+
+  /* ── Modal batch configuration ────────────────────────────────────────── */
+  batchModalContainer: {
+    flex: 1,
+  },
+  batchModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  batchModalClose: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchModalTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    textAlign: 'center',
+    flex: 1,
+  },
+  batchModalHint: {
+    fontSize: FontSizes.sm,
+    lineHeight: 20,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  batchStyleBlock: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  batchStyleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  batchStyleThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+  },
+  batchStyleName: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+  },
+  batchStyleCategory: {
+    fontSize: FontSizes.sm,
+    marginTop: 2,
+  },
+  batchFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: Spacing.md,
+    paddingBottom: 0,
+    gap: Spacing.sm,
+  },
+  batchFieldIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+  },
+  batchFieldLabel: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  batchFieldInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: FontSizes.md,
+  },
+  batchDescInput: {
+    minHeight: 72,
+    textAlignVertical: 'top',
+  },
+  batchLocationRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  batchLocationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    gap: 4,
+  },
+  batchLocationPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  batchPhotoBtn: {
+    height: 80,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  batchPhotoBtnImage: {
+    width: '100%',
+    height: '100%',
+  },
+  batchPhotoBtnPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  batchPhotoBtnText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '500',
+  },
+  batchModalFooter: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+  },
+  batchSavingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  batchSavingText: {
+    fontSize: FontSizes.md,
+  },
+  batchSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    gap: 8,
+  },
+  batchSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.md,
+    fontWeight: '700',
   },
 });
