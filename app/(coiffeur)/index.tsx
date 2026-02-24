@@ -667,46 +667,40 @@ export default function CoiffeurDashboard() {
           </View>
         </View>
 
-        {/* Business Performance Widget */}
-        <Animated.View 
+        {/* Business Performance Widget — données réelles du jour */}
+        <Animated.View
           entering={FadeInDown.delay(200).duration(600)}
           style={[styles.businessCard, { backgroundColor: '#191919' }]}
         >
           <View style={styles.businessHeader}>
             <View>
-              <Text style={styles.businessLabel}>Revenus de la semaine</Text>
-              <Text style={styles.businessValue}>840,00 €</Text>
+              <Text style={styles.businessLabel}>Revenus aujourd&apos;hui</Text>
+              <Text style={styles.businessValue}>
+                {stats.totalRevenue.toFixed(2).replace('.', ',')} €
+              </Text>
             </View>
-            <View style={styles.growthBadge}>
-              <Ionicons name="trending-up" size={14} color="#22C55E" />
-              <Text style={styles.growthText}>+12.5%</Text>
-            </View>
-          </View>
-          
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '70%', backgroundColor: '#7C3AED' }]} />
-            </View>
-            <Text style={styles.progressLabel}>70% de l&apos;objectif mensuel (1200€)</Text>
+            {stats.todayBookings > 0 && (
+              <View style={styles.growthBadge}>
+                <Ionicons name="trending-up" size={14} color="#22C55E" />
+                <Text style={styles.growthText}>Actif</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.businessFooter}>
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>14</Text>
-              <Text style={styles.footerStatLabel}>RDV faits</Text>
+              <Text style={styles.footerStatValue}>{stats.todayBookings}</Text>
+              <Text style={styles.footerStatLabel}>RDV aujourd&apos;hui</Text>
             </View>
             <View style={styles.footerDivider} />
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>22h</Text>
-              <Text style={styles.footerStatLabel}>Coiffées</Text>
+              <Text style={styles.footerStatValue}>{stats.pendingBookings}</Text>
+              <Text style={styles.footerStatLabel}>En attente</Text>
             </View>
             <View style={styles.footerDivider} />
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>4.9</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Ionicons name="star" size={10} color="#F59E0B" />
-                <Text style={styles.footerStatLabel}>Avis</Text>
-              </View>
+              <Text style={styles.footerStatValue}>{stats.totalClients}</Text>
+              <Text style={styles.footerStatLabel}>Clients</Text>
             </View>
           </View>
         </Animated.View>
@@ -778,57 +772,15 @@ export default function CoiffeurDashboard() {
           </View>
         )}
 
-                      {/* Quick Actions */}
-                      <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Ma Visibilité
-                          </Text>
-                        </View>
-                        <View style={styles.marketingGrid}>
-                          <TouchableOpacity
-                            style={[styles.marketingCard, { backgroundColor: '#191919' }]}
-                            onPress={() => {
-                              if (salon) {
-                                router.push(`/salon/${salon.id}`);
-                              } else {
-                                Alert.alert('Presque fini !', 'Configurez votre salon pour voir l\'aperçu.');
-                              }
-                            }}
-                          >
-                            <Ionicons name="eye-outline" size={24} color="#FFFFFF" />
-                            <Text style={styles.marketingCardText}>Aperçu public</Text>
-                          </TouchableOpacity>
-              
-                          <TouchableOpacity
-                            style={[styles.marketingCard, { backgroundColor: '#7C3AED' }]}
-                            onPress={() => Alert.alert('Kit Marketing', 'Génération de votre QR Code et lien de partage...')}
-                          >
-                            <Ionicons name="share-social-outline" size={24} color="#FFFFFF" />
-                            <Text style={styles.marketingCardText}>Partager mon salon</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-              
-                      {/* Gestion Section */}
+
+
+                      {/* Raccourcis rapides — uniquement les pages hors tab bar */}
                       <View style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                          Gestion
+                          Raccourcis
                         </Text>
                         <View style={styles.quickActions}>
-                          <TouchableOpacity
-                            style={[styles.quickAction, { backgroundColor: colors.card }]}
-                            onPress={() => router.push('/(coiffeur)/salon')}
-                          >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#191919' }]}>
-                              <Ionicons name="storefront" size={24} color="#FFFFFF" />
-                            </View>
-                            <Text style={[styles.quickActionText, { color: colors.text }]}>
-                              Gérer mon salon
-                            </Text>
-                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-                          </TouchableOpacity>
-              
+                          {/* Services — hors tab bar, lien important */}
                           <TouchableOpacity
                             style={[styles.quickAction, { backgroundColor: colors.card }]}
                             onPress={() => router.push('/(coiffeur)/services')}
@@ -837,37 +789,12 @@ export default function CoiffeurDashboard() {
                               <Ionicons name="cut" size={24} color="#FFFFFF" />
                             </View>
                             <Text style={[styles.quickActionText, { color: colors.text }]}>
-                              Gérer mes services
+                              Configurer mes tarifs
                             </Text>
                             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                           </TouchableOpacity>
-              
-                          <TouchableOpacity
-                            style={[styles.quickAction, { backgroundColor: colors.card }]}
-                            onPress={() => router.push('/(coiffeur)/portfolio' as any)}
-                          >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#EC4899' }]}>
-                              <Ionicons name="images" size={24} color="#FFFFFF" />
-                            </View>
-                            <Text style={[styles.quickActionText, { color: colors.text }]}>
-                              Portfolio (Réalisations)
-                            </Text>
-                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-                          </TouchableOpacity>
-              
-                          <TouchableOpacity
-                            style={[styles.quickAction, { backgroundColor: colors.card }]}
-                            onPress={() => router.push('/(coiffeur)/reservations')}
-                          >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#22C55E' }]}>
-                              <Ionicons name="calendar" size={24} color="#FFFFFF" />
-                            </View>
-                            <Text style={[styles.quickActionText, { color: colors.text }]}>
-                              Voir les réservations
-                            </Text>
-                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-                          </TouchableOpacity>
-              
+
+                          {/* Messages — hors tab bar */}
                           <TouchableOpacity
                             style={[styles.quickAction, { backgroundColor: colors.card }]}
                             onPress={() => router.push('/(coiffeur)/messages' as any)}
@@ -883,6 +810,26 @@ export default function CoiffeurDashboard() {
                                 <Text style={styles.messageBadgeText}>{pendingBookingsCount} nouveau{pendingBookingsCount > 1 ? 'x' : ''}</Text>
                               </View>
                             )}
+                            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                          </TouchableOpacity>
+
+                          {/* Aperçu public du salon */}
+                          <TouchableOpacity
+                            style={[styles.quickAction, { backgroundColor: colors.card }]}
+                            onPress={() => {
+                              if (salon) {
+                                router.push(`/salon/${salon.id}`);
+                              } else {
+                                Alert.alert('Presque fini !', 'Configurez votre salon pour voir l\'aperçu.');
+                              }
+                            }}
+                          >
+                            <View style={[styles.quickActionIcon, { backgroundColor: '#191919' }]}>
+                              <Ionicons name="eye-outline" size={24} color="#FFFFFF" />
+                            </View>
+                            <Text style={[styles.quickActionText, { color: colors.text }]}>
+                              Voir mon aperçu public
+                            </Text>
                             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>

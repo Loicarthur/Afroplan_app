@@ -3,7 +3,7 @@
  * Refonte Premium - Design épuré et professionnel
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,10 +19,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { salonService } from '@/services/salon.service';
+import { bookingService } from '@/services/booking.service';
 
 const { width } = Dimensions.get('window');
 
@@ -72,7 +75,83 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
 export default function CoiffeurProfilScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, signOut, isAuthenticated } = useAuth();
+  const { user, profile, signOut, isAuthenticated, refreshProfile } = useAuth();
+  const [realStats, setRealStats] = useState({ bookings: 0, revenue: 0 });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user || !isAuthenticated) return;
+      try {
+        const salon = await salonService.getSalonByOwnerId(user.id);
+        if (salon) {
+          const response = await bookingService.getSalonBookings(salon.id);
+          const completed = response.data.filter(
+            (b) => b.status === 'completed' || b.status === 'confirmed'
+          );
+          const revenue = completed.reduce((sum, b) => sum + (b.total_price || 0), 0);
+          setRealStats({ bookings: completed.length, revenue });
+        }
+      } catch {
+        // Non bloquant
+      }
+    };
+    loadStats();
+  }, [isAuthenticated, user]);
+
+  const handleAvatarUpload = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Accès à la galerie refusé.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const { supabase } = await import('@/lib/supabase');
+        const uri = result.assets[0].uri;
+        const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `avatars/${user!.id}/avatar.${extension}`;
+
+        const base64: string = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = function () {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(xhr.response);
+          };
+          xhr.onerror = () => reject(new Error('Lecture fichier impossible'));
+          xhr.open('GET', uri);
+          xhr.responseType = 'blob';
+          xhr.send();
+        });
+
+        const { default: base64js } = await import('base64-js');
+        const arrayBuffer = base64js.toByteArray(base64);
+
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, arrayBuffer, { contentType: `image/${extension}`, upsert: true });
+
+        if (error) throw error;
+
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+        await supabase
+          .from('profiles')
+          .update({ avatar_url: urlData.publicUrl })
+          .eq('id', user!.id);
+
+        await refreshProfile();
+        Alert.alert('Succès', 'Photo de profil mise à jour !');
+      }
+    } catch (err: any) {
+      Alert.alert('Erreur', err.message || 'Impossible de mettre à jour la photo.');
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -150,6 +229,7 @@ export default function CoiffeurProfilScreen() {
             <TouchableOpacity
               style={[styles.editAvatarButton, { backgroundColor: colors.card }]}
               activeOpacity={0.8}
+              onPress={handleAvatarUpload}
             >
               <Ionicons name="camera" size={16} color={colors.primary} />
             </TouchableOpacity>
@@ -169,19 +249,21 @@ export default function CoiffeurProfilScreen() {
           </View>
         </View>
 
-        {/* ── QUICK STATS ── */}
+        {/* ── QUICK STATS — données réelles ── */}
         <View style={styles.statsRow}>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>4.9</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Note</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{realStats.bookings}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Prestations</Text>
           </View>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>124</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Ventes</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {realStats.revenue > 0 ? `${realStats.revenue.toFixed(0)}€` : '–'}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Revenus</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>3 ans</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exp.</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>Pro</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Statut</Text>
           </View>
         </View>
 
