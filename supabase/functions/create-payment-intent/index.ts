@@ -76,37 +76,26 @@ serve(async (req) => {
       );
     }
 
-    // Get salon's Stripe Connect account
+    // Get salon's Stripe Connect account (optionnel — fallback si absent)
     const { data: stripeAccount } = await supabase
       .from('stripe_accounts')
       .select('stripe_account_id, subscription_plan')
       .eq('salon_id', salonId)
       .single();
 
-    if (!stripeAccount?.stripe_account_id) {
-      return new Response(
-        JSON.stringify({ error: 'Salon does not have a Stripe Connect account' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Calculate commission
-    const plan = stripeAccount.subscription_plan || 'free';
+    // Commission selon le plan du salon (défaut 20 %)
+    const plan = stripeAccount?.subscription_plan || 'free';
     const commissionRate = COMMISSION_RATES[plan] || 0.20;
     const depositAmount = Math.round(amount * DEPOSIT_RATE);
     const payAmount = paymentType === 'full' ? amount : depositAmount;
     const applicationFee = Math.round(payAmount * commissionRate);
 
-    // Create Stripe PaymentIntent with application_fee_amount
-    // This automatically sends the fee to the platform (AfroPlan)
-    // and the rest to the connected account (salon)
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Construction des paramètres du PaymentIntent
+    // Si le salon a un compte Stripe Connect → split automatique via application_fee_amount
+    // Sinon → l'argent entier arrive sur le compte plateforme AfroPlan
+    const paymentIntentParams: Record<string, any> = {
       amount: payAmount,
       currency,
-      application_fee_amount: applicationFee,
-      transfer_data: {
-        destination: stripeAccount.stripe_account_id,
-      },
       metadata: {
         booking_id: bookingId,
         salon_id: salonId,
@@ -117,7 +106,18 @@ serve(async (req) => {
       automatic_payment_methods: {
         enabled: true,
       },
-    });
+    };
+
+    if (stripeAccount?.stripe_account_id) {
+      // Stripe Connect : le split commission/salon est automatique
+      paymentIntentParams.application_fee_amount = applicationFee;
+      paymentIntentParams.transfer_data = {
+        destination: stripeAccount.stripe_account_id,
+      };
+    }
+    // (sans Connect : AfroPlan collecte tout, redistribue manuellement ou via payout)
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
     // Save payment record in database
     const { data: payment, error: paymentError } = await supabase

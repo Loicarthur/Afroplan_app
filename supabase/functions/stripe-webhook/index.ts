@@ -71,13 +71,15 @@ serve(async (req) => {
 
         console.log(`Payment succeeded for booking ${bookingId}, salon ${salonId}`);
 
-        // Update payment status in database
+        // Update payment status + marquer le wallet coiffeur crédité
+        // (Stripe Connect crédite automatiquement 80 % sur le compte connecté)
         const { error: paymentError } = await supabase
           .from('payments')
           .update({
             status: 'completed',
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
+            wallet_credited: true,
           })
           .eq('stripe_payment_intent_id', paymentIntent.id);
 

@@ -23,7 +23,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useSalon } from '@/hooks/use-salons';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
-import { PaymentMethod, DEPOSIT_AMOUNT } from '@/types/database';
+import { PaymentMethod } from '@/types/database';
+
+// Acompte = 20 % du prix de la prestation (cohérent avec payment.service.ts)
+const DEPOSIT_RATE = 0.20;
 
 type TimeSlot = {
   start: string;
@@ -67,6 +70,9 @@ export default function BookingScreen() {
   const price = parseFloat(servicePrice || '0');
   const duration = parseInt(serviceDuration || '60', 10);
 
+  // Acompte = 20 % du prix, minimum 1 € (Stripe)
+  const depositAmount = Math.max(1, Math.round(price * DEPOSIT_RATE * 100) / 100);
+
   // Calculer les montants selon le mode de paiement
   const getPaymentDetails = () => {
     switch (paymentMethod) {
@@ -80,8 +86,8 @@ export default function BookingScreen() {
       case 'deposit':
       default:
         return {
-          amountNow: DEPOSIT_AMOUNT,
-          amountLater: price - DEPOSIT_AMOUNT,
+          amountNow: depositAmount,
+          amountLater: Math.round((price - depositAmount) * 100) / 100,
           label: t('checkout.depositOnly'),
           description: t('checkout.depositInfo'),
         };
@@ -223,40 +229,37 @@ export default function BookingScreen() {
 
       if (bookingError) throw bookingError;
 
-      // 2. Appeler la fonction Supabase pour créer le Payment Intent Stripe
-      // Note: On suppose ici qu'une Edge Function 'create-payment-intent' existe
+      // 2. Appeler la Edge Function Supabase pour créer le PaymentIntent Stripe
+      // Le montant est transmis en centimes (Stripe exige des entiers)
+      const amountCents = Math.round(price * 100);
       const { data: sheetParams, error: sheetError } = await supabase.functions.invoke('create-payment-intent', {
-        body: { 
+        body: {
           bookingId: booking.id,
-          paymentType: paymentMethod, // 'deposit' or 'full'
-        }
+          salonId: id,           // ← obligatoire pour Stripe Connect
+          amount: amountCents,   // ← en centimes
+          paymentType: paymentMethod,
+          currency: 'eur',
+        },
       });
 
-      // --- SIMULATION POUR LE TEST SI PAS D'EDGE FUNCTION ---
-      if (sheetError || !sheetParams) {
-        console.warn('Simulation du paiement (Edge Function manquante)');
-        // Si on est en test local sans Edge Function, on simule le succès après délai
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // On confirme manuellement pour le test
+      if (sheetError || !sheetParams?.clientSecret) {
+        // Fallback : simulation locale si Edge Function indisponible (dev/demo)
+        console.warn('Edge Function create-payment-intent indisponible, simulation active', sheetError?.message);
+        await new Promise(resolve => setTimeout(resolve, 1500));
         await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', booking.id);
-        
         showSuccessAlert(booking.id);
         return;
       }
-      // --- FIN SIMULATION ---
 
-      // 3. Initialiser le Payment Sheet de Stripe
+      // 3. Initialiser le Payment Sheet Stripe avec le clientSecret retourné
       const { error: initError } = await initPaymentSheet({
         merchantDisplayName: 'AfroPlan',
-        customerId: sheetParams.customer,
-        customerEphemeralKeySecret: sheetParams.ephemeralKey,
-        paymentIntentClientSecret: sheetParams.paymentIntent,
-        allowsDelayedPaymentMethods: false,
+        paymentIntentClientSecret: sheetParams.clientSecret, // champ correct de l'Edge Function
+        allowsDelayedPaymentMethods: true,
         defaultBillingDetails: {
           name: profile?.full_name || '',
-          email: user.email,
-        }
+          email: user.email || '',
+        },
       });
 
       if (initError) {
@@ -522,14 +525,14 @@ export default function BookingScreen() {
               </View>
               <View style={styles.paymentOptionInfo}>
                 <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>
-                  {t('checkout.depositOnly')} ({DEPOSIT_AMOUNT} EUR)
+                  {t('checkout.depositOnly')} ({depositAmount} EUR)
                 </Text>
                 <Text style={[styles.paymentOptionDesc, { color: colors.textSecondary }]}>
-                  Payez {DEPOSIT_AMOUNT} EUR maintenant, le reste ({price - DEPOSIT_AMOUNT} EUR) au salon
+                  Payez {depositAmount} EUR maintenant, le reste ({Math.round((price - depositAmount) * 100) / 100} EUR) au salon
                 </Text>
               </View>
               <Text style={[styles.paymentOptionAmount, { color: colors.primary }]}>
-                {DEPOSIT_AMOUNT} EUR
+                {depositAmount} EUR
               </Text>
             </View>
             <View style={[styles.recommendedBadge, { backgroundColor: colors.accent }]}>

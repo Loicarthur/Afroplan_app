@@ -68,10 +68,17 @@ export default function SalonDetailScreen() {
     const checkBooking = async () => {
       if (user?.id && id) {
         try {
-          const bookings = await bookingService.getSalonBookings(id);
-          // On vérifie si l'utilisateur actuel est parmi les clients ayant réservé
-          const userHasBooked = bookings.data.some(b => b.client_id === user.id && (b.status === 'confirmed' || b.status === 'pending' || b.status === 'completed'));
-          setHasBooking(userHasBooked);
+          // On cherche uniquement les réservations PAYÉES (confirmed ou completed)
+          // 'pending' = réservation créée mais pas encore payée → ne donne pas accès
+          const { supabase: sb } = await import('@/lib/supabase');
+          const { data } = await sb
+            .from('bookings')
+            .select('id, status')
+            .eq('salon_id', id)
+            .eq('client_id', user.id)
+            .in('status', ['confirmed', 'completed'])
+            .limit(1);
+          setHasBooking((data?.length ?? 0) > 0);
         } catch (e) {
           setHasBooking(false);
         }
@@ -94,6 +101,22 @@ export default function SalonDetailScreen() {
       const query = encodeURIComponent(`${salon.address}, ${salon.city}`);
       Linking.openURL(`https://maps.google.com/?q=${query}`);
     }
+  };
+
+  const handleMessage = () => {
+    // Navigation vers la messagerie (après réservation confirmée)
+    router.push(`/(tabs)/reservations`);
+  };
+
+  const showLockedAlert = () => {
+    Alert.alert(
+      '🔒 Accès réservé',
+      'Réservez et payez une prestation pour débloquer le contact direct, l\'itinéraire et la messagerie avec ce salon.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Réserver maintenant', onPress: () => selectedService ? handleBook() : null },
+      ]
+    );
   };
 
   const handleBook = () => {
@@ -265,45 +288,99 @@ export default function SalonDetailScreen() {
             />
           </View>
 
-          {/* Address */}
-          <TouchableOpacity style={styles.addressContainer} onPress={handleDirections}>
-            <Ionicons name="location-outline" size={20} color={colors.textSecondary} />
-            <Text style={[styles.address, { color: colors.textSecondary }]}>
-              {salon.address}, {salon.postal_code} {salon.city}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
+          {/* Address — verrouillée avant paiement */}
+          {hasBooking ? (
+            <TouchableOpacity style={styles.addressContainer} onPress={handleDirections}>
+              <Ionicons name="location-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.address, { color: colors.textSecondary }]}>
+                {salon.address}, {salon.postal_code} {salon.city}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.addressContainer} onPress={showLockedAlert} activeOpacity={0.7}>
+              <Ionicons name="location-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.address, { color: colors.textMuted }]} numberOfLines={1}>
+                ••••••••••••••••••••••••
+              </Text>
+              <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
 
-          {/* Quick Actions */}
+          {/* Quick Actions — grisées avec cadenas avant paiement */}
           <View style={styles.quickActions}>
-            {hasBooking ? (
-              <>
-                {salon.phone && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                    onPress={handleCall}
-                  >
-                    <Ionicons name="call-outline" size={20} color={colors.primary} />
-                    <Text style={[styles.actionText, { color: colors.text }]}>Appeler</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={handleDirections}
-                >
-                  <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Itineraire</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <View style={[styles.restrictedContactBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
-                <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
-                <Text style={[styles.restrictedContactText, { color: colors.textSecondary }]}>
-                  Réservez une prestation pour débloquer l&apos;itinéraire et le contact direct.
+            {/* Appeler */}
+            {salon.phone && (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: hasBooking ? colors.backgroundSecondary : colors.backgroundSecondary },
+                  !hasBooking && styles.actionButtonLocked,
+                ]}
+                onPress={hasBooking ? handleCall : showLockedAlert}
+                activeOpacity={hasBooking ? 0.7 : 0.9}
+              >
+                <Ionicons
+                  name={hasBooking ? 'call-outline' : 'lock-closed-outline'}
+                  size={18}
+                  color={hasBooking ? colors.primary : colors.textMuted}
+                />
+                <Text style={[styles.actionText, { color: hasBooking ? colors.text : colors.textMuted }]}>
+                  Appeler
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
+
+            {/* Itinéraire */}
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                { backgroundColor: colors.backgroundSecondary },
+                !hasBooking && styles.actionButtonLocked,
+              ]}
+              onPress={hasBooking ? handleDirections : showLockedAlert}
+              activeOpacity={hasBooking ? 0.7 : 0.9}
+            >
+              <Ionicons
+                name={hasBooking ? 'navigate-outline' : 'lock-closed-outline'}
+                size={18}
+                color={hasBooking ? colors.primary : colors.textMuted}
+              />
+              <Text style={[styles.actionText, { color: hasBooking ? colors.text : colors.textMuted }]}>
+                Itinéraire
+              </Text>
+            </TouchableOpacity>
+
+            {/* Message */}
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                { backgroundColor: colors.backgroundSecondary },
+                !hasBooking && styles.actionButtonLocked,
+              ]}
+              onPress={hasBooking ? handleMessage : showLockedAlert}
+              activeOpacity={hasBooking ? 0.7 : 0.9}
+            >
+              <Ionicons
+                name={hasBooking ? 'chatbubble-outline' : 'lock-closed-outline'}
+                size={18}
+                color={hasBooking ? colors.primary : colors.textMuted}
+              />
+              <Text style={[styles.actionText, { color: hasBooking ? colors.text : colors.textMuted }]}>
+                Message
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Bandeau de rappel si non payé */}
+          {!hasBooking && (
+            <View style={[styles.lockBanner, { backgroundColor: colors.primary + '0A', borderColor: colors.primary + '30' }]}>
+              <Ionicons name="lock-closed" size={14} color={colors.primary} />
+              <Text style={[styles.lockBannerText, { color: colors.textSecondary }]}>
+                Réservez et payez une prestation pour débloquer l&apos;appel, l&apos;itinéraire et la messagerie.
+              </Text>
+            </View>
+          )}
 
                     {/* Description */}
                     {salon.description && (
@@ -599,6 +676,23 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
+  },
+  actionButtonLocked: {
+    opacity: 0.45,
+  },
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: Spacing.md,
+  },
+  lockBannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
   },
   restrictedContactBox: {
     flex: 1,
