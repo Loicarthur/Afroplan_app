@@ -344,48 +344,52 @@ export default function CoiffeurPortfolioScreen() {
         ) : (
           <View style={styles.grid}>
             {filteredRealizations.map((item, index) => (
-              <Animated.View 
-                key={item.id} 
+              <Animated.View
+                key={item.id}
                 entering={FadeInUp.delay(index * 100).duration(400)}
                 style={styles.gridItem}
               >
-                <TouchableOpacity 
-                  onLongPress={() => handleDelete(item.id)}
-                  activeOpacity={0.9}
-                >
-                  {item.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
-                    <View style={styles.image}>
-                      {Video ? (
-                        <Video
-                          source={{ uri: item.image_url }}
-                          style={StyleSheet.absoluteFill}
-                          resizeMode={ResizeMode.COVER}
-                          shouldPlay={false}
-                        />
-                      ) : (
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-                          <Ionicons name="videocam" size={32} color="#FFF" />
-                        </View>
-                      )}
-                      <View style={styles.videoIndicator}>
-                        <Ionicons name="play" size={24} color="#FFFFFF" />
+                {item.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
+                  <View style={styles.image}>
+                    {Video ? (
+                      <Video
+                        source={{ uri: item.image_url }}
+                        style={StyleSheet.absoluteFill}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={false}
+                      />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="videocam" size={32} color="#FFF" />
                       </View>
+                    )}
+                    <View style={styles.videoIndicator}>
+                      <Ionicons name="play" size={24} color="#FFFFFF" />
                     </View>
-                  ) : (
-                    <Image source={{ uri: item.image_url }} style={styles.image} contentFit="cover" />
-                  )}
-                  
-                  {/* Badge de catégorie */}
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryBadgeText}>{item.style_category}</Text>
                   </View>
+                ) : (
+                  <Image source={{ uri: item.image_url }} style={styles.image} contentFit="cover" />
+                )}
 
-                  <View style={[styles.itemOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
-                    <Text style={styles.itemCaption} numberOfLines={1}>
-                      {item.caption || 'Sans description'}
-                    </Text>
-                  </View>
+                {/* Badge de catégorie */}
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryBadgeText}>{item.style_category}</Text>
+                </View>
+
+                {/* Bouton supprimer — visible et accessible */}
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDelete(item.id)}
+                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                >
+                  <Ionicons name="trash" size={14} color="#FFFFFF" />
                 </TouchableOpacity>
+
+                <View style={[styles.itemOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
+                  <Text style={styles.itemCaption} numberOfLines={1}>
+                    {item.caption || 'Sans description'}
+                  </Text>
+                </View>
               </Animated.View>
             ))}
           </View>
@@ -581,6 +585,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(239,68,68,0.9)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryBadgeText: {
     color: '#FFFFFF',

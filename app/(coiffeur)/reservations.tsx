@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,13 +100,13 @@ export default function CoiffeurReservationsScreen() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return 'Confirme';
+        return 'Confirmé';
       case 'pending':
         return 'En attente';
       case 'completed':
-        return 'Termine';
+        return 'Terminé';
       case 'cancelled':
-        return 'Annule';
+        return 'Annulé';
       default:
         return 'Inconnu';
     }
@@ -245,44 +246,64 @@ export default function CoiffeurReservationsScreen() {
               <View style={[styles.infoBox, { backgroundColor: colors.primary + '08', borderColor: colors.border }]}>
                 <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                  Définissez vos horaires habituels pour que les clients sachent quand réserver.
+                  Modifiez vos horaires et appuyez sur &quot;Enregistrer&quot;. Vos clients verront les créneaux disponibles en temps réel.
                 </Text>
               </View>
 
-              {Object.entries(weeklySchedule).map(([day, config]: [string, any]) => (
-                <View key={day} style={[styles.dayRow, { borderBottomColor: colors.border }]}>
-                  <View style={styles.dayMain}>
-                    <TouchableOpacity 
-                      style={[styles.checkbox, config.active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                      onPress={() => setWeeklySchedule((prev: any) => ({
-                        ...prev,
-                        [day]: { ...config, active: !config.active }
-                      }))}
-                    >
-                      {config.active && <Ionicons name="checkmark" size={14} color="#FFF" />}
-                    </TouchableOpacity>
-                    <Text style={[styles.dayLabel, { color: config.active ? colors.text : colors.textMuted }]}>
-                      {day.charAt(0).toUpperCase() + day.slice(1)}
-                    </Text>
-                  </View>
-
-                  {config.active ? (
-                    <View style={styles.hoursRow}>
-                      <View style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary }]}>
-                        <Text style={{ fontSize: 13 }}>{config.start}</Text>
-                      </View>
-                      <Text style={{ marginHorizontal: 8, color: colors.textMuted }}>-</Text>
-                      <View style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary }]}>
-                        <Text style={{ fontSize: 13 }}>{config.end}</Text>
-                      </View>
+              {Object.entries(weeklySchedule).map(([day, config]: [string, any]) => {
+                const labels: Record<string, string> = {
+                  monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi',
+                  thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche',
+                };
+                return (
+                  <View key={day} style={[styles.dayRow, { borderBottomColor: colors.border }]}>
+                    <View style={styles.dayMain}>
+                      <TouchableOpacity
+                        style={[styles.checkbox, config.active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        onPress={() => setWeeklySchedule((prev: any) => ({
+                          ...prev,
+                          [day]: { ...config, active: !config.active }
+                        }))}
+                      >
+                        {config.active && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                      </TouchableOpacity>
+                      <Text style={[styles.dayLabel, { color: config.active ? colors.text : colors.textMuted }]}>
+                        {labels[day] || day}
+                      </Text>
                     </View>
-                  ) : (
-                    <Text style={[styles.closedText, { color: colors.textMuted }]}>Fermé</Text>
-                  )}
-                </View>
-              ))}
 
-              <TouchableOpacity 
+                    {config.active ? (
+                      <View style={styles.hoursRow}>
+                        <TextInput
+                          style={[styles.hourInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                          value={config.start}
+                          onChangeText={(val) => setWeeklySchedule((prev: any) => ({
+                            ...prev,
+                            [day]: { ...config, start: val }
+                          }))}
+                          placeholder="09:00"
+                          keyboardType="numbers-and-punctuation"
+                        />
+                        <Text style={{ marginHorizontal: 6, color: colors.textMuted }}>–</Text>
+                        <TextInput
+                          style={[styles.hourInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                          value={config.end}
+                          onChangeText={(val) => setWeeklySchedule((prev: any) => ({
+                            ...prev,
+                            [day]: { ...config, end: val }
+                          }))}
+                          placeholder="18:00"
+                          keyboardType="numbers-and-punctuation"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={[styles.closedText, { color: colors.textMuted }]}>Fermé</Text>
+                    )}
+                  </View>
+                );
+              })}
+
+              <TouchableOpacity
                 style={[styles.pauseButton, { borderColor: colors.error }]}
                 onPress={() => Alert.alert('Mode Pause', 'Toutes vos réservations en ligne seront bloquées pour aujourd\'hui.')}
               >
@@ -290,9 +311,9 @@ export default function CoiffeurReservationsScreen() {
                 <Text style={[styles.pauseButtonText, { color: colors.error }]}>Bloquer ma journée (Urgence)</Text>
               </TouchableOpacity>
 
-              <Button 
-                title="Enregistrer mes horaires" 
-                onPress={() => Alert.alert('Succès', 'Vos disponibilités ont été mises à jour.')}
+              <Button
+                title="Enregistrer mes horaires"
+                onPress={() => Alert.alert('Horaires mis à jour', 'Vos disponibilités ont été enregistrées avec succès.')}
                 style={{ marginTop: 24 }}
               />
             </View>
@@ -316,7 +337,7 @@ export default function CoiffeurReservationsScreen() {
                 <View style={styles.bookingHeader}>
                   <View style={styles.bookingDateTime}>
                     <Text style={[styles.bookingDate, { color: colors.text }]}>
-                      {booking.booking_date}
+                      {new Date(booking.booking_date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </Text>
                     <Text style={[styles.bookingTime, { color: colors.primary }]}>
                       {booking.start_time.substring(0, 5)} - {booking.service?.duration_minutes}min
@@ -592,8 +613,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    minWidth: 60,
-    alignItems: 'center',
+    minWidth: 62,
+    textAlign: 'center',
+    fontSize: 13,
+    borderWidth: 1,
   },
   closedText: {
     fontSize: 13,

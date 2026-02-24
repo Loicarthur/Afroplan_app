@@ -23,22 +23,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { bookingService } from '@/services/booking.service';
 import { salonService } from '@/services/salon.service';
-import { BookingWithDetails } from '@/types';
+import { bookingService } from '@/services/booking.service';
 
-const { width, height } = Dimensions.get('window');
-
-// Données fictives pour les clients
-const MOCK_CLIENTS = [
-  { id: '1', name: 'Marie Dupont', phone: '+33 6 12 34 56 78', lastVisit: '12 Fév 2025', visitsCount: 4, notes: 'Cuir chevelu sensible. Préfère les tresses pas trop serrées.', avatar: 'https://i.pravatar.cc/150?img=1' },
-  { id: '2', name: 'Fatou Diallo', phone: '+33 6 98 76 54 32', lastVisit: '05 Fév 2025', visitsCount: 12, notes: "Utilise la coloration miel #4. Toujours à l'heure.", avatar: 'https://i.pravatar.cc/150?img=5' },
-  { id: '3', name: 'Awa Sylla', phone: '+33 7 11 22 33 44', lastVisit: '28 Jan 2025', visitsCount: 1, notes: 'Première visite. Cheveux très épais, prévoir 30min de plus pour le démêlage.', avatar: 'https://i.pravatar.cc/150?img=9' },
-];
+const { width } = Dimensions.get('window');
 
 type MenuItemProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -74,71 +67,83 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
 export default function CoiffeurProfilScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, signOut, isAuthenticated } = useAuth();
-
-  // États pour les Modals
-  const [walletModalVisible, setWalletModalVisible] = useState(false);
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
-  const [infoModalVisible, setInfoModalVisible] = useState(false);
-  const [notifModalVisible, setNotifModalVisible] = useState(false);
-  const [securityModalVisible, setSecurityModalVisible] = useState(false);
-  const [bankModalVisible, setBankModalVisible] = useState(false);
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [clientsModalVisible, setClientsModalVisible] = useState(false);
-  const [clientDetailModalVisible, setClientDetailModalVisible] = useState(false);
-
-  // États pour les données
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
-  const [balance, setBalance] = useState(0);
-  const [selectedClient, setSelectedClient] = useState<any>(null);
-  const [clientNotes, setClientNotes] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // États pour les formulaires
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [notifBookings, setNotifBookings] = useState(true);
-  const [notifMessages, setNotifMessages] = useState(true);
-
-  // États pour le RIB
-  const [iban, setIban] = useState('FR7612345678901234567890123');
-  const [accountHolder, setAccountHolder] = useState(profile?.full_name || 'TITULAIRE DU COMPTE');
-  const [isSavingBank, setIsSavingBank] = useState(false);
-
-  // États Sécurité & Confidentialité
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const [isProfileVisible, setIsProfileVisible] = useState(true);
-  const [twoFactorAuth, setTwoFactorAuth] = useState(false);
-
-  const fetchFinancialData = async () => {
-    if (!user) return;
-    setLoadingData(true);
-    try {
-      const salon = await salonService.getSalonByOwnerId(user.id);
-      if (salon) {
-        const response = await bookingService.getSalonBookings(salon.id);
-        setBookings(response.data);
-        const total = response.data
-          .filter(b => b.status === 'completed' || b.status === 'confirmed')
-          .reduce((sum, b) => sum + b.total_price, 0);
-        setBalance(total);
-      }
-    } catch (error) {
-      console.error('Erreur données financières:', error);
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  const { user, profile, signOut, isAuthenticated, refreshProfile } = useAuth();
+  const [realStats, setRealStats] = useState({ bookings: 0, revenue: 0 });
 
   useEffect(() => {
-    if (isAuthenticated && (walletModalVisible || historyModalVisible)) {
-      fetchFinancialData();
+    const loadStats = async () => {
+      if (!user || !isAuthenticated) return;
+      try {
+        const salon = await salonService.getSalonByOwnerId(user.id);
+        if (salon) {
+          const response = await bookingService.getSalonBookings(salon.id);
+          const completed = response.data.filter(
+            (b) => b.status === 'completed' || b.status === 'confirmed'
+          );
+          const revenue = completed.reduce((sum, b) => sum + (b.total_price || 0), 0);
+          setRealStats({ bookings: completed.length, revenue });
+        }
+      } catch {
+        // Non bloquant
+      }
+    };
+    loadStats();
+  }, [isAuthenticated, user]);
+
+  const handleAvatarUpload = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Accès à la galerie refusé.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const { supabase } = await import('@/lib/supabase');
+        const uri = result.assets[0].uri;
+        const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `avatars/${user!.id}/avatar.${extension}`;
+
+        const base64: string = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = function () {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(xhr.response);
+          };
+          xhr.onerror = () => reject(new Error('Lecture fichier impossible'));
+          xhr.open('GET', uri);
+          xhr.responseType = 'blob';
+          xhr.send();
+        });
+
+        const { default: base64js } = await import('base64-js');
+        const arrayBuffer = base64js.toByteArray(base64);
+
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, arrayBuffer, { contentType: `image/${extension}`, upsert: true });
+
+        if (error) throw error;
+
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+        await supabase
+          .from('profiles')
+          .update({ avatar_url: urlData.publicUrl })
+          .eq('id', user!.id);
+
+        await refreshProfile();
+        Alert.alert('Succès', 'Photo de profil mise à jour !');
+      }
+    } catch (err: any) {
+      Alert.alert('Erreur', err.message || 'Impossible de mettre à jour la photo.');
     }
-  }, [isAuthenticated, walletModalVisible, historyModalVisible]);
+  };
 
   const handleSignOut = () => {
     Alert.alert('Déconnexion', 'Souhaitez-vous vous déconnecter ?', [
@@ -243,7 +248,11 @@ export default function CoiffeurProfilScreen() {
                 <Text style={styles.avatarInitials}>{profile?.full_name?.charAt(0)?.toUpperCase() || 'C'}</Text>
               </LinearGradient>
             )}
-            <TouchableOpacity style={[styles.editAvatarButton, { backgroundColor: colors.card }]} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.editAvatarButton, { backgroundColor: colors.card }]}
+              activeOpacity={0.8}
+              onPress={handleAvatarUpload}
+            >
               <Ionicons name="camera" size={16} color={colors.primary} />
             </TouchableOpacity>
           </View>
@@ -257,19 +266,21 @@ export default function CoiffeurProfilScreen() {
           </View>
         </View>
 
-        {/* QUICK STATS */}
+        {/* ── QUICK STATS — données réelles ── */}
         <View style={styles.statsRow}>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>4.9</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Note</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{realStats.bookings}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Prestations</Text>
           </View>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>124</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Ventes</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {realStats.revenue > 0 ? `${realStats.revenue.toFixed(0)}€` : '–'}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Revenus</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>3 ans</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exp.</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>Pro</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Statut</Text>
           </View>
         </View>
 
