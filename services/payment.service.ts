@@ -93,6 +93,7 @@ export interface PaymentIntent {
   status: PaymentStatus;
   stripePaymentIntentId?: string;
   clientSecret?: string;
+  paymentId?: string;
 }
 
 export interface StripeAccount {
@@ -115,130 +116,118 @@ export const paymentService = {
   },
 
   /**
-   * Calculer la commission sur l'acompte
-   * L'acompte est de 20% du prix du service, la commission est prise dessus
-   */
-  calculateDepositCommission(
-    totalServicePrice: number,
-    plan: SubscriptionPlan = 'free'
-  ): {
-    depositAmount: number;
-    commission: number;
-    salonDepositAmount: number;
-    commissionRate: number;
-  } {
-    const depositAmount = Math.round(totalServicePrice * DEPOSIT_RATE);
-    const commissionRate = COMMISSION_RATES[plan];
-    const commission = Math.round(depositAmount * commissionRate);
-    const salonDepositAmount = depositAmount - commission;
-
-    return {
-      depositAmount,
-      commission,
-      salonDepositAmount,
-      commissionRate,
-    };
-  },
-
-  /**
-   * Calculer la commission sur un montant
-   * Commission de 20% par défaut (réduite selon l'abonnement)
-   */
-  calculateCommission(
-    amount: number,
-    plan: SubscriptionPlan = 'free'
-  ): {
-    amount: number;
-    commission: number;
-    salonAmount: number;
-    commissionRate: number;
-  } {
-    const commissionRate = COMMISSION_RATES[plan];
-    const commission = Math.round(amount * commissionRate);
-    const salonAmount = amount - commission;
-
-    return {
-      amount,
-      commission,
-      salonAmount,
-      commissionRate,
-    };
-  },
-
-  /**
-   * Créer une intention de paiement pour une réservation
-   * Supporte le paiement d'acompte ou le paiement intégral
-   * Commission AfroPlan de 20% appliquée sur le montant payé
+   * Créer une intention de paiement via l'Edge Function Supabase
    */
   async createPaymentIntent(
     bookingId: string,
-    totalServicePrice: number,
+    amountInCents: number,
     salonId: string,
     paymentType: 'deposit' | 'full' = 'deposit'
-  ): Promise<PaymentIntent> {
-    // Récupérer le compte Stripe du salon
-    const { data: stripeAccount } = await supabase
-      .from('stripe_accounts')
-      .select('*')
-      .eq('salon_id', salonId)
-      .single();
+  ): Promise<{
+    clientSecret: string;
+    paymentIntentId?: string;
+    paymentId?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          bookingId,
+          salonId,
+          amount: amountInCents,
+          paymentType,
+          currency: 'eur',
+        },
+      });
 
-    const plan = stripeAccount?.subscription_plan || 'free';
-    const commissionRate = COMMISSION_RATES[plan];
+      console.error('DEBUG: RAW DATA FROM EDGE FUNCTION:', JSON.stringify(data));
+      if (error) {
+        console.error('DEBUG: ERROR FROM EDGE FUNCTION:', JSON.stringify(error));
+      }
+      
+      if (data?.version) {
+        console.error(`DEBUG: Version Edge Function: ${data.version}`);
+      }
 
-    let payAmount: number;
-    let remainingAmount: number;
+      if (error) {
+        let errorMsg = error.message;
+        if ((error as any).context) {
+          const body = await (error as any).context.text();
+          try {
+            const json = JSON.parse(body);
+            errorMsg = json.error || json.message || body;
+          } catch (e) {
+            errorMsg = body || error.message;
+          }
+        }
+        throw new Error(errorMsg);
+      }
 
-    if (paymentType === 'full') {
-      // Paiement intégral - le client paie tout en une fois
-      payAmount = totalServicePrice;
-      remainingAmount = 0;
-    } else {
-      // Acompte de 20% - le client paie 20% maintenant, le reste au salon
-      payAmount = Math.round(totalServicePrice * DEPOSIT_RATE);
-      remainingAmount = totalServicePrice - payAmount;
+      if (!data || !data.clientSecret) {
+        throw new Error('Réponse invalide de la passerelle de paiement: clientSecret manquant');
+      }
+
+      const clientSecret = data.clientSecret;
+      const paymentIntentId = data.paymentIntentId || data.stripe_payment_intent_id || clientSecret.split('_secret')[0];
+
+      // Sécurité : Si l'Edge Function n'a pas renvoyé de paymentId, 
+      // on s'assure que la ligne existe en base (Récupération ou Création)
+      let paymentId = data.paymentId;
+      
+      if (!paymentId) {
+        console.warn('DEBUG: Pas de paymentId renvoyé, tentative de récupération/création via stripe_payment_intent_id');
+        
+        const { data: existingPayment } = await supabase
+          .from('payments')
+          .select('id')
+          .eq('stripe_payment_intent_id', paymentIntentId)
+          .maybeSingle();
+        
+        if (existingPayment) {
+          paymentId = existingPayment.id;
+        } else {
+          // INSERT de secours si la ligne n'existe vraiment pas
+          console.log('DEBUG: Ligne inexistante, création du paiement de secours...');
+          
+          // Calculs simplifiés pour le secours (l'essentiel est le lien booking_id + intent_id)
+          const payAmount = Math.round(paymentType === 'full' ? amountInCents : amountInCents * DEPOSIT_RATE);
+          const commission = Math.round(payAmount * AFROPLAN_COMMISSION_RATE);
+          
+          const { data: newPayment, error: insertError } = await supabase
+            .from('payments')
+            .insert({
+              booking_id: bookingId,
+              salon_id: salonId,
+              amount: payAmount,
+              total_service_price: amountInCents,
+              remaining_amount: paymentType === 'full' ? 0 : amountInCents - payAmount,
+              commission: commission,
+              salon_amount: payAmount - commission,
+              commission_rate: AFROPLAN_COMMISSION_RATE,
+              status: 'pending',
+              payment_type: paymentType,
+              stripe_payment_intent_id: paymentIntentId,
+            })
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error('Erreur lors de la création du paiement de secours:', insertError);
+          } else if (newPayment) {
+            paymentId = newPayment.id;
+            console.log('DEBUG: Paiement de secours créé avec ID:', paymentId);
+          }
+        }
+      }
+
+      return {
+        clientSecret,
+        paymentIntentId,
+        paymentId,
+      };
+    } catch (err: any) {
+      console.error('Erreur createPaymentIntent:', err.message);
+      throw err;
     }
-
-    // Commission AfroPlan sur le montant payé en ligne
-    const commission = Math.round(payAmount * commissionRate);
-    const salonPayAmount = payAmount - commission;
-
-    // Enregistrer le paiement en base
-    const { data: payment, error } = await supabase
-      .from('payments')
-      .insert({
-        booking_id: bookingId,
-        salon_id: salonId,
-        amount: payAmount,
-        total_service_price: totalServicePrice,
-        remaining_amount: remainingAmount,
-        commission,
-        salon_amount: salonPayAmount,
-        commission_rate: commissionRate,
-        currency: 'eur',
-        status: 'pending',
-        payment_type: paymentType,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Erreur création paiement: ${error.message}`);
-    }
-
-    // L'appel à Stripe PaymentIntent sera fait via Supabase Edge Function
-    // pour sécuriser les clés secrètes. Le frontend utilise le clientSecret retourné.
-    return {
-      id: payment.id,
-      bookingId,
-      depositAmount: payAmount,
-      totalServicePrice,
-      remainingAmount,
-      commission,
-      salonDepositAmount: salonPayAmount,
-      currency: 'eur',
-      status: 'pending',
-    };
   },
 
   /**
@@ -280,136 +269,34 @@ export const paymentService = {
   },
 
   /**
-   * Récupérer les statistiques de paiement d'un salon
+   * Créer un compte Stripe Connect CUSTOM pour un salon
    */
-  async getSalonPaymentStats(salonId: string, period: 'week' | 'month' | 'year' = 'month') {
-    const now = new Date();
-    let startDate: Date;
+  async createStripeCustomAccount(salonId: string, email: string) {
+    const { data, error } = await supabase.functions.invoke('manage-stripe-account', {
+      body: { action: 'create_custom_account', salonId, email },
+    });
 
-    switch (period) {
-      case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case 'month':
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case 'year':
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        break;
-    }
-
-    const { data, error } = await supabase
-      .from('payments')
-      .select('amount, commission, salon_amount, status, created_at')
-      .eq('salon_id', salonId)
-      .eq('status', 'completed')
-      .gte('created_at', startDate.toISOString());
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const stats = {
-      totalRevenue: 0,
-      totalCommission: 0,
-      netRevenue: 0,
-      transactionCount: 0,
-      averageTransaction: 0,
-    };
-
-    if (data && data.length > 0) {
-      stats.totalRevenue = data.reduce((sum, p) => sum + p.amount, 0);
-      stats.totalCommission = data.reduce((sum, p) => sum + p.commission, 0);
-      stats.netRevenue = data.reduce((sum, p) => sum + p.salon_amount, 0);
-      stats.transactionCount = data.length;
-      stats.averageTransaction = Math.round(stats.totalRevenue / data.length);
-    }
-
-    return stats;
-  },
-
-  /**
-   * Récupérer le compte Stripe d'un salon
-   */
-  async getStripeAccount(salonId: string): Promise<StripeAccount | null> {
-    const { data, error } = await supabase
-      .from('stripe_accounts')
-      .select('*')
-      .eq('salon_id', salonId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new Error(error.message);
-    }
-
-    if (!data) return null;
-
-    return {
-      id: data.id,
-      salonId: data.salon_id,
-      stripeAccountId: data.stripe_account_id,
-      isOnboarded: data.is_onboarded,
-      chargesEnabled: data.charges_enabled,
-      payoutsEnabled: data.payouts_enabled,
-      subscriptionPlan: data.subscription_plan,
-      subscriptionStatus: data.subscription_status,
-    };
-  },
-
-  /**
-   * Créer un compte Stripe Connect pour un salon
-   * Note: Cette fonction devrait appeler une Edge Function Supabase
-   */
-  async createStripeConnectAccount(salonId: string, email: string) {
-    // Créer l'entrée en base
-    const { data, error } = await supabase
-      .from('stripe_accounts')
-      .insert({
-        salon_id: salonId,
-        subscription_plan: 'free',
-        is_onboarded: false,
-        charges_enabled: false,
-        payouts_enabled: false,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    // Note: L'appel Stripe serait fait via Edge Function
-    // Retourner l'URL d'onboarding Stripe Connect
-    return {
-      accountId: data.id,
-      onboardingUrl: null, // Serait retourné par l'Edge Function
-    };
-  },
-
-  /**
-   * Mettre à jour le plan d'abonnement d'un salon
-   */
-  async updateSubscriptionPlan(salonId: string, plan: SubscriptionPlan) {
-    const { data, error } = await supabase
-      .from('stripe_accounts')
-      .update({
-        subscription_plan: plan,
-        subscription_status: plan === 'free' ? null : 'active',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('salon_id', salonId)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    if (error) throw new Error(error.message);
     return data;
   },
 
   /**
-   * Récupérer le solde disponible pour un salon
+   * Enregistrer l'IBAN (RIB) pour un compte Custom
+   */
+  async registerIban(salonId: string, iban: string) {
+    const { data, error } = await supabase.functions.invoke('manage-stripe-account', {
+      body: { action: 'attach_bank_account', salonId, iban },
+    });
+
+    if (error) {
+      console.error('Erreur enregistrement IBAN:', error);
+      throw new Error(error.message);
+    }
+    return data;
+  },
+
+  /**
+   * Récupérer le solde disponible pour un virement (80% net)
    */
   async getSalonBalance(salonId: string) {
     const { data, error } = await supabase
@@ -419,9 +306,7 @@ export const paymentService = {
       .eq('status', 'completed')
       .eq('is_paid_out', false);
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
 
     const availableBalance = data?.reduce((sum, p) => sum + p.salon_amount, 0) || 0;
 
@@ -434,31 +319,83 @@ export const paymentService = {
   /**
    * Confirmer un paiement (appelé après validation Stripe)
    */
-  async confirmPayment(paymentId: string, stripePaymentIntentId: string) {
-    const { data, error } = await supabase
-      .from('payments')
-      .update({
-        status: 'completed',
-        stripe_payment_intent_id: stripePaymentIntentId,
-        paid_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', paymentId)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
+  async confirmPayment(paymentId?: string, stripePaymentIntentId?: string) {
+    console.log('--- DEBUT confirmPayment ---', { paymentId, stripePaymentIntentId });
+    
+    if (!paymentId && !stripePaymentIntentId) {
+      console.error('Erreur confirmPayment: Aucun identifiant fourni');
+      throw new Error('Identifiant de paiement manquant pour la confirmation.');
     }
 
+    // On prépare l'objet de mise à jour
+    const updateData = {
+      status: 'completed' as PaymentStatus,
+      paid_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any;
+
+    if (stripePaymentIntentId) {
+      updateData.stripe_payment_intent_id = stripePaymentIntentId;
+    }
+
+    let query = supabase.from('payments').update(updateData);
+
+    if (stripePaymentIntentId && stripePaymentIntentId !== '' && stripePaymentIntentId !== 'undefined') {
+      console.log('DEBUG: Filtrage par stripe_payment_intent_id:', stripePaymentIntentId);
+      query = query.eq('stripe_payment_intent_id', stripePaymentIntentId);
+    } else if (paymentId && paymentId !== 'undefined' && paymentId !== 'null' && paymentId !== '') {
+      console.log('DEBUG: Filtrage par paymentId:', paymentId);
+      query = query.eq('id', paymentId);
+    } else {
+      throw new Error('Identifiant de filtrage (Stripe Intent ID) manquant pour la confirmation.');
+    }
+
+    const { data, error } = await query.select().maybeSingle();
+
+    if (error) {
+      console.error('Erreur SQL confirmPayment:', error);
+      throw new Error(`Erreur lors de la confirmation du paiement: ${error.message}`);
+    }
+
+    if (!data) {
+      console.error('CRITIQUE: Paiement introuvable avec les critères fournis', { paymentId, stripePaymentIntentId });
+      
+      // Tentative de secours : chercher si le paiement existe déjà en mode complété
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('*')
+        .or(`id.eq.${paymentId},stripe_payment_intent_id.eq.${stripePaymentIntentId}`)
+        .maybeSingle();
+      
+      if (existingPayment) {
+        console.log('DEBUG: Paiement déjà existant trouvé:', existingPayment);
+        if (existingPayment.status === 'completed') {
+          console.log('INFO: Le paiement est déjà marqué comme complété.');
+          return existingPayment;
+        }
+      }
+      
+      throw new Error('Paiement introuvable pour la confirmation.');
+    }
+
+    console.log('DEBUG: Paiement mis à jour avec succès:', data.id);
+
     // Mettre à jour le statut de la réservation
-    await supabase
-      .from('bookings')
-      .update({
-        status: 'confirmed',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', data.booking_id);
+    if (data.booking_id) {
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'confirmed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.booking_id);
+      
+      if (bookingError) {
+        console.error('Erreur mise à jour réservation:', bookingError);
+      } else {
+        console.log('DEBUG: Réservation confirmée:', data.booking_id);
+      }
+    }
 
     return data;
   },
@@ -477,7 +414,7 @@ export const paymentService = {
       })
       .eq('id', paymentId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       throw new Error(error.message);

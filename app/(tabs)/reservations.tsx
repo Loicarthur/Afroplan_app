@@ -148,9 +148,23 @@ export default function ClientReservationsScreen() {
           { 
             text: 'Oui, annuler', 
             style: 'destructive', 
-            onPress: () => {
-              // Logique d'annulation simple
-              Alert.alert('Succès', 'Rendez-vous annulé.');
+            onPress: async () => {
+              try {
+                // On retire immédiatement de l'affichage pour une réactivité instantanée
+                setBookings(prev => prev.filter(b => b.id !== booking.id));
+                
+                await bookingService.cancelBooking(booking.id);
+                
+                Alert.alert('Succès', 'Votre rendez-vous a été définitivement supprimé.');
+                
+                // Rafraîchir quand même pour synchroniser avec le serveur
+                await fetchBookings();
+              } catch (error) {
+                console.error('Error deleting booking:', error);
+                Alert.alert('Erreur', 'Impossible de supprimer le rendez-vous.');
+                // En cas d'erreur, on remet tout à jour
+                await fetchBookings();
+              }
             } 
           }
         ]
@@ -162,8 +176,18 @@ export default function ClientReservationsScreen() {
     Alert.alert('Info', 'Ce rendez-vous ne peut plus être modifié.');
   };
 
-  const upcomingBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
-  const pastBookings = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  const today = new Date().toISOString().split('T')[0];
+
+  const upcomingBookings = bookings.filter(b => {
+    const isFuture = b.booking_date >= today;
+    return isFuture && (b.status === 'confirmed' || b.status === 'pending');
+  });
+
+  const pastBookings = bookings.filter(b => {
+    const isPast = b.booking_date < today;
+    const isDone = b.status === 'completed' || b.status === 'cancelled';
+    return isPast || isDone;
+  });
   const displayedBookings = filter === 'upcoming' ? upcomingBookings : pastBookings;
 
   const renderBooking = ({ item }: { item: BookingWithDetails }) => (

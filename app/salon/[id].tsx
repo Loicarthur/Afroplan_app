@@ -52,7 +52,7 @@ export default function SalonDetailScreen() {
     id || ''
   );
 
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [hasBooking, setHasBooking] = useState(false);
   const [activeRole, setActiveRole] = useState<string | null>(null);
 
@@ -96,6 +96,17 @@ export default function SalonDetailScreen() {
     }
   };
 
+  const toggleService = (service: Service) => {
+    setSelectedServices(prev => {
+      const isSelected = prev.find(s => s.id === service.id);
+      if (isSelected) {
+        return prev.filter(s => s.id !== service.id);
+      } else {
+        return [...prev, service];
+      }
+    });
+  };
+
   const handleBook = () => {
     if (!isAuthenticated) {
       Alert.alert(
@@ -109,22 +120,28 @@ export default function SalonDetailScreen() {
       return;
     }
 
-    if (!selectedService) {
-      Alert.alert('Attention', 'Veuillez selectionner un service');
+    if (selectedServices.length === 0) {
+      Alert.alert('Attention', 'Veuillez selectionner au moins un service');
       return;
     }
+
+    // Calculer les totaux
+    const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
+    const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
+    const serviceIds = selectedServices.map(s => s.id).join(',');
+    const serviceNames = selectedServices.map(s => s.name).join(', ');
 
     // Navigate to booking flow with service details
     router.push({
       pathname: '/booking/[id]',
       params: {
         id: id,
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        servicePrice: selectedService.price.toString(),
-        serviceDuration: selectedService.duration_minutes.toString(),
-        requiresExtensions: selectedService.requires_extensions ? 'true' : 'false',
-        extensionsIncluded: selectedService.extensions_included ? 'true' : 'false',
+        serviceId: serviceIds,
+        serviceName: serviceNames,
+        servicePrice: totalPrice.toString(),
+        serviceDuration: totalDuration.toString(),
+        requiresExtensions: selectedServices.some(s => s.requires_extensions) ? 'true' : 'false',
+        extensionsIncluded: selectedServices.every(s => s.extensions_included) ? 'true' : 'false',
       },
     });
   };
@@ -330,38 +347,35 @@ export default function SalonDetailScreen() {
                                       </Text>
                                                         <View style={styles.servicesGrid}>
                                                           {services.map((service) => {
-                                                            if (!service) return null;
+                                                            if (!service?.id) return null;
+                                                            const isSelected = selectedServices.some(s => s.id === service.id);
                                                             
+                                                            const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
+                                                            const imageSource = service.image_url 
+                                                              ? { uri: service.image_url } 
+                                                              : catalogStyle?.image;
+
                                                             return (
-                                                              <View key={service.id} style={[
-                                                                styles.serviceCardGrid,
-                                                                { backgroundColor: colors.card },
-                                                                selectedService?.id === service.id && {
-                                                                  borderColor: colors.primary,
-                                                                  borderWidth: 2,
-                                                                },
-                                                                Shadows.sm,
-                                                              ]}>
-                                                                <TouchableOpacity
-                                                                  style={styles.serviceMainContentGrid}
-                                                                  onPress={() => setSelectedService(service)}
-                                                                >
-                                                                  {/* Photo spécifique ou photo du catalogue par défaut */}
-                                                                  {(() => {
-                                                                    const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
-                                                                    const imageSource = service.image_url 
-                                                                      ? { uri: service.image_url } 
-                                                                      : catalogStyle?.image;
-                                      
-                                                                    return (
-                                                                      <Image
-                                                                        source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
-                                                                        style={styles.serviceImageGrid}
-                                                                        contentFit="cover"
-                                                                        transition={300}
-                                                                      />
-                                                                    );
-                                                                  })()}
+                                                              <TouchableOpacity 
+                                                                key={service.id} 
+                                                                activeOpacity={0.9}
+                                                                style={[
+                                                                  styles.serviceCardGrid,
+                                                                  { 
+                                                                    backgroundColor: colors.card,
+                                                                    borderColor: isSelected ? colors.primary : 'transparent',
+                                                                    borderWidth: 2,
+                                                                  },
+                                                                  Shadows.sm,
+                                                                ]}
+                                                                onPress={() => toggleService(service)}
+                                                              >
+                                                                <View style={styles.serviceMainContentGrid}>
+                                                                  <Image
+                                                                    source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
+                                                                    style={styles.serviceImageGrid}
+                                                                    contentFit="cover"
+                                                                  />
                                                                   
                                                                   <View style={styles.serviceInfoGrid}>
                                                                     <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
@@ -375,13 +389,20 @@ export default function SalonDetailScreen() {
                                                                     </Text>
                                                                   </View>
                                                                   
-                                                                  {selectedService?.id === service.id && (
-                                                                    <View style={styles.selectedOverlay}>
-                                                                      <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
+                                                                  {isSelected && (
+                                                                    <View style={{
+                                                                      position: 'absolute',
+                                                                      top: 8,
+                                                                      right: 8,
+                                                                      backgroundColor: 'rgba(255,255,255,0.9)',
+                                                                      borderRadius: 12,
+                                                                      padding: 2,
+                                                                    }}>
+                                                                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                                                                     </View>
                                                                   )}
-                                                                </TouchableOpacity>
-                                                              </View>
+                                                                </View>
+                                                              </TouchableOpacity>
                                                             );
                                                           })}
                                                         </View>
@@ -446,13 +467,13 @@ export default function SalonDetailScreen() {
       {/* Bottom Book Button */}
       <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
         <View style={styles.bottomBarContent}>
-          {selectedService ? (
+          {selectedServices.length > 0 ? (
             <View>
               <Text style={[styles.selectedServiceName, { color: colors.text }]}>
-                {selectedService.name}
+                {selectedServices.length} {selectedServices.length > 1 ? 'prestations' : 'prestation'}
               </Text>
               <Text style={[styles.selectedServicePrice, { color: colors.primary }]}>
-                {selectedService.price} EUR
+                {selectedServices.reduce((sum, s) => sum + s.price, 0)} EUR
               </Text>
             </View>
           ) : (
@@ -463,7 +484,7 @@ export default function SalonDetailScreen() {
           <Button
             title={t('booking.book')}
             onPress={handleBook}
-            disabled={!selectedService}
+            disabled={selectedServices.length === 0}
             style={{ minWidth: 120 }}
           />
         </View>

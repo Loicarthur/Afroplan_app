@@ -195,7 +195,7 @@ export default function BookingScreen() {
 
     try {
       const { supabase } = await import('@/lib/supabase');
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = selectedDate.toISOString().split('T')[0];
       const startDateTime = `${selectedSlot.start}:00`;
       const endDateTime = `${selectedSlot.end}:00`;
 
@@ -203,12 +203,22 @@ export default function BookingScreen() {
         throw new Error('Informations du service manquantes');
       }
 
+      // Pour la DB, on prend le premier ID de service si plusieurs sont présents
+      const firstServiceId = params.serviceId.includes(',') 
+        ? params.serviceId.split(',')[0] 
+        : params.serviceId;
+      
+      // On prépare une note avec tous les services sélectionnés
+      const bookingNotes = params.serviceId.includes(',') 
+        ? `Prestations sélectionnées: ${serviceName}`
+        : null;
+
       // 1. Créer la réservation initiale (statut pending)
       const { data: booking, error: bookingError } = await supabase
         .from('bookings')
         .insert({
           salon_id: id,
-          service_id: params.serviceId,
+          service_id: firstServiceId,
           client_id: user.id,
           booking_date: todayStr,
           start_time: startDateTime,
@@ -217,66 +227,38 @@ export default function BookingScreen() {
           status: 'pending',
           payment_method: paymentMethod,
           service_location: 'salon',
+          notes: bookingNotes,
         })
         .select()
         .single();
 
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        console.error('Erreur SQL creation reservation:', bookingError);
+        throw bookingError;
+      }
 
-      // 2. Appeler la fonction Supabase pour créer le Payment Intent Stripe
-      // Note: On suppose ici qu'une Edge Function 'create-payment-intent' existe
-      const { data: sheetParams, error: sheetError } = await supabase.functions.invoke('create-payment-intent', {
-        body: { 
+      if (!booking || !booking.id) {
+        throw new Error('La réservation a été créée mais aucun identifiant n\'a été retourné.');
+      }
+
+      console.log('DEBUG: Réservation créée avec succès:', booking.id);
+
+      // 2. Rediriger vers la page de checkout réelle
+      router.push({
+        pathname: '/checkout',
+        params: {
           bookingId: booking.id,
+          salonId: id,
+          salonName: salon?.name || '',
+          salonImage: salon?.image_url || '',
+          serviceName: serviceName || '',
+          servicePrice: (price * 100).toString(), // En centimes pour le checkout
+          duration: duration.toString(),
           paymentType: paymentMethod, // 'deposit' or 'full'
+          date: todayStr,
+          time: selectedSlot.start,
         }
       });
-
-      // --- SIMULATION POUR LE TEST SI PAS D'EDGE FUNCTION ---
-      if (sheetError || !sheetParams) {
-        console.warn('Simulation du paiement (Edge Function manquante)');
-        // Si on est en test local sans Edge Function, on simule le succès après délai
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // On confirme manuellement pour le test
-        await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', booking.id);
-        
-        showSuccessAlert(booking.id);
-        return;
-      }
-      // --- FIN SIMULATION ---
-
-      // 3. Initialiser le Payment Sheet de Stripe
-      const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'AfroPlan',
-        customerId: sheetParams.customer,
-        customerEphemeralKeySecret: sheetParams.ephemeralKey,
-        paymentIntentClientSecret: sheetParams.paymentIntent,
-        allowsDelayedPaymentMethods: false,
-        defaultBillingDetails: {
-          name: profile?.full_name || '',
-          email: user.email,
-        }
-      });
-
-      if (initError) {
-        throw new Error(initError.message);
-      }
-
-      // 4. Présenter le Payment Sheet
-      const { error: presentError } = await presentPaymentSheet();
-
-      if (presentError) {
-        if (presentError.code === 'Canceled') {
-          // L'utilisateur a annulé le paiement
-          setIsSubmitting(false);
-          return;
-        }
-        throw new Error(presentError.message);
-      }
-
-      // 5. Paiement réussi ! (La confirmation finale se fait souvent via Webhook Stripe -> Supabase)
-      showSuccessAlert(booking.id);
 
     } catch (error: any) {
       console.error('Booking Error:', error);
@@ -346,10 +328,12 @@ export default function BookingScreen() {
         {/* Service selectionne */}
         <View style={[styles.section, styles.serviceSection, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {language === 'fr' ? 'Service sélectionné' : 'Selected Service'}
+            {params.serviceId?.includes(',') 
+              ? (language === 'fr' ? 'Prestations sélectionnées' : 'Selected Services')
+              : (language === 'fr' ? 'Service sélectionné' : 'Selected Service')}
           </Text>
           <View style={styles.serviceInfo}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.serviceName, { color: colors.text }]}>
                 {serviceName || 'Service'}
               </Text>

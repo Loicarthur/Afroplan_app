@@ -194,10 +194,22 @@ export const bookingService = {
   },
 
   /**
-   * Annuler une reservation
+   * Annuler une reservation (Suppression physique)
    */
-  async cancelBooking(id: string): Promise<Booking> {
-    return this.updateBookingStatus(id, 'cancelled');
+  async cancelBooking(id: string): Promise<void> {
+    const { data, error } = await supabase
+      .from('bookings')
+      .delete()
+      .eq('id', id)
+      .select(); // Important pour vérifier si la suppression a eu lieu
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('Suppression impossible : Vous n\'avez pas les droits ou le rendez-vous n\'existe plus.');
+    }
   },
 
   /**

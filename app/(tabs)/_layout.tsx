@@ -127,9 +127,9 @@ export default function TabLayout() {
       />
       {/* L'onglet "Styles" est masqué de la barre de navigation :
           la navigation par style se fait via les cartes de la page Accueil.
-          La route /bookings reste accessible en interne si besoin. */}
+          La route /styles reste accessible en interne si besoin. */}
       <Tabs.Screen
-        name="bookings"
+        name="styles"
         options={{
           href: null,
         }}

@@ -1,11 +1,4 @@
-/**
- * Page de Checkout - AfroPlan
- * Paiement sécurisé pour les réservations
- * Supporte acompte (10€) ou paiement intégral
- * Commission AfroPlan: 20% sur le montant en ligne
- */
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
+import { useStripe } from '@stripe/stripe-react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,10 +40,16 @@ export default function CheckoutScreen() {
   const { isAuthenticated } = useAuth();
   const { t } = useLanguage();
   const params = useLocalSearchParams();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple' | 'google'>('card');
-  const [paymentType, setPaymentType] = useState<'deposit' | 'full'>('deposit');
+  const [paymentType, setPaymentType] = useState<'deposit' | 'full'>((params.paymentType as 'deposit' | 'full') || 'deposit');
+
+  useEffect(() => {
+    console.log('DEBUG: CheckoutScreen monté');
+    console.log('DEBUG: Params reçus:', params);
+  }, []);
 
   // Données de réservation
   const bookingDetails: BookingDetails = {
@@ -95,7 +95,10 @@ export default function CheckoutScreen() {
   };
 
   const handlePayment = async () => {
+    console.log('--- ACTION: Bouton Payer cliqué ---');
+    
     if (!isAuthenticated) {
+      console.warn('DEBUG: Utilisateur non authentifié');
       Alert.alert(
         t('auth.loginRequired'),
         t('auth.loginRequiredMessage'),
@@ -113,25 +116,83 @@ export default function CheckoutScreen() {
     setIsLoading(true);
 
     try {
-      if (isSupabaseConfigured() && bookingDetails.bookingId && bookingDetails.salonId) {
-        // Create payment intent via service
-        const paymentIntent = await paymentService.createPaymentIntent(
+      console.log('DEBUG: Configuration Supabase:', isSupabaseConfigured());
+      console.log('DEBUG: IDs présents:', { bookingId: bookingDetails.bookingId, salonId: bookingDetails.salonId });
+
+      if (!bookingDetails.bookingId || bookingDetails.bookingId === 'undefined') {
+        throw new Error('Identifiant de réservation manquant ou invalide.');
+      }
+
+      if (!bookingDetails.salonId || bookingDetails.salonId === 'undefined') {
+        throw new Error('Identifiant de salon manquant ou invalide.');
+      }
+
+      if (isSupabaseConfigured()) {
+        console.log('DEBUG: Appel createPaymentIntent...');
+        const priceInCents = bookingDetails.servicePrice;
+        
+        const response = await paymentService.createPaymentIntent(
           bookingDetails.bookingId,
-          bookingDetails.servicePrice,
+          priceInCents,
           bookingDetails.salonId,
           paymentType
         );
+        
+        const clientSecret = response.clientSecret;
+        const paymentIntentId = response.paymentIntentId || '';
+        const paymentId = response.paymentId || '';
+        
+        console.log('DEBUG: Réponse createPaymentIntent OK', { paymentIntentId, paymentId });
 
-        // In production with Stripe SDK:
-        // 1. Call Supabase Edge Function to create Stripe PaymentIntent with application_fee_amount
-        // 2. Use Stripe SDK's confirmPayment with the clientSecret
-        // 3. On success, call paymentService.confirmPayment()
+        console.log('DEBUG: Initialisation PaymentSheet...');
+        const { error: initError } = await initPaymentSheet({
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'AfroPlan',
+          applePay: { merchantCountryCode: 'FR' },
+          googlePay: { merchantCountryCode: 'FR', testEnv: true },
+          appearance: {
+            colors: {
+              primary: colors.primary,
+              background: colors.background,
+              componentBackground: colors.card,
+              componentBorder: colors.border,
+              componentDivider: colors.border,
+              primaryText: colors.text,
+              secondaryText: colors.textSecondary,
+              componentText: colors.text,
+              placeholderText: colors.textMuted,
+            },
+            shapes: { borderRadius: 12 },
+          },
+        });
 
-        // For now, simulate successful payment
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (initError) {
+          console.error('DEBUG: Erreur initPaymentSheet:', initError);
+          throw new Error(`Initialisation Stripe échouée: ${initError.message}`);
+        }
 
-        // Confirm payment
-        await paymentService.confirmPayment(paymentIntent.id, 'pi_simulated_' + Date.now());
+        console.log('DEBUG: Présentation PaymentSheet...');
+        const { error: presentError } = await presentPaymentSheet();
+
+        if (presentError) {
+          console.error('DEBUG: Erreur presentPaymentSheet:', presentError);
+          if (presentError.code === 'Canceled') {
+            console.log('DEBUG: Paiement annulé par l\'utilisateur. Nettoyage de la réservation pending...');
+            try {
+              // On supprime la réservation si le paiement n'est pas allé au bout
+              const { bookingService } = await import('@/services/booking.service');
+              await bookingService.cancelBooking(bookingDetails.bookingId);
+            } catch (cleanupError) {
+              console.error('Erreur nettoyage réservation:', cleanupError);
+            }
+            setIsLoading(false);
+            return;
+          }
+          throw new Error(`Paiement échoué: ${presentError.message}`);
+        }
+
+        console.log('DEBUG: Paiement réussi! Confirmation en DB...');
+        await paymentService.confirmPayment(paymentId, paymentIntentId);
 
         Alert.alert(
           t('checkout.paymentSuccess'),
@@ -139,33 +200,25 @@ export default function CheckoutScreen() {
           [
             {
               text: t('checkout.viewBooking'),
-              onPress: () => router.replace('/(tabs)/bookings'),
+              onPress: () => router.replace('/(tabs)/reservations'),
             },
           ]
         );
       } else {
-        // Demo mode without Supabase
+        console.warn('DEBUG: Passage en mode démo (Configuration manquante)');
         await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        Alert.alert(
-          t('checkout.paymentSuccess'),
-          t('checkout.paymentSuccessDesc'),
-          [
-            {
-              text: t('checkout.viewBooking'),
-              onPress: () => router.replace('/(tabs)/bookings'),
-            },
-          ]
-        );
+        Alert.alert(t('checkout.paymentSuccess'), t('checkout.paymentSuccessDesc'));
       }
-    } catch {
+    } catch (error: any) {
+      console.error('DEBUG: Erreur dans handlePayment:', error);
       Alert.alert(
         t('checkout.paymentError'),
-        t('checkout.paymentErrorDesc'),
+        error.message || t('checkout.paymentErrorDesc'),
         [{ text: 'OK' }]
       );
     } finally {
       setIsLoading(false);
+      console.log('--- FIN PROCESSUS handlePayment ---');
     }
   };
 
@@ -354,13 +407,13 @@ export default function CheckoutScreen() {
             onPress={() => setPaymentMethod('google')}
           >
             <View style={styles.paymentOptionLeft}>
-              <View style={[styles.cardIcon, { backgroundColor: '#FFFFFF' }]}>
+              <View style={[styles.cardIcon, { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5E5' }]}>
                 <Ionicons name="logo-google" size={20} color="#4285F4" />
               </View>
               <View>
                 <Text style={[styles.paymentOptionTitle, { color: colors.text }]}>Google Pay</Text>
                 <Text style={[styles.paymentOptionSubtitle, { color: colors.textSecondary }]}>
-                  {t('search.quickPay')}
+                  Paiement rapide et sécurisé
                 </Text>
               </View>
             </View>
@@ -414,10 +467,10 @@ export default function CheckoutScreen() {
 
           {/* Commission breakdown */}
           <View style={styles.priceRow}>
-            <Text style={[styles.priceLabel, { color: colors.textMuted }]}>
+            <Text style={[styles.priceLabel, { color: Colors.light.textMuted }]}>
               {t('checkout.commission')} ({Math.round(commissionRate * 100)}%)
             </Text>
-            <Text style={[styles.priceValue, { color: colors.textMuted }]}>
+            <Text style={[styles.priceValue, { color: Colors.light.textMuted }]}>
               {formatAmount(commission)}
             </Text>
           </View>
@@ -452,8 +505,8 @@ export default function CheckoutScreen() {
 
         {/* Conditions */}
         <View style={styles.termsContainer}>
-          <Ionicons name="shield-checkmark" size={16} color={colors.textMuted} />
-          <Text style={[styles.termsText, { color: colors.textMuted }]}>
+          <Ionicons name="shield-checkmark" size={16} color={Colors.light.textMuted} />
+          <Text style={[styles.termsText, { color: Colors.light.textMuted }]}>
             {t('checkout.termsNotice')}
           </Text>
         </View>

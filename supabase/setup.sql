@@ -642,6 +642,7 @@ CREATE POLICY "bookings_own_insert" ON bookings FOR INSERT WITH CHECK (
     auth.uid() = client_id
 );
 CREATE POLICY "bookings_own_update" ON bookings FOR UPDATE USING (auth.uid() = client_id);
+CREATE POLICY "bookings_own_delete" ON bookings FOR DELETE USING (auth.uid() = client_id);
 -- Coiffeur: voit et gère les réservations de SON salon
 CREATE POLICY "bookings_coiffeur_select" ON bookings FOR SELECT USING (
     EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())
@@ -747,6 +748,9 @@ CREATE POLICY "stripe_update" ON stripe_accounts FOR UPDATE USING (
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_full_access_payments" ON payments FOR ALL USING (is_admin());
 CREATE POLICY "payments_client_select" ON payments FOR SELECT USING (
+    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = booking_id AND bookings.client_id = auth.uid())
+);
+CREATE POLICY "payments_client_update" ON payments FOR UPDATE USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = booking_id AND bookings.client_id = auth.uid())
 );
 CREATE POLICY "payments_salon_select" ON payments FOR SELECT USING (
@@ -1131,14 +1135,17 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
 
 -- Politiques de sécurité pour le stockage (Storage)
 -- Autoriser les utilisateurs connectés à uploader dans salon-photos
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 CREATE POLICY "Allow authenticated uploads" ON storage.objects
     FOR INSERT TO authenticated WITH CHECK (bucket_id = 'salon-photos');
 
 -- Autoriser tout le monde à voir les photos
+DROP POLICY IF EXISTS "Allow public viewing" ON storage.objects;
 CREATE POLICY "Allow public viewing" ON storage.objects
     FOR SELECT TO public USING (bucket_id = 'salon-photos');
 
 -- Autoriser les propriétaires à supprimer leurs photos
+DROP POLICY IF EXISTS "Allow individual deletes" ON storage.objects;
 CREATE POLICY "Allow individual deletes" ON storage.objects
     FOR DELETE TO authenticated USING (bucket_id = 'salon-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
 
