@@ -57,15 +57,62 @@ export default function BookingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, user, profile } = useAuth();
   const { t, language } = useLanguage();
-  const { salon, isLoading: loadingSalon } = useSalon(id || '');
+  const { salon: hookSalon, isLoading: loadingSalon } = useSalon(id || '');
+  const [localSalon, setLocalSalon] = useState<any>(null);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('deposit');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [specificAvailabilities, setSpecificAvailabilities] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Synchroniser le salon local avec celui du hook initial
+  React.useEffect(() => {
+    if (hookSalon) {
+      setLocalSalon(hookSalon);
+    }
+  }, [hookSalon]);
 
   const price = parseFloat(servicePrice || '0');
   const duration = parseInt(serviceDuration || '60', 10);
+
+  const fetchSpecificAvailabilities = React.useCallback(async () => {
+    if (!id) return;
+    setRefreshing(true);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { salonService } = await import('@/services/salon.service');
+      
+      // 1. Re-charger les infos du salon (pour les horaires d'ouverture mis à jour)
+      const freshSalon = await salonService.getSalonById(id);
+      if (freshSalon) {
+        setLocalSalon(freshSalon);
+      }
+
+      // 2. Charger les indisponibilités spécifiques
+      const ownerId = freshSalon?.owner_id || localSalon?.owner_id;
+      if (ownerId) {
+        const dateStr = selectedDate.toLocaleDateString('en-CA');
+        const { data } = await supabase
+          .from('coiffeur_availability')
+          .select('*')
+          .eq('coiffeur_id', ownerId)
+          .eq('specific_date', dateStr);
+        
+        setSpecificAvailabilities(data || []);
+      }
+    } catch (e) {
+      console.error('Erreur chargement indisponibilités:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [selectedDate, id, localSalon?.owner_id]);
+
+  // Charger les indisponibilités spécifiques (bloquage d'urgence, etc.)
+  React.useEffect(() => {
+    fetchSpecificAvailabilities();
+  }, [fetchSpecificAvailabilities]);
 
   // Calculer les montants selon le mode de paiement
   const getPaymentDetails = () => {
@@ -106,21 +153,50 @@ export default function BookingScreen() {
 
   // Generer les creneaux horaires disponibles
   const getAvailableSlots = (): TimeSlot[] => {
+    // 1. Vérifier si la journée complète est bloquée par le coiffeur
+    const isDayBlocked = specificAvailabilities.some(
+      a => !a.is_available && 
+      (a.start_time <= '00:00' || a.start_time === '00:00:00') && 
+      (a.end_time >= '23:59' || a.end_time === '23:59:00' || a.end_time >= '23:59:59')
+    );
+    if (isDayBlocked) return [];
+
     const slots: TimeSlot[] = [];
     
-    // 1. Récupérer les horaires du salon pour le jour sélectionné
+    // 2. Récupérer les horaires du salon pour le jour sélectionné
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const selectedDayName = days[selectedDate.getDay()];
-    const schedule = salon?.opening_hours ? (salon.opening_hours as any)[selectedDayName] : null;
+    
+    // Gérer le cas où opening_hours serait une chaîne JSON
+    let openingHours = localSalon?.opening_hours;
+    if (typeof openingHours === 'string') {
+      try {
+        openingHours = JSON.parse(openingHours);
+      } catch (e) {
+        openingHours = null;
+      }
+    }
+    
+    const schedule = openingHours ? (openingHours as any)[selectedDayName] : null;
 
-    // Si pas d'horaires définis ou salon fermé ce jour-là
-    if (!schedule || schedule.closed) {
+    // Logique ultra-stricte : si le jour est explicitement inactif ou marqué fermé
+    if (!schedule || 
+        schedule.active === false || schedule.active === 'false' || 
+        schedule.closed === true || schedule.closed === 'true') {
       return [];
     }
 
-    // 2. Parser les horaires (format HH:mm)
-    const [startH, startM] = schedule.open.split(':').map(Number);
-    const [endH, endM] = schedule.close.split(':').map(Number);
+    // 3. Parser les horaires (format HH:mm)
+    // On supporte les deux formats de clés possibles : open/close ou start/end
+    const openTime = schedule.start || schedule.open;
+    const closeTime = schedule.end || schedule.close;
+    
+    if (!openTime || !closeTime || (openTime === '00:00' && closeTime === '00:00')) {
+      return [];
+    }
+
+    const [startH, startM] = openTime.split(':').map(Number);
+    const [endH, endM] = closeTime.split(':').map(Number);
 
     const now = new Date();
     const isToday = selectedDate.toDateString() === now.toDateString();
@@ -137,7 +213,22 @@ export default function BookingScreen() {
         // Ignorer si on finit après l'heure de fermeture
         if (slotEndMinutes > closingMinutes) continue;
 
-        // Vérifier si le créneau est dans le passé pour aujourd'hui
+        const startStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const endHourCalc = Math.floor(slotEndMinutes / 60);
+        const endMinCalc = slotEndMinutes % 60;
+        const endStr = `${endHourCalc.toString().padStart(2, '0')}:${endMinCalc.toString().padStart(2, '0')}`;
+
+        // 4. Vérifier si le créneau est bloqué par une indisponibilité spécifique
+        const isSlotBlocked = specificAvailabilities.some(
+          a => !a.is_available && (
+            (startStr >= a.start_time && startStr < a.end_time) ||
+            (endStr > a.start_time && endStr <= a.end_time) ||
+            (startStr <= a.start_time && endStr >= a.end_time)
+          )
+        );
+        if (isSlotBlocked) continue;
+
+        // 5. Vérifier si le créneau est dans le passé pour aujourd'hui
         if (isToday) {
           const slotDate = new Date(now);
           slotDate.setHours(hour, minute, 0, 0);
@@ -147,11 +238,6 @@ export default function BookingScreen() {
 
           if (slotDate < limitDate) continue;
         }
-
-        const startStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const endHourCalc = Math.floor(slotEndMinutes / 60);
-        const endMinCalc = slotEndMinutes % 60;
-        const endStr = `${endHourCalc.toString().padStart(2, '0')}:${endMinCalc.toString().padStart(2, '0')}`;
 
         slots.push({ start: startStr, end: endStr });
       }
@@ -195,7 +281,7 @@ export default function BookingScreen() {
 
     try {
       const { supabase } = await import('@/lib/supabase');
-      const todayStr = selectedDate.toISOString().split('T')[0];
+      const todayStr = selectedDate.toLocaleDateString('en-CA');
       const startDateTime = `${selectedSlot.start}:00`;
       const endDateTime = `${selectedSlot.end}:00`;
 
@@ -249,8 +335,8 @@ export default function BookingScreen() {
         params: {
           bookingId: booking.id,
           salonId: id,
-          salonName: salon?.name || '',
-          salonImage: salon?.image_url || '',
+          salonName: localSalon?.name || '',
+          salonImage: localSalon?.image_url || '',
           serviceName: serviceName || '',
           servicePrice: (price * 100).toString(), // En centimes pour le checkout
           duration: duration.toString(),
@@ -418,34 +504,80 @@ export default function BookingScreen() {
 
         {/* Selection de l'heure */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {language === 'fr' ? 'Choisir un créneau' : 'Choose a time slot'}
-          </Text>
-          <View style={styles.slotsGrid}>
-            {timeSlots.map((slot, index) => {
-              const isSelected = selectedSlot?.start === slot.start;
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.slotCard,
-                    { backgroundColor: colors.card },
-                    isSelected && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setSelectedSlot(slot)}
-                >
-                  <Text
-                    style={[
-                      styles.slotTime,
-                      { color: isSelected ? '#FFFFFF' : colors.text },
-                    ]}
-                  >
-                    {slot.start}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
+              {language === 'fr' ? 'Choisir un créneau' : 'Choose a time slot'}
+            </Text>
+            <TouchableOpacity 
+              onPress={fetchSpecificAvailabilities}
+              disabled={refreshing}
+              style={styles.refreshButton}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={colors.primary} />
+              )}
+            </TouchableOpacity>
           </View>
+          
+          {(() => {
+            const isDayBlocked = specificAvailabilities.some(
+              a => !a.is_available && a.start_time <= '00:00' && a.end_time >= '23:59'
+            );
+
+            if (isDayBlocked) {
+              return (
+                <View style={[styles.blockedDayBox, { backgroundColor: colors.error + '10', borderColor: colors.error + '30' }]}>
+                  <Ionicons name="alert-circle" size={24} color={colors.error} />
+                  <View style={styles.blockedDayContent}>
+                    <Text style={[styles.blockedDayTitle, { color: colors.error }]}>
+                      Journée indisponible
+                    </Text>
+                    <Text style={[styles.blockedDayText, { color: colors.textSecondary }]}>
+                      Désolé, votre coiffeur est exceptionnellement indisponible aujourd'hui. Veuillez choisir une autre date.
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            if (timeSlots.length === 0) {
+              return (
+                <Text style={[styles.noSlotsText, { color: colors.textMuted }]}>
+                  Aucun créneau disponible pour cette date.
+                </Text>
+              );
+            }
+
+            return (
+              <View style={styles.slotsGrid}>
+                {timeSlots.map((slot, index) => {
+                  const isSelected = selectedSlot?.start === slot.start;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.slotCard,
+                        { backgroundColor: colors.card },
+                        isSelected && { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => setSelectedSlot(slot)}
+                    >
+                      <Text
+                        style={[
+                          styles.slotTime,
+                          { color: isSelected ? '#FFFFFF' : colors.text },
+                        ]}
+                      >
+                        {slot.start}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            );
+          })()}
         </View>
 
         {/* Options de paiement */}
@@ -512,13 +644,6 @@ export default function BookingScreen() {
                   Payez {DEPOSIT_AMOUNT} EUR maintenant, le reste ({price - DEPOSIT_AMOUNT} EUR) au salon
                 </Text>
               </View>
-              <Text style={[styles.paymentOptionAmount, { color: colors.primary }]}>
-                {DEPOSIT_AMOUNT} EUR
-              </Text>
-            </View>
-            <View style={[styles.recommendedBadge, { backgroundColor: colors.accent }]}>
-              <Ionicons name="star" size={12} color="#1A1A1A" />
-              <Text style={styles.recommendedText}>Recommande</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -639,6 +764,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: Spacing.md,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  refreshButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   serviceInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -708,6 +847,33 @@ const styles = StyleSheet.create({
   slotTime: {
     fontSize: FontSizes.md,
     fontWeight: '500',
+  },
+  blockedDayBox: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  blockedDayContent: {
+    flex: 1,
+  },
+  blockedDayTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  blockedDayText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  noSlotsText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   paymentOption: {
     borderRadius: BorderRadius.lg,

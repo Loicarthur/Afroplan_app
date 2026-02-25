@@ -937,15 +937,28 @@ export const salonService = {
     pendingBookings: number;
     cancelledBookings: number;
     totalRevenue: number;
+    weeklyRevenue: number;
+    weeklyBookingsCount: number;
     averageRating: number;
     totalReviews: number;
     totalServices: number;
     activePromotions: number;
   }> {
-    // Reservations
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    const mondayStr = monday.toLocaleDateString('en-CA');
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const sundayStr = sunday.toLocaleDateString('en-CA');
+
+    // 1. Reservations stats (Global + Hebdo)
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('status, total_price')
+      .select('status, total_price, booking_date')
       .eq('salon_id', salonId);
 
     const stats = {
@@ -954,6 +967,8 @@ export const salonService = {
       pendingBookings: 0,
       cancelledBookings: 0,
       totalRevenue: 0,
+      weeklyRevenue: 0,
+      weeklyBookingsCount: 0,
       averageRating: 0,
       totalReviews: 0,
       totalServices: 0,
@@ -964,7 +979,6 @@ export const salonService = {
       switch (booking.status) {
         case 'completed':
           stats.completedBookings++;
-          stats.totalRevenue += booking.total_price;
           break;
         case 'pending':
         case 'confirmed':
@@ -974,9 +988,44 @@ export const salonService = {
           stats.cancelledBookings++;
           break;
       }
+
+      const bDate = typeof booking.booking_date === 'string' 
+        ? booking.booking_date 
+        : new Date(booking.booking_date).toLocaleDateString('en-CA');
+
+      const isConfirmedOrDone = booking.status === 'confirmed' || booking.status === 'completed';
+      const isThisWeek = bDate >= mondayStr && bDate <= sundayStr;
+      
+      if (isConfirmedOrDone && isThisWeek) {
+        stats.weeklyBookingsCount++;
+      }
     });
 
-    // Avis et note
+    // 2. Revenu Affiché (100% du montant payé par les clients)
+    // On affiche le volume total généré pour valoriser le travail du coiffeur
+    const { data: allPayments } = await supabase
+      .from('payments')
+      .select(`
+        amount, 
+        paid_at,
+        booking:bookings!inner(status)
+      `)
+      .eq('salon_id', salonId)
+      .eq('status', 'completed')
+      .in('bookings.status', ['confirmed', 'completed']);
+
+    if (allPayments) {
+      allPayments.forEach((p: any) => {
+        const amountEur = p.amount / 100; // On utilise 'amount' (100%) au lieu de 'salon_amount'
+        stats.totalRevenue += amountEur;
+
+        if (p.paid_at && p.paid_at >= monday.toISOString()) {
+          stats.weeklyRevenue += amountEur;
+        }
+      });
+    }
+
+    // 3. Avis et note
     const { data: salon } = await supabase
       .from('salons')
       .select('rating, reviews_count')
@@ -986,7 +1035,7 @@ export const salonService = {
     stats.averageRating = salon?.rating || 0;
     stats.totalReviews = salon?.reviews_count || 0;
 
-    // Services
+    // 4. Services
     const { count: servicesCount } = await supabase
       .from('services')
       .select('*', { count: 'exact', head: true })
@@ -995,15 +1044,14 @@ export const salonService = {
 
     stats.totalServices = servicesCount || 0;
 
-    // Promotions actives
-    const now = new Date().toISOString();
+    // 5. Promotions actives
     const { count: promosCount } = await supabase
       .from('promotions')
       .select('*', { count: 'exact', head: true })
       .eq('salon_id', salonId)
       .eq('status', 'active')
-      .lte('start_date', now)
-      .gte('end_date', now);
+      .lte('start_date', now.toISOString())
+      .gte('end_date', now.toISOString());
 
     stats.activePromotions = promosCount || 0;
 

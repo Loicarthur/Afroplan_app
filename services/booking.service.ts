@@ -3,6 +3,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { notificationService } from './notification.service';
 import {
   Booking,
   BookingInsert,
@@ -190,6 +191,69 @@ export const bookingService = {
       throw new Error(error.message);
     }
 
+    // Notifier le client du changement de statut
+    if (data) {
+      if (status === 'confirmed') {
+        await notificationService.createNotification({
+          user_id: data.client_id,
+          title: 'Rendez-vous confirmé !',
+          message: `Votre coiffeur a validé votre rendez-vous du ${data.booking_date}.`,
+          type: 'booking_confirmed',
+          booking_id: data.id,
+        });
+      } else if (status === 'completed') {
+        await notificationService.createNotification({
+          user_id: data.client_id,
+          title: 'Prestation terminée',
+          message: `Merci de votre visite ! N'hésitez pas à laisser un avis.`,
+          type: 'system',
+          booking_id: data.id,
+        });
+      }
+    }
+
+    return data;
+  },
+
+  /**
+   * Annuler une reservation par le coiffeur avec un motif
+   */
+  async cancelBookingByCoiffeur(id: string, reason: string): Promise<Booking> {
+    checkSupabaseConfig();
+    
+    // 1. Mettre à jour le statut du rendez-vous
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'cancelled', 
+        notes: `Annulation coiffeur : ${reason}`,
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // 2. Notifier le client
+    if (data) {
+      await notificationService.createNotification({
+        user_id: data.client_id,
+        title: 'Rendez-vous annulé',
+        message: `Votre coiffeur a annulé le RDV du ${data.booking_date}. Motif : ${reason}`,
+        type: 'booking_cancelled',
+        booking_id: data.id,
+      });
+    }
+
+    // 3. Simuler le remboursement automatique via Stripe
+    console.log(`[STRIPE] Remboursement initié pour le booking ${id} (Motif: ${reason})`);
+    
+    // TODO: Appel API Stripe pour le remboursement réel
+    // stripe.refunds.create({ payment_intent: data.stripe_payment_intent_id });
+
     return data;
   },
 
@@ -265,10 +329,10 @@ export const bookingService = {
     date: string,
     serviceDurationMinutes: number
   ): Promise<string[]> {
-    // Recuperer les horaires du salon
+    // 1. Recuperer les informations du salon et du propriétaire (coiffeur)
     const { data: salon } = await supabase
       .from('salons')
-      .select('opening_hours')
+      .select('opening_hours, owner_id')
       .eq('id', salonId)
       .single();
 
@@ -276,7 +340,23 @@ export const bookingService = {
       return [];
     }
 
-    // Recuperer les reservations existantes
+    // 2. Vérifier si le coiffeur a bloqué sa journée ou a des indisponibilités spécifiques
+    const { data: specificAvailabilities } = await supabase
+      .from('coiffeur_availability')
+      .select('*')
+      .eq('coiffeur_id', salon.owner_id)
+      .eq('specific_date', date);
+
+    // Si le coiffeur a bloqué toute la journée (00:00 à 23:59 et is_available = false)
+    const isDayBlocked = specificAvailabilities?.some(
+      a => !a.is_available && a.start_time <= '00:00' && a.end_time >= '23:59'
+    );
+
+    if (isDayBlocked) {
+      return [];
+    }
+
+    // 3. Recuperer les reservations existantes
     const { data: bookings } = await supabase
       .from('bookings')
       .select('start_time, end_time')
@@ -284,16 +364,15 @@ export const bookingService = {
       .eq('booking_date', date)
       .in('status', ['pending', 'confirmed']);
 
-    // Calculer les creneaux disponibles (logique simplifiee)
+    // 4. Calculer les creneaux disponibles
     const slots: string[] = [];
     const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as keyof typeof salon.opening_hours;
     const daySchedule = (salon.opening_hours as any)[dayOfWeek];
 
-    if (!daySchedule || daySchedule.isClosed) {
+    if (!daySchedule || daySchedule.isClosed || daySchedule.closed) {
       return [];
     }
 
-    // Generer des creneaux de 30 minutes
     const openTime = daySchedule.open;
     const closeTime = daySchedule.close;
 
@@ -306,12 +385,21 @@ export const bookingService = {
       const endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
 
       if (endTime <= closeTime) {
-        // Verifier si le creneau n'est pas pris
+        // Vérifier si le créneau est bloqué par une indisponibilité spécifique
+        const isSlotUnavailable = specificAvailabilities?.some(
+          a => !a.is_available && (
+            (currentTime >= a.start_time && currentTime < a.end_time) ||
+            (endTime > a.start_time && endTime <= a.end_time) ||
+            (currentTime <= a.start_time && endTime >= a.end_time)
+          )
+        );
+
+        // Verifier si le creneau n'est pas pris par une réservation
         const isBooked = bookings?.some(
           (b) => b.start_time < endTime && b.end_time > currentTime
         );
 
-        if (!isBooked) {
+        if (!isSlotUnavailable && !isBooked) {
           slots.push(currentTime);
         }
       }

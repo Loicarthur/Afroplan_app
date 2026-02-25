@@ -31,6 +31,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, Shadows, BorderRadius } from '@/constants/theme';
 import LanguageSelector from '@/components/LanguageSelector';
+import NotificationModal from '@/components/NotificationModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { salonService } from '@/services/salon.service';
 import { bookingService } from '@/services/booking.service';
@@ -146,6 +147,7 @@ export default function CoiffeurDashboard() {
   
   // États pour le modal de réservation manuelle
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [selectedSlotTime, setSelectedSlotTime] = useState('');
   const [manualClientName, setManualClientName] = useState('');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -199,6 +201,8 @@ export default function CoiffeurDashboard() {
   const progress = completedCount / steps.length;
   const showOnboarding = completedCount < steps.length;
 
+  const [allTimeStats, setAllTimeStats] = useState<any>(null);
+
   const fetchDashboardData = async () => {
     if (!user) return;
     try {
@@ -210,9 +214,13 @@ export default function CoiffeurDashboard() {
         setSalon(fullSalon);
 
         // 2. Charger les réservations du jour
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = new Date().toLocaleDateString('en-CA');
         const bookingsData = await bookingService.getSalonBookings(salonData.id, undefined, todayStr);
         setTodayBookings(bookingsData.data);
+
+        // 3. Charger les statistiques globales
+        const statsData = await salonService.getSalonStats(salonData.id);
+        setAllTimeStats(statsData);
       }
     } catch (error) {
       console.error('Erreur chargement dashboard:', error);
@@ -241,16 +249,20 @@ export default function CoiffeurDashboard() {
     const schedule = salon.opening_hours ? (salon.opening_hours as any)[todayName] : null;
 
     if (schedule) {
-      if (schedule.closed) {
+      const isClosed = schedule.active === false || schedule.closed === true;
+      if (isClosed) {
         Alert.alert('Salon fermé', `Votre salon est configuré comme fermé le ${new Date().toLocaleDateString('fr-FR', { weekday: 'long' })}.`);
         return;
       }
       
+      const openTime = schedule.start || schedule.open;
+      const closeTime = schedule.end || schedule.close;
+
       // Comparaison simple des chaînes "HH:mm"
-      if (selectedSlotTime < schedule.open || selectedSlotTime > schedule.close) {
+      if (selectedSlotTime < openTime || selectedSlotTime > closeTime) {
         Alert.alert(
           'Hors horaires', 
-          `L'heure choisie (${selectedSlotTime}) est en dehors de vos horaires d'ouverture (${schedule.open} - ${schedule.close}).`
+          `L'heure choisie (${selectedSlotTime}) est en dehors de vos horaires d'ouverture (${openTime} - ${closeTime}).`
         );
         return;
       }
@@ -269,7 +281,7 @@ export default function CoiffeurDashboard() {
 
     setIsSavingBooking(true);
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toLocaleDateString('en-CA');
       let serviceToUse = selectedService;
 
       // 1. Si c'est un service personnalisé, on le crée d'abord
@@ -328,13 +340,19 @@ export default function CoiffeurDashboard() {
     router.replace('/(tabs)');
   };
 
-  const pendingBookingsCount = todayBookings.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
+  const pendingBookingsCount = todayBookings.filter(b => b.status === 'pending').length;
+  const confirmedTodayCount = todayBookings.filter(b => b.status === 'confirmed' || b.status === 'completed').length;
 
   const stats = {
-    todayBookings: todayBookings.length,
+    todayBookings: confirmedTodayCount,
     pendingBookings: pendingBookingsCount,
     totalRevenue: todayBookings.filter(b => b.status === 'confirmed' || b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0),
-    totalClients: [...new Set(todayBookings.map(b => b.client_id))].length,
+    totalClients: [...new Set(todayBookings.filter(b => b.status !== 'cancelled').map(b => b.client_id))].length,
+    allTimeRevenue: allTimeStats?.totalRevenue || 0,
+    weeklyRevenue: allTimeStats?.weeklyRevenue || 0,
+    weeklyBookingsCount: allTimeStats?.weeklyBookingsCount || 0,
+    allTimeCompleted: allTimeStats?.completedBookings || 0,
+    averageRating: allTimeStats?.averageRating || 0,
   };
 
   const onRefresh = React.useCallback(() => {
@@ -661,7 +679,10 @@ export default function CoiffeurDashboard() {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}>
+            <TouchableOpacity 
+              style={[styles.notificationButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => setNotificationModalVisible(true)}
+            >
               <Ionicons name="notifications-outline" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -675,37 +696,37 @@ export default function CoiffeurDashboard() {
           <View style={styles.businessHeader}>
             <View>
               <Text style={styles.businessLabel}>Revenus de la semaine</Text>
-              <Text style={styles.businessValue}>840,00 €</Text>
+              <Text style={styles.businessValue}>{stats.weeklyRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</Text>
             </View>
             <View style={styles.growthBadge}>
               <Ionicons name="trending-up" size={14} color="#22C55E" />
-              <Text style={styles.growthText}>+12.5%</Text>
+              <Text style={styles.growthText}>En hausse</Text>
             </View>
           </View>
           
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '70%', backgroundColor: '#7C3AED' }]} />
+              <View style={[styles.progressFill, { width: stats.allTimeRevenue > 0 ? '100%' : '5%', backgroundColor: '#7C3AED' }]} />
             </View>
-            <Text style={styles.progressLabel}>70% de l&apos;objectif mensuel (1200€)</Text>
+            <Text style={styles.progressLabel}>Performance basée sur vos réservations terminées</Text>
           </View>
 
           <View style={styles.businessFooter}>
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>14</Text>
-              <Text style={styles.footerStatLabel}>RDV faits</Text>
+              <Text style={styles.footerStatValue}>{stats.weeklyBookingsCount}</Text>
+              <Text style={styles.footerStatLabel}>RDV cette sem.</Text>
             </View>
             <View style={styles.footerDivider} />
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>22h</Text>
-              <Text style={styles.footerStatLabel}>Coiffées</Text>
+              <Text style={styles.footerStatValue}>{todayBookings.length}</Text>
+              <Text style={styles.footerStatLabel}>Aujourd&apos;hui</Text>
             </View>
             <View style={styles.footerDivider} />
             <View style={styles.footerStat}>
-              <Text style={styles.footerStatValue}>4.9</Text>
+              <Text style={styles.footerStatValue}>{stats.averageRating.toFixed(1)}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                 <Ionicons name="star" size={10} color="#F59E0B" />
-                <Text style={styles.footerStatLabel}>Avis</Text>
+                <Text style={styles.footerStatLabel}>Note</Text>
               </View>
             </View>
           </View>
@@ -969,6 +990,11 @@ export default function CoiffeurDashboard() {
             })}
           </View>
         </View>
+
+        <NotificationModal
+          visible={notificationModalVisible}
+          onClose={() => setNotificationModalVisible(false)}
+        />
 
         {/* Modal Réservation Manuelle */}
         <Modal

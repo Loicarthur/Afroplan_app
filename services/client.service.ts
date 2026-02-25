@@ -304,10 +304,10 @@ export const clientService = {
     favoriteCategories: string[];
     visitedSalonsCount: number;
   }> {
-    // Reservations
+    // 1. Reservations
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('status, total_price, service:services(category)')
+      .select('status, service:services(category)')
       .eq('client_id', userId);
 
     const stats = {
@@ -325,7 +325,6 @@ export const clientService = {
       switch (booking.status) {
         case 'completed':
           stats.completedBookings++;
-          stats.totalSpent += booking.total_price;
           if (booking.service?.category) {
             categoryCount[booking.service.category] = (categoryCount[booking.service.category] || 0) + 1;
           }
@@ -335,6 +334,15 @@ export const clientService = {
           break;
       }
     });
+
+    // 2. Dépenses Réelles (Basé sur les paiements Stripe réussis)
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('status', 'completed')
+      .in('booking_id', (await supabase.from('bookings').select('id').eq('client_id', userId)).data?.map(b => b.id) || []);
+
+    stats.totalSpent = (payments?.reduce((sum, p) => sum + p.amount, 0) || 0) / 100;
 
     // Trier les categories par frequence
     stats.favoriteCategories = Object.entries(categoryCount)

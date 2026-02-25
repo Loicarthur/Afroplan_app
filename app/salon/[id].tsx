@@ -55,6 +55,7 @@ export default function SalonDetailScreen() {
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [hasBooking, setHasBooking] = useState(false);
   const [activeRole, setActiveRole] = useState<string | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'services' | 'about' | 'reviews'>('services');
 
   React.useEffect(() => {
     const loadRole = async () => {
@@ -322,139 +323,149 @@ export default function SalonDetailScreen() {
             )}
           </View>
 
-                    {/* Description */}
-                    {salon.description && (
-                      <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                          {language === 'fr' ? 'À propos' : 'About'}
-                        </Text>
-                        <Text style={[styles.description, { color: colors.textSecondary }]}>
-                          {salon.description}
-                        </Text>
-                      </View>
-                    )}
-          
-                              {/* Services - C'est ici que le client voit TOUT */}
-                              <View style={styles.section}>
-                                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                                  {language === 'fr' ? 'Mes prestations & Styles' : 'My Styles'}
-                                </Text>
-                                {Object.keys(servicesByCategory).length > 0 ? (
-                                  Object.entries(servicesByCategory).map(([category, services]) => (
-                                    <View key={category} style={styles.serviceCategory}>
-                                      <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
-                                        {category}
-                                      </Text>
-                                                        <View style={styles.servicesGrid}>
-                                                          {services.map((service) => {
-                                                            if (!service?.id) return null;
-                                                            const isSelected = selectedServices.some(s => s.id === service.id);
-                                                            
-                                                            const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
-                                                            const imageSource = service.image_url 
-                                                              ? { uri: service.image_url } 
-                                                              : catalogStyle?.image;
-
-                                                            return (
-                                                              <TouchableOpacity 
-                                                                key={service.id} 
-                                                                activeOpacity={0.9}
-                                                                style={[
-                                                                  styles.serviceCardGrid,
-                                                                  { 
-                                                                    backgroundColor: colors.card,
-                                                                    borderColor: isSelected ? colors.primary : 'transparent',
-                                                                    borderWidth: 2,
-                                                                  },
-                                                                  Shadows.sm,
-                                                                ]}
-                                                                onPress={() => toggleService(service)}
-                                                              >
-                                                                <View style={styles.serviceMainContentGrid}>
-                                                                  <Image
-                                                                    source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
-                                                                    style={styles.serviceImageGrid}
-                                                                    contentFit="cover"
-                                                                  />
-                                                                  
-                                                                  <View style={styles.serviceInfoGrid}>
-                                                                    <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
-                                                                      {service.name}
-                                                                    </Text>
-                                                                    <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
-                                                                      {service.duration_minutes} min
-                                                                    </Text>
-                                                                    <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
-                                                                      {service.price}€
-                                                                    </Text>
-                                                                  </View>
-                                                                  
-                                                                  {isSelected && (
-                                                                    <View style={{
-                                                                      position: 'absolute',
-                                                                      top: 8,
-                                                                      right: 8,
-                                                                      backgroundColor: 'rgba(255,255,255,0.9)',
-                                                                      borderRadius: 12,
-                                                                      padding: 2,
-                                                                    }}>
-                                                                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                                                                    </View>
-                                                                  )}
-                                                                </View>
-                                                              </TouchableOpacity>
-                                                            );
-                                                          })}
-                                                        </View>
-                                    </View>
-                                  ))
-                                ) : (              <Text style={[styles.noServices, { color: colors.textMuted }]}>
-                {language === 'fr' ? 'Aucun service disponible' : 'No services available'}
-              </Text>
-            )}
+          {/* Tab Navigation */}
+          <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
+            {[
+              { id: 'services', label: 'Prestations' },
+              { id: 'about', label: 'À propos' },
+              { id: 'reviews', label: 'Avis' },
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={[
+                  styles.tabItem,
+                  activeDetailTab === tab.id && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+                ]}
+                onPress={() => setActiveDetailTab(tab.id as any)}
+              >
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeDetailTab === tab.id ? colors.primary : colors.textMuted }
+                ]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {/* Gallery */}
-          {salon.gallery && salon.gallery.length > 0 && (
+          {activeDetailTab === 'about' && (
+            <>
+              {/* Description */}
+              {salon.description && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    {language === 'fr' ? 'À propos' : 'About'}
+                  </Text>
+                  <Text style={[styles.description, { color: colors.textSecondary }]}>
+                    {salon.description}
+                  </Text>
+                </View>
+              )}
+
+              {/* Gallery */}
+              {salon.gallery && salon.gallery.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    {language === 'fr' ? 'Nos réalisations' : 'Our creations'}
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                    {salon.gallery.map((image) => {
+                      const isVideo = image.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/);
+                      return (
+                        <View key={image.id} style={[styles.galleryThumbnail, { backgroundColor: colors.card }]}>
+                          <Image source={{ uri: image.image_url }} style={styles.thumbnailImage} contentFit="cover" />
+                          {isVideo && <View style={styles.videoBadge}><Ionicons name="play" size={16} color="#FFF" /></View>}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+            </>
+          )}
+
+          {activeDetailTab === 'services' && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {language === 'fr' ? 'Nos réalisations' : 'Our creations'}
+                {language === 'fr' ? 'Choisissez vos prestations' : 'Choose your services'}
               </Text>
-              <View style={styles.galleryGrid}>
-                {salon.gallery.map((image) => {
-                  const isVideo = image.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/);
-                  
-                  return (
-                    <View key={image.id} style={[styles.galleryItem, { backgroundColor: colors.card }]}>
-                      {isVideo ? (
-                        Video ? (
-                          <Video
-                            source={{ uri: image.image_url }}
-                            style={styles.galleryImage}
-                            useNativeControls
-                            resizeMode={ResizeMode.COVER}
-                            isLooping
-                          />
-                        ) : (
-                          <View style={[styles.galleryImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name="videocam" size={32} color="#FFF" />
-                          </View>
-                        )
-                      ) : (
-                        <Image
-                          source={{ uri: image.image_url }}
-                          style={styles.galleryImage}
-                          contentFit="cover"
-                        />
-                      )}
-                      {image.caption ? (
-                        <Text style={[styles.galleryCaption, { color: colors.textSecondary }]} numberOfLines={1}>
-                          {image.caption}
-                        </Text>
-                      ) : null}
+              {Object.keys(servicesByCategory).length > 0 ? (
+                Object.entries(servicesByCategory).map(([category, services]) => (
+                  <View key={category} style={styles.serviceCategory}>
+                    <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
+                      {category}
+                    </Text>
+                    <View style={styles.servicesGrid}>
+                      {services.map((service) => {
+                        if (!service?.id) return null;
+                        const isSelected = selectedServices.some(s => s.id === service.id);
+                        const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
+                        const imageSource = service.image_url ? { uri: service.image_url } : catalogStyle?.image;
+
+                        return (
+                          <TouchableOpacity 
+                            key={service.id} 
+                            activeOpacity={0.9}
+                            style={[
+                              styles.serviceCardGrid,
+                              { 
+                                backgroundColor: colors.card,
+                                borderColor: isSelected ? colors.primary : 'transparent',
+                                borderWidth: 2,
+                              },
+                              Shadows.sm,
+                            ]}
+                            onPress={() => toggleService(service)}
+                          >
+                            <View style={styles.serviceMainContentGrid}>
+                              <Image
+                                source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
+                                style={styles.serviceImageGrid}
+                                contentFit="cover"
+                              />
+                              <View style={styles.serviceInfoGrid}>
+                                <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
+                                  {service.name}
+                                </Text>
+                                <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
+                                  {service.duration_minutes} min
+                                </Text>
+                                <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
+                                  {service.price}€
+                                </Text>
+                              </View>
+                              {isSelected && (
+                                <View style={styles.checkBadge}>
+                                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                                </View>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                  );
-                })}
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.noServices, { color: colors.textMuted }]}>
+                  {language === 'fr' ? 'Aucun service disponible' : 'No services available'}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {activeDetailTab === 'reviews' && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {language === 'fr' ? 'Avis clients' : 'Customer reviews'}
+              </Text>
+              {/* Avis réels ici... (placeholder pour l'instant) */}
+              <View style={styles.reviewSummary}>
+                <Text style={[styles.bigRating, { color: colors.text }]}>{salon.rating.toFixed(1)}</Text>
+                <Rating value={salon.rating} size={20} />
+                <Text style={[styles.reviewTotal, { color: colors.textMuted }]}>
+                  Basé sur {salon.reviews_count} avis
+                </Text>
               </View>
             </View>
           )}
@@ -636,6 +647,76 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '500',
   },
+
+  /* Tab Bar */
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  tabItem: {
+    paddingVertical: Spacing.md,
+    marginRight: Spacing.lg,
+  },
+  tabLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  /* Gallery Thumbnails */
+  galleryThumbnail: {
+    width: 140,
+    height: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoBadge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -15,
+    marginTop: -15,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Reviews */
+  reviewSummary: {
+    alignItems: 'center',
+    padding: Spacing.xl,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  bigRating: {
+    fontSize: 48,
+    fontWeight: '800',
+    marginBottom: Spacing.xs,
+  },
+  reviewTotal: {
+    fontSize: 14,
+    marginTop: Spacing.sm,
+  },
+
+  /* Badges & Overlays */
+  checkBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 2,
+  },
+
   section: {
     marginBottom: Spacing.lg,
   },

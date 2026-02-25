@@ -176,17 +176,31 @@ export default function ClientReservationsScreen() {
     Alert.alert('Info', 'Ce rendez-vous ne peut plus être modifié.');
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-CA');
 
   const upcomingBookings = bookings.filter(b => {
-    const isFuture = b.booking_date >= today;
-    return isFuture && (b.status === 'confirmed' || b.status === 'pending');
+    // 1. Si annulé ou terminé, c'est du passé
+    if (b.status === 'cancelled' || b.status === 'completed') return false;
+
+    // 2. Comparaison précise date + heure
+    const [h, m] = b.start_time.split(':').map(Number);
+    const bDateTime = new Date(b.booking_date);
+    bDateTime.setHours(h, m, 0, 0);
+
+    return bDateTime > now;
   });
 
   const pastBookings = bookings.filter(b => {
-    const isPast = b.booking_date < today;
-    const isDone = b.status === 'completed' || b.status === 'cancelled';
-    return isPast || isDone;
+    // 1. Si annulé ou terminé, c'est du passé
+    if (b.status === 'cancelled' || b.status === 'completed') return true;
+
+    // 2. Comparaison précise date + heure
+    const [h, m] = b.start_time.split(':').map(Number);
+    const bDateTime = new Date(b.booking_date);
+    bDateTime.setHours(h, m, 0, 0);
+
+    return bDateTime <= now;
   });
   const displayedBookings = filter === 'upcoming' ? upcomingBookings : pastBookings;
 
@@ -235,6 +249,15 @@ export default function ClientReservationsScreen() {
         <Text style={[styles.priceText, { color: colors.primary }]}>{item.total_price} EUR</Text>
       </View>
 
+      {item.status === 'cancelled' && item.notes?.includes('Annulation coiffeur') && (
+        <View style={[styles.reasonBox, { backgroundColor: colors.error + '10' }]}>
+          <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+          <Text style={[styles.reasonText, { color: colors.error }]}>
+            {item.notes.replace('Annulation coiffeur : ', 'Motif d\'annulation : ')}
+          </Text>
+        </View>
+      )}
+
       {(item.status === 'confirmed' || item.status === 'pending') && (
         <View style={styles.cardActions}>
           <TouchableOpacity
@@ -249,15 +272,17 @@ export default function ClientReservationsScreen() {
               Message
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => handleCancelBooking(item as any)}
-          >
-            <Ionicons name="close-circle-outline" size={16} color={colors.error} />
-            <Text style={[styles.actionButtonText, { color: colors.error }]}>
-              Annuler
-            </Text>
-          </TouchableOpacity>
+          {item.status === 'pending' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelBooking(item as any)}
+            >
+              <Ionicons name="close-circle-outline" size={16} color={colors.error} />
+              <Text style={[styles.actionButtonText, { color: colors.error }]}>
+                Annuler
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -457,6 +482,21 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: 'transparent',
+  },
+  reasonBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: 8,
+  },
+  reasonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '500',
+    flex: 1,
   },
   emptyState: {
     flex: 1,

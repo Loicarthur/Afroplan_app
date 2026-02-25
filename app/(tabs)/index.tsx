@@ -31,7 +31,10 @@ import { Colors } from '@/constants/theme';
 import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 import LanguageSelector from '@/components/LanguageSelector';
+import NotificationModal from '@/components/NotificationModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSalons } from '@/hooks/use-salons';
+import { SalonCard } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
@@ -180,7 +183,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
+
+  const { salons, isLoading: loadingSalons, refresh: refreshSalons } = useSalons();
 
   const fetchActiveBookingsCount = React.useCallback(async () => {
     if (isAuthenticated && user) {
@@ -198,7 +204,8 @@ export default function HomeScreen() {
   useFocusEffect(
     React.useCallback(() => {
       fetchActiveBookingsCount();
-    }, [fetchActiveBookingsCount])
+      refreshSalons();
+    }, [fetchActiveBookingsCount, refreshSalons])
   );
 
   const handleSwitchToCoiffeur = async () => {
@@ -208,8 +215,8 @@ export default function HomeScreen() {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refreshSalons().finally(() => setRefreshing(false));
+  }, [refreshSalons]);
 
   const openLink = (url: string) => {
     Linking.openURL(url).catch(() => {});
@@ -230,6 +237,13 @@ export default function HomeScreen() {
   };
 
   const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
+  
+  // Featured salons: highest rated verified salons
+  const featuredSalons = salons.filter(s => s.is_verified).sort((a, b) => b.rating - a.rating).slice(0, 5);
+  // Popular salons: most reviews
+  const popularSalons = salons.sort((a, b) => b.reviews_count - a.reviews_count).slice(0, 6);
+  // Nearby (just newest for now)
+  const nearbySalons = [...salons].reverse().slice(0, 6);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -240,6 +254,11 @@ export default function HomeScreen() {
         visible={searchModalVisible}
         onClose={() => setSearchModalVisible(false)}
         onSearch={handleSearch}
+      />
+
+      <NotificationModal
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
       />
 
       <ScrollView
@@ -299,7 +318,10 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]}>
+                <TouchableOpacity 
+                  style={[styles.notificationButton, { backgroundColor: colors.card }]}
+                  onPress={() => setNotificationModalVisible(true)}
+                >
                   <Ionicons name="notifications-outline" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
@@ -313,7 +335,7 @@ export default function HomeScreen() {
                 {language === 'fr' ? 'Bonjour' : 'Hello'} {profile.full_name?.split(' ')[0] || 'toi'} 👋
               </Text>
               <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                {language === 'fr' ? 'Prêt(e) pour une nouvelle coiffure ?' : 'Ready for a new hairstyle?'}
+                {language === 'fr' ? 'Disponible pour une nouvelle coiffure ?' : 'Available for a new hairstyle?'}
               </Text>
             </View>
           )}
@@ -341,6 +363,28 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
+
+        {/* ---------------- Featured Salons ---------------- */}
+        {featuredSalons.length > 0 && (
+          <Animated.View
+            entering={FadeInUp.delay(300).duration(500)}
+            style={styles.section}
+          >
+            <SectionHeader 
+              title={language === 'fr' ? 'À la une' : 'Featured Salons'} 
+              onSeeAll={() => router.push('/(tabs)/explore')} 
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {featuredSalons.map((salon) => (
+                <SalonCard key={salon.id} salon={salon} variant="featured" />
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
 
         {/* ---------------- Quick Categories ---------------- */}
         <Animated.View
@@ -378,91 +422,38 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* ---------------- Coiffeurs à proximité ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(400).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
+        {nearbySalons.length > 0 && (
+          <Animated.View
+            entering={FadeInUp.delay(400).duration(500)}
+            style={styles.section}
           >
-            {NEARBY_COIFFEURS.map((coiffeur) => (
-              <TouchableOpacity
-                key={coiffeur.id}
-                style={[styles.coiffeurCard, { backgroundColor: colors.card }]}
-                onPress={() => requireAuth(() => router.push(`/salon/${coiffeur.id}`))}
-              >
-                <View style={styles.coiffeurImageContainer}>
-                  <Image source={coiffeur.image} style={styles.coiffeurImage} contentFit="cover" />
-                  {coiffeur.available && (
-                    <View style={styles.availableBadge}>
-                      <Text style={styles.availableText}>{language === 'fr' ? 'Dispo' : 'Available'}</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.coiffeurInfo}>
-                  <Text style={[styles.coiffeurName, { color: colors.text }]}>{coiffeur.name}</Text>
-                  <Text style={[styles.coiffeurSpecialty, { color: colors.textSecondary }]}>{coiffeur.specialty}</Text>
-                  <Text style={[styles.coiffeurPrice, { color: '#7C3AED' }]}>{language === 'fr' ? 'À partir de' : 'From'} {coiffeur.price.replace('À partir de ', '')}</Text>
-                  <View style={styles.coiffeurMeta}>
-                    <View style={styles.ratingContainer}>
-                      <Ionicons name="star" size={12} color="#F59E0B" />
-                      <Text style={[styles.ratingText, { color: colors.text }]}>{coiffeur.rating}</Text>
-                      <Text style={[styles.reviewCount, { color: colors.textMuted }]}>({coiffeur.reviews})</Text>
-                    </View>
-                    <View style={styles.distanceContainer}>
-                      <Ionicons name="location" size={12} color={colors.textMuted} />
-                      <Text style={[styles.distanceText, { color: colors.textMuted }]}>{coiffeur.distance}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
+            <SectionHeader title={language === 'fr' ? 'Nouveautés à proximité' : 'Nearby New Salons'} onSeeAll={() => router.push('/(tabs)/explore')} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {nearbySalons.map((salon) => (
+                <SalonCard key={salon.id} salon={salon} variant="default" />
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
 
         {/* ---------------- Salons populaires ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(450).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
-          {POPULAR_SALONS.map((salon) => (
-            <TouchableOpacity
-              key={salon.id}
-              style={[styles.salonCard, { backgroundColor: colors.card }]}
-              onPress={() => requireAuth(() => router.push(`/salon/${salon.id}`))}
-            >
-              <Image source={salon.image} style={styles.salonImage} contentFit="cover" />
-              <View style={styles.salonInfo}>
-                <View style={styles.salonHeader}>
-                  <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
-                  {salon.openNow && (
-                    <View style={styles.openBadge}>
-                      <Text style={styles.openBadgeText}>{language === 'fr' ? 'Ouvert' : 'Open'}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.salonLocation, { color: colors.textSecondary }]}>
-                  <Ionicons name="location-outline" size={12} /> {salon.location}
-                </Text>
-                <Text style={[styles.salonServices, { color: colors.textMuted }]}>
-                  {salon.services.join(' • ')}
-                </Text>
-                <View style={styles.salonMeta}>
-                  <Text style={[styles.salonPrice, { color: '#7C3AED' }]}>{salon.priceRange}</Text>
-                  <View style={styles.ratingContainer}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={[styles.ratingText, { color: colors.text }]}>{salon.rating}</Text>
-                    <Text style={[styles.reviewCount, { color: colors.textMuted }]}>({salon.reviews})</Text>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </Animated.View>
+        {popularSalons.length > 0 && (
+          <Animated.View
+            entering={FadeInUp.delay(450).duration(500)}
+            style={styles.section}
+          >
+            <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
+            <View style={styles.popularGrid}>
+              {popularSalons.map((salon) => (
+                <SalonCard key={salon.id} salon={salon} variant="horizontal" />
+              ))}
+            </View>
+          </Animated.View>
+        )}
 
         {/* ---------------- Tips & Inspiration ---------------- */}
         <Animated.View
@@ -812,142 +803,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Coiffeurs
-  coiffeurCard: {
-    width: 180,
-    borderRadius: 16,
-    overflow: 'hidden',
+  popularGrid: {
+    gap: 12,
+    paddingBottom: 8,
   },
-  coiffeurImageContainer: {
-    position: 'relative',
+  horizontalScroll: {
+    paddingRight: 16,
+    gap: 12,
   },
-  coiffeurImage: {
-    width: '100%',
-    height: 120,
-  },
-  availableBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#22C55E',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  availableText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  coiffeurInfo: {
-    padding: 12,
-  },
-  coiffeurName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  coiffeurSpecialty: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  coiffeurPrice: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  coiffeurMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reviewCount: {
-    fontSize: 11,
-  },
-  distanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  distanceText: {
-    fontSize: 11,
-  },
-
-  // Salons
-  salonCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#191919',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  salonImage: {
-    width: 110,
-    height: 130,
-  },
-  salonInfo: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'center',
-  },
-  salonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  salonName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  openBadge: {
-    backgroundColor: '#22C55E20',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  openBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#22C55E',
-  },
-  salonLocation: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  salonServices: {
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  salonMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  salonPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   // Tips
   tipCard: {
     width: 240,

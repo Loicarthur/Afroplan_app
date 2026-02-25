@@ -32,6 +32,7 @@ import { useSalons } from '@/hooks/use-salons';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Shadows } from '@/constants/theme';
 import { salonService } from '@/services/salon.service';
+import { SalonCard } from '@/components/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types de coiffure pour filtres
@@ -412,7 +413,7 @@ export default function SearchScreen() {
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={styles.listGrid}
         >
           {loadingSalons && realSalons.length === 0 && (
             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
@@ -428,67 +429,8 @@ export default function SearchScreen() {
               </Text>
             </View>
           ) : (
-            realSalons.map((salon, index) => (
-              <View key={salon.id}>
-                <TouchableOpacity
-                  style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.md]}
-                  onPress={() => handleSalonPress(salon.id)}
-                  activeOpacity={0.9}
-                >
-                  {/* Image avec Overlay Gradient simulé */}
-                  <View style={styles.salonImageContainer}>
-                    <Image
-                      source={{ uri: salon.cover_image_url || salon.image_url || 'https://via.placeholder.com/300' }}
-                      style={styles.salonImage}
-                      contentFit="cover"
-                    />
-                    {salon.is_verified && (
-                      <View style={styles.verifiedBadgeOverlay}>
-                        <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.salonContent}>
-                    <View style={styles.salonHeader}>
-                      <Text style={[styles.salonName, { color: colors.text }]} numberOfLines={1}>
-                        {salon.name}
-                      </Text>
-                      <View style={styles.ratingBadgePremium}>
-                        <Ionicons name="star" size={14} color="#F59E0B" />
-                        <Text style={styles.ratingTextPremium}>
-                          {salon.rating > 0 ? salon.rating.toFixed(1) : "2.0"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text style={[styles.specialtiesText, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {salon.specialties?.join(' • ') || 'Expert Coiffure Afro'}
-                    </Text>
-
-                    <View style={styles.locationRow}>
-                      <Ionicons name="location" size={14} color={colors.primary} />
-                      <Text style={[styles.addressText, { color: colors.textMuted }]} numberOfLines={1}>
-                        {salon.city} • {salon.postal_code}
-                      </Text>
-                    </View>
-
-                    <View style={styles.salonFooter}>
-                      <View style={styles.priceContainer}>
-                        <Text style={[styles.pricePrefix, { color: colors.textMuted }]}>À partir de</Text>
-                        <Text style={[styles.priceTag, { color: colors.text }]}>
-                          {(salon as any).min_price !== undefined ? `${(salon as any).min_price}€` : "N/A"}
-                        </Text>
-                      </View>
-                      
-                      <View style={[styles.viewTarifsButton, { backgroundColor: '#191919' }]}>
-                        <Text style={styles.viewTarifsText}>Voir les tarifs</Text>
-                        <Ionicons name="chevron-forward" size={14} color="#FFF" />
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
+            realSalons.map((salon) => (
+              <SalonCard key={salon.id} salon={salon} variant="default" />
             ))
           )}
           <View style={{ height: 100 }} />
@@ -929,111 +871,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  listContainer: {
+  listGrid: {
     paddingHorizontal: 20,
-  },
-  salonCard: {
     flexDirection: 'row',
-    borderRadius: 20,
-    marginBottom: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  salonImageContainer: {
-    position: 'relative',
-  },
-  salonImage: {
-    width: 110,
-    height: 140,
-  },
-  verifiedBadgeOverlay: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 2,
-  },
-  salonContent: {
-    flex: 1,
-    padding: 14,
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  salonHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  salonName: {
-    fontSize: 17,
-    fontWeight: '800',
-    flex: 1,
-    marginRight: 8,
-  },
-  ratingBadgePremium: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FEF3C7',
-    gap: 4,
-  },
-  ratingTextPremium: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#92400E',
-  },
-  specialtiesText: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: -4,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  addressText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  salonFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  priceContainer: {
-    flexDirection: 'column',
-  },
-  pricePrefix: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  priceTag: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  viewTarifsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 6,
-  },
-  viewTarifsText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
   // Modal Styles
   modalContainer: {
     flex: 1,

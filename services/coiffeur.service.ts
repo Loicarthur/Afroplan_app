@@ -225,6 +225,21 @@ export const coiffeurService = {
   },
 
   /**
+   * Supprimer toutes les indisponibilités spécifiques pour un jour donné
+   */
+  async deleteSpecificAvailability(coiffeurId: string, date: string): Promise<void> {
+    const { error } = await supabase
+      .from('coiffeur_availability')
+      .delete()
+      .eq('coiffeur_id', coiffeurId)
+      .eq('specific_date', date);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
    * Recuperer les disponibilites d'un coiffeur
    */
   async getCoiffeurAvailabilities(coiffeurId: string): Promise<CoiffeurAvailability[]> {

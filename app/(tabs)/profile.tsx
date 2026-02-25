@@ -11,6 +11,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,39 +22,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { clientService } from '@/services/client.service';
+import { BookingWithDetails } from '@/types';
+import NotificationModal from '@/components/NotificationModal';
 
-/* ---------- MOCK DATA ---------- */
-const RECENT_BOOKINGS = [
-  {
-    id: '1',
-    salon: 'Bella Coiffure',
-    service: 'Box Braids',
-    date: '15 Jan 2026',
-    status: 'completed' as const,
-  },
-  {
-    id: '2',
-    salon: 'Afro Style Studio',
-    service: 'Twists',
-    date: '22 Dec 2025',
-    status: 'completed' as const,
-  },
-  {
-    id: '3',
-    salon: 'NaturalHair Paris',
-    service: 'Soins capillaires',
-    date: '10 Fev 2026',
-    status: 'upcoming' as const,
-  },
-];
-
+/* ---------- STATUS CONFIG ---------- */
 const STATUS_CONFIG = {
   completed: { label: 'Terminé', color: '#22C55E', icon: 'checkmark-circle' as const },
-  upcoming: { label: 'À venir', color: '#3B82F6', icon: 'time' as const },
+  pending: { label: 'En attente', color: '#F59E0B', icon: 'time' as const },
+  confirmed: { label: 'Confirmé', color: '#3B82F6', icon: 'checkmark-circle' as const },
   cancelled: { label: 'Annulé', color: '#EF4444', icon: 'close-circle' as const },
 };
 
-/* ---------- MENU ITEM ---------- */
+/* ---------- MENU ITEM COMPONENT ---------- */
 type MenuItemProps = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -103,47 +84,38 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
   );
 }
 
-/* ---------- BOOKING CARD ---------- */
-function BookingCard({ booking }: { booking: any }) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  
-  // Sécurisation du statut pour éviter le crash
-  const statusKey = (booking.status && STATUS_CONFIG[booking.status as keyof typeof STATUS_CONFIG]) 
-    ? (booking.status as keyof typeof STATUS_CONFIG) 
-    : 'upcoming';
-    
-  const statusConfig = STATUS_CONFIG[statusKey];
-
-  return (
-    <TouchableOpacity
-      style={[styles.bookingCard, { backgroundColor: colors.card }]}
-      activeOpacity={0.7}
-      onPress={() => Alert.alert('Info', 'Détails du rendez-vous à venir')}
-    >
-      <View style={[styles.bookingIconContainer, { backgroundColor: statusConfig.color + '15' }]}>
-        <Ionicons name={statusConfig.icon} size={22} color={statusConfig.color} />
-      </View>
-      <View style={styles.bookingContent}>
-        <Text style={[styles.bookingSalon, { color: colors.text }]}>{booking.salon || 'Salon'}</Text>
-        <Text style={[styles.bookingService, { color: colors.textSecondary }]}>
-          {booking.service || 'Service'} · {booking.date || 'Date'}
-        </Text>
-      </View>
-      <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '15' }]}>
-        <Text style={[styles.statusText, { color: statusConfig.color }]}>
-          {statusConfig.label}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 /* ---------- MAIN SCREEN ---------- */
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile, signOut, isAuthenticated } = useAuth();
+
+  const [stats, setStats] = React.useState<any>(null);
+  const [recentBookings, setRecentBookings] = React.useState<BookingWithDetails[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [notificationModalVisible, setNotificationModalVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+      try {
+        const [statsData, bookingsData] = await Promise.all([
+          clientService.getClientStats(user.id),
+          clientService.getBookingHistory(user.id, 1)
+        ]);
+        setStats(statsData);
+        setRecentBookings(bookingsData.data.slice(0, 3));
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [user?.id, isAuthenticated]);
 
   // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
@@ -200,7 +172,7 @@ export default function ProfileScreen() {
 
   const displayName = profile?.full_name || 'Utilisateur';
   const displayEmail = profile?.email || user?.email || '';
-  const initials = displayName.charAt(0).toUpperCase();
+  const initials = displayName ? displayName.charAt(0).toUpperCase() : 'U';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -235,6 +207,22 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
+        {/* ── STATS SECTION ── */}
+        <View style={styles.statsSection}>
+          <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.totalBookings || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>RDV</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.visitedSalonsCount || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Salons</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.totalSpent || 0}€</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Dépensé</Text>
+          </View>
+        </View>
+
         {/* ── SWITCH MODE COIFFEUR (style CityGo) ── */}
         <View style={styles.switchSection}>
           <TouchableOpacity
@@ -259,31 +247,70 @@ export default function ProfileScreen() {
         <View style={styles.menuSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-              Mes rendez-vous
+              Mes rendez-vous récents
             </Text>
-            <TouchableOpacity onPress={() => Alert.alert('Info', 'Historique complet à venir')}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/reservations')}>
               <Text style={[styles.seeAllText, { color: colors.primary }]}>Tout voir</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.menuGroup, Shadows.sm]}>
-            {RECENT_BOOKINGS.map(booking => (
-              <BookingCard key={booking.id} booking={booking} />
-            ))}
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ padding: 20 }} />
+            ) : recentBookings.length > 0 ? (
+              recentBookings.map(booking => {
+                const status = (STATUS_CONFIG[booking.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending);
+                return (
+                  <TouchableOpacity
+                    key={booking.id}
+                    style={[styles.bookingCard, { backgroundColor: colors.card }]}
+                    activeOpacity={0.7}
+                    onPress={() => router.push({
+                      pathname: '/chat/[bookingId]',
+                      params: { bookingId: booking.id },
+                    })}
+                  >
+                    <View style={[styles.bookingIconContainer, { backgroundColor: status.color + '15' }]}>
+                      <Ionicons name={status.icon} size={22} color={status.color} />
+                    </View>
+                    <View style={styles.bookingContent}>
+                      <Text style={[styles.bookingSalon, { color: colors.text }]}>{booking.salon?.name || 'Salon'}</Text>
+                      <Text style={[styles.bookingService, { color: colors.textSecondary }]}>
+                        {booking.service?.name || 'Service'} · {booking.booking_date}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: status.color + '15' }]}>
+                      <Text style={[styles.statusText, { color: status.color }]}>
+                        {status.label}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: colors.textMuted }}>Aucun rendez-vous récent</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* ── MESSAGES ── */}
+        {/* ── MESSAGES & ALERTES ── */}
         <View style={styles.menuSection}>
           <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-            Messages
+            Messages & Alertes
           </Text>
           <View style={[styles.menuGroup, Shadows.sm]}>
             <MenuItem
               icon="chatbubbles-outline"
               title="Mes conversations"
               subtitle="Échanges avec vos coiffeurs"
-              badge={2}
-              onPress={() => Alert.alert('Info', 'Messagerie à venir')}
+              onPress={() => router.push('/(tabs)/reservations')}
+            />
+            <MenuItem
+              icon="notifications-outline"
+              title="Notifications"
+              subtitle="Historique de vos alertes"
+              onPress={() => setNotificationModalVisible(true)}
             />
           </View>
         </View>
@@ -303,7 +330,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon="settings-outline"
               title="Paramètres"
-              subtitle="Notifications, langue, sécurité"
+              subtitle="Langue, sécurité"
               onPress={() => Alert.alert('Info', 'Fonctionnalité à venir')}
             />
             <MenuItem
@@ -335,6 +362,11 @@ export default function ProfileScreen() {
 
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
+
+      <NotificationModal 
+        visible={notificationModalVisible} 
+        onClose={() => setNotificationModalVisible(false)} 
+      />
     </SafeAreaView>
   );
 }
@@ -394,6 +426,29 @@ const styles = StyleSheet.create({
   profileEmail: {
     fontSize: FontSizes.md,
     marginTop: Spacing.xs,
+  },
+
+  /* Stats Section */
+  statsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  statCard: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderRadius: BorderRadius.lg,
+  },
+  statValue: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: FontSizes.xs,
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
 
   /* Switch Button */

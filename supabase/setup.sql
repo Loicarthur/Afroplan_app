@@ -82,7 +82,7 @@ CREATE TYPE user_role AS ENUM ('client', 'coiffeur', 'admin');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed');
 CREATE TYPE payment_method AS ENUM ('full', 'deposit', 'on_site');
 CREATE TYPE booking_payment_status AS ENUM ('pending', 'partial', 'completed', 'refunded');
-CREATE TYPE service_location_type AS ENUM ('salon', 'domicile', 'both');
+CREATE TYPE service_location_type AS ENUM ('salon', 'coiffeur_home', 'domicile', 'both');
 CREATE TYPE booking_source AS ENUM ('client_app', 'coiffeur_walkin', 'coiffeur_for_client');
 CREATE TYPE promotion_type AS ENUM ('percentage', 'fixed_amount', 'free_service');
 CREATE TYPE promotion_status AS ENUM ('draft', 'active', 'paused', 'expired');
@@ -259,6 +259,22 @@ CREATE TABLE favorites (
 );
 
 CREATE INDEX idx_favorites_user ON favorites(user_id);
+
+-- NOTIFICATIONS
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL,
+    booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
 
 -- GALLERY_IMAGES
 -- Distinction photo principale / sous-photos :

@@ -991,7 +991,7 @@ export interface Database {
       payment_method: 'full' | 'deposit' | 'on_site';
       booking_payment_status: 'pending' | 'partial' | 'completed' | 'refunded';
       booking_source: 'client_app' | 'coiffeur_walkin' | 'coiffeur_for_client';
-      service_location_type: 'salon' | 'domicile' | 'both';
+      service_location_type: 'salon' | 'coiffeur_home' | 'domicile' | 'both';
       promotion_type: 'percentage' | 'fixed_amount' | 'free_service';
       promotion_status: 'draft' | 'active' | 'paused' | 'expired';
       stripe_payment_status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';

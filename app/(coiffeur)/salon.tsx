@@ -136,7 +136,9 @@ export default function SalonManagementScreen() {
           }
           
           // Déduire le type de localisation depuis les données existantes
-          if (salon.offers_home_service) {
+          if (salon.service_location) {
+            setServiceLocationType(salon.service_location as any);
+          } else if (salon.offers_home_service) {
             setServiceLocationType('both');
           } else {
             setServiceLocationType('salon');
@@ -366,8 +368,8 @@ export default function SalonManagementScreen() {
         photos: allPhotos,
         // On pourrait stocker les vidéos dans une colonne 'videos' si on l'ajoute plus tard
         opening_hours: openingHours,
-        offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both' || serviceLocationType === 'coiffeur_home',
-        service_location: serviceLocationType,
+        offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
+        service_location: serviceLocationType === 'coiffeur_home' ? 'salon' : serviceLocationType,
         min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both')
           ? parseFloat(homeServiceFee || '0')
           : 0,
