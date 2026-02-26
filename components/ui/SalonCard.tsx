@@ -19,7 +19,7 @@ const CARD_WIDTH = (width - Spacing.md * 3) / 2;
 
 type SalonCardProps = {
   salon: Salon;
-  variant?: 'default' | 'horizontal' | 'featured';
+  variant?: 'default' | 'horizontal' | 'featured' | 'listing';
   onFavoritePress?: () => void;
   isFavorite?: boolean;
   searchedService?: string;
@@ -106,6 +106,99 @@ export function SalonCard({
       )}
     </View>
   );
+
+  if (variant === 'listing') {
+    return (
+      <TouchableOpacity
+        style={[styles.listingCard, Shadows.sm]}
+        onPress={handlePress}
+        activeOpacity={0.92}
+      >
+        <View style={styles.listingImageContainer}>
+          <Image
+            source={{ uri: salon.cover_image_url || salon.image_url || 'https://via.placeholder.com/600x400?text=Salon' }}
+            style={styles.listingImage}
+            contentFit="cover"
+            transition={300}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)']}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Badges top-left */}
+          <View style={styles.listingBadgesRow}>
+            {salon.is_verified && (
+              <View style={[styles.listingBadge, { backgroundColor: 'rgba(34,197,94,0.9)' }]}>
+                <Ionicons name="checkmark-circle" size={11} color="#FFFFFF" />
+                <Text style={styles.listingBadgeText}>Vérifié</Text>
+              </View>
+            )}
+            <View style={[styles.listingBadge, { backgroundColor: isOpen() ? 'rgba(34,197,94,0.85)' : 'rgba(107,114,128,0.85)' }]}>
+              <View style={styles.statusDot} />
+              <Text style={styles.listingBadgeText}>{isOpen() ? 'Ouvert' : 'Fermé'}</Text>
+            </View>
+          </View>
+          {/* Favorite button top-right */}
+          {onFavoritePress && (
+            <TouchableOpacity style={styles.listingFavoriteBtn} onPress={onFavoritePress}>
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={22}
+                color={isFavorite ? '#EF4444' : '#FFFFFF'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.listingContent}>
+          {/* Name + Rating */}
+          <View style={styles.listingRow}>
+            <Text style={[styles.listingName, { color: colors.text }]} numberOfLines={1}>
+              {salon.name}
+            </Text>
+            <View style={styles.listingRatingBox}>
+              <Ionicons name="star" size={13} color="#F59E0B" />
+              <Text style={[styles.listingRating, { color: colors.text }]}>
+                {salon.rating > 0 ? salon.rating.toFixed(1) : 'Nouveau'}
+              </Text>
+              {salon.reviews_count > 0 && (
+                <Text style={[styles.listingReviewCount, { color: colors.textMuted }]}>
+                  ({salon.reviews_count})
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Location */}
+          <View style={styles.listingMetaRow}>
+            <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+            <Text style={[styles.listingMeta, { color: colors.textMuted }]} numberOfLines={1}>
+              {salon.city}{salon.address ? ` · ${salon.address}` : ''}
+            </Text>
+          </View>
+
+          {/* Specialties chips */}
+          {salon.specialties && salon.specialties.length > 0 && (
+            <View style={styles.specialtiesRow}>
+              {salon.specialties.slice(0, 3).map((sp, i) => (
+                <View key={i} style={[styles.specialtyChip, { backgroundColor: colors.background }]}>
+                  <Text style={[styles.specialtyChipText, { color: colors.textSecondary }]}>{sp}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Price */}
+          <View style={styles.listingPriceRow}>
+            <Text style={[styles.listingPriceLabel, { color: colors.textMuted }]}>À partir de </Text>
+            <Text style={[styles.listingPrice, { color: colors.text }]}>
+              {(salon as any).min_price || 25}€
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   if (variant === 'horizontal') {
     return (
@@ -457,6 +550,123 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+
+  // Listing card (Airbnb-style full-width)
+  listingCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  listingImageContainer: {
+    position: 'relative',
+    height: 220,
+  },
+  listingImage: {
+    width: '100%',
+    height: '100%',
+  },
+  listingBadgesRow: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  listingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  listingBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  listingFavoriteBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listingContent: {
+    padding: 14,
+    gap: 6,
+  },
+  listingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  listingName: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
+  listingRatingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  listingRating: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  listingReviewCount: {
+    fontSize: 12,
+  },
+  listingMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  listingMeta: {
+    fontSize: 13,
+    flex: 1,
+  },
+  specialtiesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  specialtyChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  specialtyChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  listingPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  listingPriceLabel: {
+    fontSize: 13,
+  },
+  listingPrice: {
+    fontSize: 15,
+    fontWeight: '800',
   },
 
   // Featured card
