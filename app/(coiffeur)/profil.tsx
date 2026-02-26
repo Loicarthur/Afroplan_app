@@ -12,9 +12,12 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +26,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { Button } from '@/components/ui';
+import { salonService } from '@/services/salon.service';
+import { paymentService } from '@/services/payment.service';
+import NotificationModal from '@/components/NotificationModal';
 
 const { width } = Dimensions.get('window');
 
@@ -74,6 +81,37 @@ export default function CoiffeurProfilScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile, signOut, isAuthenticated } = useAuth();
 
+  const [stats, setStats] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [notificationModalVisible, setNotificationModalVisible] = React.useState(false);
+  const [walletModalVisible, setWalletModalVisible] = React.useState(false);
+  const [historyModalVisible, setHistoryModalVisible] = React.useState(false);
+  const [personalInfoModalVisible, setPersonalInfoModalVisible] = React.useState(false);
+  const [securityModalVisible, setSecurityModalVisible] = React.useState(false);
+
+  const fetchStats = async () => {
+    if (!user?.id) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        const statsData = await salonService.getSalonStats(salon.id);
+        setStats(statsData);
+      }
+    } catch (error) {
+      console.error('Error fetching coiffeur stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated) {
+        fetchStats();
+      }
+    }, [user?.id, isAuthenticated])
+  );
+
   const handleSignOut = () => {
     Alert.alert(
       'Déconnexion',
@@ -109,7 +147,7 @@ export default function CoiffeurProfilScreen() {
           <View style={styles.authIconContainer}>
             <Ionicons name="person" size={48} color={colors.textMuted} />
           </View>
-          <Text style={[styles.authTitle, { color: colors.text }]}>Mon profil Pro</Text>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Profil</Text>
           <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
             Connectez-vous pour gérer votre activité professionnelle
           </Text>
@@ -172,16 +210,12 @@ export default function CoiffeurProfilScreen() {
         {/* ── QUICK STATS ── */}
         <View style={styles.statsRow}>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>4.9</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{stats?.averageRating?.toFixed(1) || '0.0'}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Note</Text>
           </View>
-          <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>124</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Ventes</Text>
-          </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>3 ans</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exp.</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{stats?.totalSuccessfulBookings || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>RDV</Text>
           </View>
         </View>
 
@@ -235,12 +269,12 @@ export default function CoiffeurProfilScreen() {
               icon="wallet-outline"
               title="Portefeuille"
               subtitle="Solde et virements"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité disponible prochainement')}
+              onPress={() => setWalletModalVisible(true)}
             />
             <MenuItem
               icon="receipt-outline"
               title="Historique des gains"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité disponible prochainement')}
+              onPress={() => setHistoryModalVisible(true)}
             />
           </View>
         </View>
@@ -251,17 +285,17 @@ export default function CoiffeurProfilScreen() {
             <MenuItem
               icon="person-outline"
               title="Informations Personnelles"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité disponible prochainement')}
+              onPress={() => setPersonalInfoModalVisible(true)}
             />
             <MenuItem
               icon="notifications-outline"
               title="Notifications"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité disponible prochainement')}
+              onPress={() => setNotificationModalVisible(true)}
             />
             <MenuItem
               icon="shield-outline"
               title="Confidentialité & Sécurité"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité disponible prochainement')}
+              onPress={() => setSecurityModalVisible(true)}
             />
           </View>
         </View>
@@ -286,6 +320,167 @@ export default function CoiffeurProfilScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── NOTIFICATION MODAL ── */}
+      <NotificationModal 
+        visible={notificationModalVisible} 
+        onClose={() => setNotificationModalVisible(false)} 
+      />
+
+      {/* ── PORTEFEUILLE MODAL ── */}
+      <Modal
+        visible={walletModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setWalletModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Mon Portefeuille</Text>
+              <TouchableOpacity onPress={() => setWalletModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.balanceBox, { backgroundColor: '#191919' }]}>
+              <Text style={styles.balanceLabel}>Solde disponible (Net 80%)</Text>
+              <Text style={styles.balanceValue}>
+                {((stats?.totalRevenue || 0) * 0.8).toFixed(2)} €
+              </Text>
+              <TouchableOpacity 
+                style={styles.payoutButton}
+                onPress={() => Alert.alert('Virement', 'Demande de virement envoyée vers votre RIB.')}
+              >
+                <Text style={styles.payoutButtonText}>Demander un virement</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                Les virements sont effectués sous 48h ouvrées.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── HISTORIQUE GAINS MODAL ── */}
+      <Modal
+        visible={historyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setHistoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Historique des gains</Text>
+              <TouchableOpacity onPress={() => setHistoryModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.historySummary}>
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Chiffre d'affaires</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{stats?.totalRevenue?.toFixed(2)}€</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Commission (20%)</Text>
+                  <Text style={[styles.summaryValue, { color: colors.error }]}>-{(stats?.totalRevenue * 0.2)?.toFixed(2)}€</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionTitleModal, { color: colors.text }]}>Dernières transactions</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 20 }]}>
+                Aucune transaction récente à afficher.
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── INFOS PERSONNELLES MODAL ── */}
+      <Modal
+        visible={personalInfoModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setPersonalInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Mes Informations</Text>
+              <TouchableOpacity onPress={() => setPersonalInfoModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Nom complet</Text>
+              <TextInput 
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                value={profile?.full_name}
+                editable={false}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Email professionnel</Text>
+              <TextInput 
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                value={profile?.email || user?.email}
+                editable={false}
+              />
+            </View>
+
+            <Button 
+              title="Modifier mes infos"
+              onPress={() => Alert.alert('Info', 'Veuillez contacter le support pour modifier vos infos vérifiées.')}
+              style={{ marginTop: 10 }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── SECURITE MODAL ── */}
+      <Modal
+        visible={securityModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setSecurityModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sécurité & Confidentialité</Text>
+              <TouchableOpacity onPress={() => setSecurityModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <MenuItem 
+              icon="lock-closed-outline"
+              title="Changer le mot de passe"
+              onPress={() => Alert.alert('Sécurité', 'Lien de réinitialisation envoyé par email.')}
+            />
+            <MenuItem 
+              icon="finger-print-outline"
+              title="Authentification biométrique"
+              onPress={() => Alert.alert('Info', 'Bientôt disponible')}
+            />
+            <MenuItem 
+              icon="eye-off-outline"
+              title="Masquer mon profil"
+              onPress={() => Alert.alert('Confidentialité', 'Votre profil ne sera plus visible par les nouveaux clients.')}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -487,6 +682,114 @@ const styles = StyleSheet.create({
   footerVersion: {
     fontSize: 11,
     marginTop: 4,
+  },
+
+  /* Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    padding: 24,
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  balanceBox: {
+    padding: 24,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  balanceValue: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 20,
+  },
+  payoutButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  payoutButtonText: {
+    color: '#191919',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 12,
+    flex: 1,
+  },
+  historySummary: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginHorizontal: 10,
+  },
+  sectionTitleModal: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    backgroundColor: 'rgba(0,0,0,0.02)',
   },
 
   // Auth Prompt

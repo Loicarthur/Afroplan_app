@@ -472,6 +472,34 @@ export default function SalonManagementScreen() {
     }
   };
 
+  const handleUnpublish = async () => {
+    Alert.alert(
+      'Dépublier le salon ?',
+      'Votre salon ne sera plus visible par les clients dans la recherche. Vos rendez-vous en cours restent valides.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Oui, dépublier',
+          style: 'destructive',
+          onPress: async () => {
+            setIsPublishing(true);
+            try {
+              if (existingSalonId) {
+                await salonService.updateSalon(existingSalonId, { is_active: false } as any);
+                setIsPublished(false);
+                Alert.alert('Succès', 'Votre salon a été retiré de la publication.');
+              }
+            } catch (err) {
+              Alert.alert('Erreur', 'Impossible de dépublier le salon.');
+            } finally {
+              setIsPublishing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
     return (
@@ -866,17 +894,27 @@ export default function SalonManagementScreen() {
         </View>
 
         {/* Statut de publication */}
-        {isPublished && (
-          <View style={[styles.publishedBanner, { backgroundColor: '#F0FDF4' }]}>
-            <Ionicons name="checkmark-circle" size={22} color="#22C55E" />
+        {isPublished ? (
+          <View style={[styles.publishedBanner, { backgroundColor: '#F0FDF4', borderColor: '#22C55E30', borderWidth: 1 }]}>
+            <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
             <View style={styles.publishedBannerContent}>
-              <Text style={styles.publishedBannerTitle}>
-                {language === 'en' ? 'Salon Published' : 'Salon publié'}
+              <Text style={[styles.publishedBannerTitle, { color: '#166534' }]}>
+                Salon en ligne
               </Text>
-              <Text style={styles.publishedBannerDesc}>
-                {language === 'en'
-                  ? 'Your salon is visible to clients'
-                  : 'Votre salon est visible par les clients'}
+              <Text style={[styles.publishedBannerDesc, { color: '#166534', opacity: 0.8 }]}>
+                Votre vitrine est visible par tous les clients AfroPlan.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.publishedBanner, { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', borderWidth: 1 }]}>
+            <Ionicons name="eye-off-outline" size={24} color="#6B7280" />
+            <View style={styles.publishedBannerContent}>
+              <Text style={[styles.publishedBannerTitle, { color: '#374151' }]}>
+                Salon hors ligne
+              </Text>
+              <Text style={[styles.publishedBannerDesc, { color: '#4B5563', opacity: 0.8 }]}>
+                Publiez votre salon pour commencer à recevoir des réservations.
               </Text>
             </View>
           </View>
@@ -892,7 +930,21 @@ export default function SalonManagementScreen() {
             disabled={isSaving || isPublishing}
           />
 
-          {!isPublished && (
+          <View style={{ height: 12 }} />
+
+          {isPublished ? (
+            <TouchableOpacity
+              style={[styles.unpublishButton, { borderColor: colors.error }]}
+              onPress={handleUnpublish}
+              disabled={isPublishing || isSaving}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="eye-off-outline" size={20} color={colors.error} />
+              <Text style={[styles.unpublishButtonText, { color: colors.error }]}>
+                Dépublier mon salon
+              </Text>
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity
               style={[
                 styles.publishButton, 
@@ -910,10 +962,10 @@ export default function SalonManagementScreen() {
               />
               <Text style={styles.publishButtonText}>
                 {servicesCount === 0 
-                  ? 'Services requis' 
+                  ? 'Services requis pour publier' 
                   : isPublishing
-                    ? (language === 'en' ? 'Publishing...' : 'Publication...')
-                    : (language === 'en' ? 'Publish my salon' : 'Publier mon salon')}
+                    ? 'Publication...'
+                    : 'Publier mon salon'}
               </Text>
             </TouchableOpacity>
           )}
@@ -1180,6 +1232,19 @@ const styles = StyleSheet.create({
   publishButtonText: {
     color: '#FFFFFF',
     fontSize: FontSizes.lg,
+    fontWeight: '700',
+  },
+  unpublishButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  unpublishButtonText: {
+    fontSize: FontSizes.md,
     fontWeight: '700',
   },
   saveSection: {

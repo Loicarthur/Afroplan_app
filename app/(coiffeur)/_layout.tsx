@@ -47,29 +47,20 @@ export default function CoiffeurLayout() {
         }}
       />
       <Tabs.Screen
-        name="portfolio"
+        name="services"
         options={{
-          title: 'Mon Portfolio',
+          title: 'Mes Services',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="images-outline" size={size} color={color} />
+            <Ionicons name="cut-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="reservations"
         options={{
-          title: 'Reservations',
+          title: 'Mes Reservations',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="services"
-        options={{
-          title: 'Services',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cut-outline" size={size} color={color} />
           ),
         }}
       />
@@ -83,14 +74,12 @@ export default function CoiffeurLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Messages',
-          headerShown: false,
-          href: null,
-        }}
-      />
+      
+      {/* Screens techniques sans icônes de menu */}
+      <Tabs.Screen name="portfolio" options={{ href: null }} />
+      <Tabs.Screen name="finance" options={{ href: null }} />
+      <Tabs.Screen name="clients" options={{ href: null }} />
+      <Tabs.Screen name="messages" options={{ href: null }} />
     </Tabs>
   );
 }

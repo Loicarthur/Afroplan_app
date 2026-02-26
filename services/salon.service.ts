@@ -928,12 +928,11 @@ export const salonService = {
   // STATISTIQUES DU SALON
   // ============================================
 
-  /**
-   * Recuperer les statistiques d'un salon
-   */
   async getSalonStats(salonId: string): Promise<{
     totalBookings: number;
     completedBookings: number;
+    confirmedBookings: number;
+    totalSuccessfulBookings: number;
     pendingBookings: number;
     cancelledBookings: number;
     totalRevenue: number;
@@ -964,6 +963,8 @@ export const salonService = {
     const stats = {
       totalBookings: bookings?.length || 0,
       completedBookings: 0,
+      confirmedBookings: 0,
+      totalSuccessfulBookings: 0,
       pendingBookings: 0,
       cancelledBookings: 0,
       totalRevenue: 0,
@@ -979,9 +980,13 @@ export const salonService = {
       switch (booking.status) {
         case 'completed':
           stats.completedBookings++;
+          stats.totalSuccessfulBookings++;
+          break;
+        case 'confirmed':
+          stats.confirmedBookings++;
+          stats.totalSuccessfulBookings++;
           break;
         case 'pending':
-        case 'confirmed':
           stats.pendingBookings++;
           break;
         case 'cancelled':
