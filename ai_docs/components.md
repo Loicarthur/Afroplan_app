@@ -13,7 +13,7 @@ Afroplan uses a custom theme (defined in `constants/theme.ts`) with a focus on a
 - **Badge**: Small labels for status or categories.
 
 ### Domain Components
-- **SalonCard**: Displays salon summary in search results.
+- **SalonCard**: Displays salon summary in search results. Supports a `searchedService` prop that dynamically alters the card to show the exact price and specific photo for the requested service (e.g., showing a "Box Braids" photo and its specific price instead of the generic salon logo and minimum price).
 - **CategoryCard**: Represents a hair style category (e.g., Braids).
 - **SearchBar**: Main search interface for finding salons.
 - **BookingSummary**: Displays details of an appointment.
@@ -26,11 +26,13 @@ Afroplan uses a custom theme (defined in `constants/theme.ts`) with a focus on a
 
 ## Special UI Features
 
-### Visual Service Management
-Coiffeurs receive rich visual feedback when managing their catalog:
+### Visual Service Management & Pro UX
+Coiffeurs receive rich visual feedback and motivation when managing their catalog:
+- **Boost Banner**: A persistent banner encouraging pros to upload their own photos to increase conversion.
+- **Custom Image Upload**: Pros can override default catalog images with their own work directly from the camera or gallery.
+- **Status Indicators**: Visual badges (✅ / ℹ️) clearly distinguish between authentic pro photos and default catalog placeholders.
 - **Thumbnail Previews**: In the style catalog and my-styles list.
-- **Hero Image Previews**: In configuration modals to confirm style selection.
-- **Dynamic Headers**: Category headers are simplified (emojis removed) to focus on professional photography.
+- **Dynamic Headers**: Category headers focus on professional photography.
 
 ## Navigation Structure (`app/`)
 The app uses Expo Router with the following structure:

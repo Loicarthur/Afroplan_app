@@ -15,11 +15,16 @@
 
 ## Core Concepts
 
-### Image Handling
-The application uses local assets for hairstyle categories and styles.
-- **Source**: `assets/images/`
-- **Implementation**: Managed in `constants/hairstyleCategories.ts` using `require()`.
-- **Display**: Categories automatically use the image of their first sub-style as a preview.
+### Catalog Synchronization & Service Matching
+- **Unified Catalog**: Both Clients and Coiffeurs use the exact same catalog structure (`constants/hairstyleCategories.ts`).
+- **Precision Filtering**: When a client selects a specific style (e.g., "Box Braids"), the app queries the database (`salon.service.ts`) specifically for salons that have actively configured a service with that exact name.
+- **Dynamic Pricing**: The SalonCard dynamically displays the exact price the professional set for the searched style, rather than a generic "starting from" price.
+
+### Smart Image Fallback System
+The application ensures a high-quality visual experience even if a professional hasn't uploaded their own portfolio photos yet:
+1. **Level 1 (Custom)**: If the coiffeur uploads a photo for a service, it's displayed on the SalonCard.
+2. **Level 2 (Catalog HD)**: If no custom photo is provided, the system automatically injects the high-definition reference photo from `HAIRSTYLE_CATEGORIES`.
+3. **Level 3 (Salon Profile)**: As a last resort, the general salon image is used.
 
 ### Service Pricing & Flexibility
 - **Customization**: Hairdressers (Coiffeurs) have full control over their offerings. They define their own prices and estimated durations for each style.
@@ -36,9 +41,11 @@ Afroplan_app/
 │   ├── (salon)/                  # Salon owner dashboard & management
 │   ├── (tabs)/                   # Main client navigation tabs
 │   ├── booking/                  # Booking details and flow
+│   ├── category-styles/          # Lists specific styles within a chosen category
 │   ├── chat/                     # Messaging between client and coiffeur
 │   ├── salon/                    # Salon public profile
-│   └── style-salons/             # Salons filtered by hairstyle category
+│   └── style-salons/             # Salons filtered by specific hairstyle service
+
 ├── components/
 │   ├── ui/                       # Reusable UI components (Button, Input, SalonCard, etc.)
 │   └── ...                       # Other shared components

@@ -41,7 +41,7 @@ import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 const HEADER_HEIGHT = 300;
 
 export default function SalonDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, preselectService } = useLocalSearchParams<{ id: string, preselectService?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile, isAuthenticated, signOut } = useAuth();
@@ -56,6 +56,18 @@ export default function SalonDetailScreen() {
   const [hasBooking, setHasBooking] = useState(false);
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<'services' | 'about' | 'reviews'>('services');
+
+  // Auto-sélection du service s'il a été recherché depuis la page précédente
+  React.useEffect(() => {
+    if (salon?.services && preselectService && selectedServices.length === 0) {
+      const targetService = salon.services.find(
+        (s) => s.name.toLowerCase() === preselectService.toLowerCase() && s.is_active
+      );
+      if (targetService) {
+        setSelectedServices([targetService]);
+      }
+    }
+  }, [salon, preselectService]);
 
   React.useEffect(() => {
     const loadRole = async () => {

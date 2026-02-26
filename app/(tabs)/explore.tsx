@@ -108,13 +108,27 @@ export default function SearchScreen() {
   });
 
   // Memoïser les filtres pour éviter une boucle de re-rendu infinie
-  const salonFilters = React.useMemo(() => ({
-    searchQuery: debouncedQuery || undefined,
-    category: selectedCategory !== 'all' ? selectedCategory : undefined,
-    city: debouncedQuery.length > 2 ? debouncedQuery : undefined,
-    minRating: filters.minRating,
-    maxPrice: filters.maxPrice,
-  }), [debouncedQuery, selectedCategory, filters.minRating, filters.maxPrice]);
+  const salonFilters = React.useMemo(() => {
+    // Mapping ID technique -> Nom affiché pour la DB
+    const categoryMap: Record<string, string> = {
+      'tresses': 'Tresses',
+      'locks': 'Locks',
+      'coupe': 'Coupe',
+      'soins': 'Soin',
+      'coloration': 'Coloration'
+    };
+    
+    const dbCategory = selectedCategory !== 'all' ? (categoryMap[selectedCategory] || selectedCategory) : undefined;
+
+    return {
+      searchQuery: debouncedQuery || undefined,
+      category: dbCategory,
+      serviceName: params.serviceName as string || undefined,
+      city: debouncedQuery.length > 2 ? debouncedQuery : undefined,
+      minRating: filters.minRating,
+      maxPrice: filters.maxPrice,
+    };
+  }, [debouncedQuery, selectedCategory, filters.minRating, filters.maxPrice, params.serviceName]);
 
   // Récupérer les salons réels depuis la base de données
   const { salons: realSalons, isLoading: loadingSalons, refresh } = useSalons(salonFilters);

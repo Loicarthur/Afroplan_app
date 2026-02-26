@@ -7,7 +7,7 @@ Services are located in the `services/` directory and handle all communication w
 | Service | Description |
 |---------|-------------|
 | `auth.service.ts` | Manages login, registration, and session state. |
-| `salon.service.ts` | Handles salon fetching, filtering, and management. |
+| `salon.service.ts` | Handles salon fetching, filtering (including specific `serviceName` vs `category` ILIKE matches), Smart Image Fallbacks (injecting HD catalog photos if pros lack their own), and management. |
 | `booking.service.ts` | Manages appointment creation, status updates, and history. |
 | `client.service.ts` | Profile management and client-specific data. |
 | `coiffeur.service.ts` | Management of coiffeur details and availability. |

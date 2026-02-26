@@ -1052,6 +1052,7 @@ export type ReviewWithClient = Review & {
 export type SalonFilters = {
   city?: string;
   category?: string;
+  serviceName?: string;
   minRating?: number;
   maxPrice?: number;
   searchQuery?: string;

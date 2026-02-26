@@ -228,6 +228,7 @@ export default function HomeScreen() {
       pathname: '/(tabs)/explore',
       params: { 
         category: filters.hairstyle,
+        serviceName: filters.subStyle,
         budget: filters.maxBudget,
         distance: filters.maxDistance,
         location: filters.location,
@@ -239,9 +240,9 @@ export default function HomeScreen() {
   const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
   
   // Featured salons: highest rated verified salons
-  const featuredSalons = salons.filter(s => s.is_verified).sort((a, b) => b.rating - a.rating).slice(0, 5);
+  const featuredSalons = [...salons].filter(s => s.is_verified).sort((a, b) => b.rating - a.rating).slice(0, 5);
   // Popular salons: most reviews
-  const popularSalons = salons.sort((a, b) => b.reviews_count - a.reviews_count).slice(0, 6);
+  const popularSalons = [...salons].sort((a, b) => (b.reviews_count || 0) - (a.reviews_count || 0)).slice(0, 6);
   // Nearby (just newest for now)
   const nearbySalons = [...salons].reverse().slice(0, 6);
 
@@ -402,14 +403,7 @@ export default function HomeScreen() {
                 key={style.id}
                 style={styles.styleCard}
                 onPress={() => {
-                  if (style.firstStyleId) {
-                    router.push({
-                      pathname: '/style-salons/[styleId]',
-                      params: { styleId: style.firstStyleId, styleName: style.name },
-                    });
-                  } else {
-                    router.push('/(tabs)/explore');
-                  }
+                  router.push(`/category-styles/${style.id}`);
                 }}
               >
                 <Image source={style.image} style={styles.styleImage} contentFit="cover" />

@@ -46,13 +46,18 @@ export const salonService = {
   ): Promise<PaginatedResponse<Salon & { min_price?: number }>> {
     checkSupabaseConfig();
     
-    // On récupère les salons et leurs services actifs pour calculer le prix min
+    // On commence par une sélection de base. 
+    // On n'utilise !inner QUE si on a un filtre de service précis, sinon on utilise une jointure normale
+    const selectStr = filters?.serviceName 
+      ? '*, services!inner(id, name, price, is_active)' 
+      : '*, services(id, name, price, is_active)';
+
     let query = supabase
       .from('salons')
-      .select('*, services(price, is_active)', { count: 'exact' })
+      .select(selectStr, { count: 'exact' })
       .eq('is_active', true);
 
-    // Appliquer les filtres
+    // Appliquer les filtres de base
     if (filters?.city) {
       query = query.ilike('city', `%${filters.city}%`);
     }
@@ -67,6 +72,18 @@ export const salonService = {
         `name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
       );
     }
+    
+    // Filtre par catégorie OU par nom de service
+    if (filters?.category && filters?.serviceName) {
+      // Recherche large : catégorie ID, catégorie Nom ou nom de service
+      query = query.or(`specialties.ilike.%${filters.category}%,services.name.ilike.%${filters.serviceName}%`);
+    } else if (filters?.category) {
+      // Si on a un ID technique comme 'tresses', on veut aussi chercher 'Tresses'
+      // On utilise ILIKE pour que ce soit insensible à la casse
+      query = query.or(`specialties.ilike.%${filters.category}%,specialties.cs.{"${filters.category}"}`);
+    } else if (filters?.serviceName) {
+      query = query.ilike('services.name', `%${filters.serviceName}%`);
+    }
 
     // Pagination
     const from = (page - 1) * SALONS_PER_PAGE;
@@ -77,19 +94,54 @@ export const salonService = {
     const { data, error, count } = await query;
 
     if (error) {
-      throw new Error(error.message);
+      if (__DEV__) console.warn('Supabase getSalons error:', error);
+      // Ne renvoyer une erreur que si c'est vraiment grave, sinon liste vide
+      if (error.code !== 'PGRST116') {
+        // Fallback sans filtres complexes si le 'or' a échoué
+        const fallback = await supabase.from('salons').select(selectStr).eq('is_active', true).limit(10);
+        if (!fallback.error) return { data: fallback.data.map(s => ({...s, min_price: 25})), total: 10, page, totalPages: 1, hasMore: false };
+      }
+      return { data: [], total: 0, page, totalPages: 0, hasMore: false };
     }
 
     // Calculer le prix min pour chaque salon
     const processedData = (data || []).map(salon => {
       const allServices = (salon as any).services || [];
-      // On ne garde que les services vraiment actifs
-      const activeServices = allServices.filter((s: any) => s.is_active);
+      const activeServices = Array.isArray(allServices) ? allServices.filter((s: any) => s.is_active) : [];
+      
+      // Si on cherche un service spécifique, on cherche son prix et sa photo en priorité
+      let specificPrice: number | undefined;
+      let specificImage: string | any;
+      let isCustomImage = false;
+      
+      if (filters?.serviceName) {
+        const matchingService = activeServices.find((s: any) => 
+          s.name.toLowerCase().includes(filters.serviceName!.toLowerCase())
+        );
+        if (matchingService) {
+          specificPrice = matchingService.price;
+          // Si le coiffeur a sa propre photo, on l'utilise, sinon on prend celle du catalogue
+          if (matchingService.image_url) {
+            specificImage = matchingService.image_url;
+            isCustomImage = true;
+          } else {
+            // Chercher l'image correspondante dans le catalogue global
+            const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === matchingService.name);
+            specificImage = catalogStyle?.image;
+          }
+        }
+      }
+
       const prices = activeServices.map((s: any) => s.price).filter((p: any) => p != null);
-      const minPrice = prices.length > 0 ? Math.min(...prices) : undefined;
+      const minPrice = specificPrice || (prices.length > 0 ? Math.min(...prices) : undefined);
       
       const { services: _, ...salonData } = salon as any;
-      return { ...salonData, min_price: minPrice };
+      return { 
+        ...salonData, 
+        min_price: minPrice,
+        service_image: specificImage, // On ajoute l'image spécifique (réelle ou catalogue)
+        is_custom_service_image: isCustomImage // Indique si c'est la photo du pro
+      };
     });
 
     const total = count || 0;

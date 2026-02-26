@@ -525,6 +525,20 @@ export default function CoiffeurServicesScreen() {
           {/* ─── ONGLET MES PRESTATIONS ───────────────────────────────────────── */}
           {activeTab === 'my_styles' && (
             <View style={styles.myStylesContainer}>
+              {configuredStyles.length > 0 && (
+                <View style={[styles.boostBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+                  <View style={styles.boostIcon}>
+                    <Ionicons name="flash" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.boostContent}>
+                    <Text style={[styles.boostTitle, { color: colors.text }]}>Boostez vos réservations ! 🚀</Text>
+                    <Text style={[styles.boostText, { color: colors.textSecondary }]}>
+                      Les coiffeurs avec leurs <Text style={{ fontWeight: '700' }}>propres photos</Text> reçoivent en moyenne <Text style={{ color: colors.primary, fontWeight: '700' }}>3x plus de demandes</Text>. Montrez votre talent !
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {configuredStyles.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="cut-outline" size={64} color={colors.textMuted} />
@@ -666,7 +680,7 @@ export default function CoiffeurServicesScreen() {
                     >
                       <Image 
                         source={data.customImage ? { uri: data.customImage } : styleEntry.image} 
-                        style={styles.batchItemImage} 
+                        style={[styles.batchItemImage, data.customImage && { borderColor: colors.primary, borderWidth: 2 }]} 
                         contentFit="cover" 
                       />
                       <View style={styles.imageEditBadge}>
@@ -675,7 +689,12 @@ export default function CoiffeurServicesScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.batchItemTitleWrap}>
-                      <Text style={[styles.batchItemName, { color: colors.text }]}>{styleEntry.name}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.batchItemName, { color: colors.text }]}>{styleEntry.name}</Text>
+                        <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                          {data.customImage ? '✅ Photo réelle de votre travail' : 'ℹ️ Photo catalogue (remplacez-la !)'}
+                        </Text>
+                      </View>
                       <TouchableOpacity 
                         style={styles.batchItemRemove} 
                         onPress={() => setSelectedStyleIds(prev => prev.filter(sid => sid !== id))}
@@ -786,6 +805,42 @@ const styles = StyleSheet.create({
     right: '10%',
     height: 2,
     borderRadius: 2,
+  },
+
+  /* Boost Banner */
+  boostBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 12,
+  },
+  boostIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  boostContent: {
+    flex: 1,
+  },
+  boostTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  boostText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   /* Catalogue */

@@ -50,7 +50,8 @@ export default function StyleSalonsScreen() {
 
   // Récupérer les salons réels filtrés par cette catégorie/style
   const { salons: realSalons, isLoading } = useSalons({
-    category: styleInfo?.category.title || styleName,
+    category: styleInfo?.category.title || undefined,
+    serviceName: displayName || styleInfo?.style.name || undefined,
   });
 
   const sortedSalons = [...realSalons].sort((a, b) => {
@@ -166,7 +167,11 @@ export default function StyleSalonsScreen() {
                 key={salon.id}
                 entering={FadeInUp.delay(index * 80).duration(400)}
               >
-                <SalonCard salon={salon} variant="default" />
+                <SalonCard 
+                  salon={salon} 
+                  variant="default" 
+                  searchedService={displayName}
+                />
               </Animated.View>
             ))}
           </View>

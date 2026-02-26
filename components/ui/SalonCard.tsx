@@ -22,6 +22,7 @@ type SalonCardProps = {
   variant?: 'default' | 'horizontal' | 'featured';
   onFavoritePress?: () => void;
   isFavorite?: boolean;
+  searchedService?: string;
 };
 
 export function SalonCard({
@@ -29,29 +30,65 @@ export function SalonCard({
   variant = 'default',
   onFavoritePress,
   isFavorite = false,
+  searchedService,
 }: SalonCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   const handlePress = () => {
-    router.push(`/salon/${salon.id}`);
+    if (searchedService) {
+      router.push({
+        pathname: `/salon/[id]`,
+        params: { id: salon.id, preselectService: searchedService }
+      });
+    } else {
+      router.push(`/salon/${salon.id}`);
+    }
   };
 
   const isOpen = () => {
     if (!salon.opening_hours) return true;
     try {
-      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const today = days[new Date().getDay()];
-      const schedule = (salon.opening_hours as any)[today];
-      if (!schedule || schedule.closed || schedule.active === false) return false;
+      // Handle both string and object formats for opening_hours
+      const hours = typeof salon.opening_hours === 'string' 
+        ? JSON.parse(salon.opening_hours) 
+        : salon.opening_hours;
       
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const now = new Date();
-      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const today = days[now.getDay()];
+      const schedule = hours[today];
+      
+      // If no schedule or explicitly closed
+      if (!schedule || schedule.closed === true || schedule.isClosed === true || schedule.active === false) {
+        return false;
+      }
+      
+      // Helper to convert "HH:mm" to minutes since midnight for robust comparison
+      const timeToMinutes = (timeStr: string) => {
+        if (!timeStr) return null;
+        const [hours, minutes] = timeStr.split(/[:h]/).map(Number);
+        if (isNaN(hours) || isNaN(minutes)) return null;
+        return hours * 60 + minutes;
+      };
+
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const openTime = schedule.open || schedule.start;
       const closeTime = schedule.close || schedule.end;
       
-      return currentTime >= openTime && currentTime <= closeTime;
+      const openMinutes = timeToMinutes(openTime);
+      const closeMinutes = timeToMinutes(closeTime);
+
+      if (openMinutes === null || closeMinutes === null) return true;
+
+      // Handle overnight hours (e.g., 22:00 to 02:00)
+      if (closeMinutes < openMinutes) {
+        return currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
+      }
+      
+      return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
     } catch (e) {
+      console.warn('Error calculating isOpen:', e);
       return true;
     }
   };
@@ -195,7 +232,7 @@ export function SalonCard({
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: salon.image_url || 'https://via.placeholder.com/300x300?text=Salon' }}
+          source={{ uri: (salon as any).service_image || salon.image_url || 'https://via.placeholder.com/300x300?text=Salon' }}
           style={styles.image}
           contentFit="cover"
           transition={300}
@@ -203,6 +240,14 @@ export function SalonCard({
         <View style={[styles.availableBadge, { backgroundColor: isOpen() ? '#22C55E' : '#6B7280' }]}>
           <Text style={styles.availableText}>{isOpen() ? 'Dispo' : 'Fermé'}</Text>
         </View>
+        
+        {/* Badge Travail Certifié */}
+        {(salon as any).is_custom_service_image && (
+          <View style={styles.certifiedBadge}>
+            <Ionicons name="camera" size={10} color="#FFFFFF" />
+            <Text style={styles.certifiedText}>Réalisation certifiée</Text>
+          </View>
+        )}
         {onFavoritePress && (
           <TouchableOpacity
             style={styles.cardFavoriteButton}
@@ -222,11 +267,11 @@ export function SalonCard({
           {salon.name}
         </Text>
         <Text style={[styles.specialty, { color: colors.textSecondary }]} numberOfLines={1}>
-          {salon.specialties?.[0] || 'Expert Coiffure'}
+          {searchedService || salon.specialties?.[0] || 'Expert Coiffure'}
         </Text>
         
         <Text style={[styles.price, { color: colors.primary }]}>
-          Dès {(salon as any).min_price || 25}€
+          {searchedService ? `${(salon as any).min_price || 25}€` : `Dès ${(salon as any).min_price || 25}€`}
         </Text>
 
         <View style={styles.meta}>
@@ -299,6 +344,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
+  },
+  certifiedBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  certifiedText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   cardFavoriteButton: {
     position: 'absolute',

@@ -54,6 +54,7 @@ interface SearchFlowModalProps {
 
 interface SearchFilters {
   hairstyle: string | null;
+  subStyle: string | null;
   hairType: string[];
   location: string | null;
   maxBudget: number;
@@ -84,6 +85,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
   const [step, setStep] = useState(1);
   const [filters, setFilters] = useState<SearchFilters>({
     hairstyle: null,
+    subStyle: null,
     hairType: [],
     location: null,
     maxBudget: 150,
@@ -91,16 +93,17 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
     showAll: false,
   });
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   const resetAndClose = () => {
     setStep(1);
     setFilters({
       hairstyle: null,
+      subStyle: null,
       hairType: [],
       location: null,
       maxBudget: 150,
-      maxDistance: 10,
+      maxDistance: 20,
       showAll: false,
     });
     onClose();
@@ -142,11 +145,14 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
 
   const canProceed = () => {
     if (step === 1) return filters.hairstyle !== null;
+    if (step === 2) return filters.subStyle !== null;
     return true;
   };
 
   // Render step content
   const renderStepContent = () => {
+    const selectedCategory = HAIRSTYLE_CATEGORIES.find(c => c.id === filters.hairstyle);
+
     switch (step) {
       case 1:
         return (
@@ -155,8 +161,8 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             exiting={SlideOutLeft.duration(300)}
             style={styles.stepContent}
           >
-            <Text style={styles.stepTitle}>Choisis ta coiffure</Text>
-            <Text style={styles.stepSubtitle}>Quel style te ferait plaisir ?</Text>
+            <Text style={styles.stepTitle}>Choisis ta catégorie</Text>
+            <Text style={styles.stepSubtitle}>Quel type de coiffure cherches-tu ?</Text>
 
             <View style={styles.hairstyleGrid}>
               {HAIRSTYLE_CATEGORIES.map((cat) => (
@@ -166,7 +172,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                     styles.hairstyleCard,
                     filters.hairstyle === cat.id && styles.hairstyleCardSelected
                   ]}
-                  onPress={() => selectHairstyle(cat.id)}
+                  onPress={() => setFilters({ ...filters, hairstyle: cat.id, subStyle: null })}
                 >
                   <Image
                     source={cat.styles[0]?.image}
@@ -188,6 +194,47 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
         );
 
       case 2:
+        return (
+          <Animated.View
+            entering={SlideInRight.duration(300)}
+            exiting={SlideOutLeft.duration(300)}
+            style={styles.stepContent}
+          >
+            <Text style={styles.stepTitle}>{t('search.chooseStyle')}</Text>
+            <Text style={styles.stepSubtitle}>
+              Lequel de ces styles de {selectedCategory?.title.toLowerCase()} te fait plaisir ?
+            </Text>
+
+            <View style={styles.subStyleGrid}>
+              {selectedCategory?.styles.map((style) => (
+                <TouchableOpacity
+                  key={style.id}
+                  style={[
+                    styles.subStyleCard,
+                    filters.subStyle === style.name && styles.subStyleCardSelected
+                  ]}
+                  onPress={() => setFilters({ ...filters, subStyle: style.name })}
+                >
+                  <Image
+                    source={style.image}
+                    style={styles.subStyleImage}
+                    contentFit="cover"
+                  />
+                  <View style={styles.subStyleOverlay}>
+                    <Text style={styles.subStyleName} numberOfLines={2}>{style.name}</Text>
+                  </View>
+                  {filters.subStyle === style.name && (
+                    <View style={styles.selectedBadge}>
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        );
+
+      case 3:
         return (
           <Animated.View
             entering={SlideInRight.duration(300)}
@@ -268,7 +315,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
           </Animated.View>
         );
 
-      case 3:
+      case 4:
         return (
           <Animated.View
             entering={SlideInRight.duration(300)}
@@ -581,6 +628,39 @@ const styles = StyleSheet.create({
   },
   hairstyleName: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  subStyleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  subStyleCard: {
+    width: (width - 72) / 3,
+    height: 110,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#E5E5E5',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  subStyleCardSelected: {
+    borderColor: '#191919',
+  },
+  subStyleImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  subStyleOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  subStyleName: {
+    fontSize: 11,
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
