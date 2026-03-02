@@ -12,6 +12,10 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Linking,
+  Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,18 +27,21 @@ import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { clientService } from '@/services/client.service';
 import { supabase } from '@/lib/supabase';
 import { BookingWithDetails } from '@/types';
 import NotificationModal from '@/components/NotificationModal';
+import LanguageSelector from '@/components/LanguageSelector';
+import { Button } from '@/components/ui';
 
 /* ---------- STATUS CONFIG ---------- */
 const STATUS_CONFIG = {
-  completed: { label: 'Terminé', color: '#22C55E', icon: 'checkmark-circle' as const },
-  pending: { label: 'En attente', color: '#F59E0B', icon: 'time' as const },
-  confirmed: { label: 'Confirmé', color: '#3B82F6', icon: 'checkmark-circle' as const },
-  cancelled: { label: 'Annulé', color: '#EF4444', icon: 'close-circle' as const },
+  completed: { color: '#22C55E', icon: 'checkmark-circle' as const },
+  pending: { color: '#F59E0B', icon: 'time' as const },
+  confirmed: { color: '#3B82F6', icon: 'checkmark-circle' as const },
+  cancelled: { color: '#EF4444', icon: 'close-circle' as const },
 };
 
 /* ---------- MENU ITEM COMPONENT ---------- */
@@ -92,12 +99,32 @@ export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile, signOut, isAuthenticated, updateProfile } = useAuth();
+  const { t } = useLanguage();
 
-  const [stats, setStats] = React.useState<any>(null);
+  const TRANSLATED_STATUS_CONFIG = {
+    completed: { label: t('booking.completed'), color: '#22C55E', icon: 'checkmark-circle' as const },
+    pending: { label: t('booking.pending'), color: '#F59E0B', icon: 'time' as const },
+    confirmed: { label: t('booking.confirmed'), color: '#3B82F6', icon: 'checkmark-circle' as const },
+    cancelled: { label: t('booking.cancelled'), color: '#EF4444', icon: 'close-circle' as const },
+  };
   const [recentBookings, setRecentBookings] = React.useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [uploading, setUploading] = React.useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = React.useState(false);
+  const [editProfileModalVisible, setEditProfileModalVisible] = React.useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = React.useState(false);
+
+  // Formulaire Edition
+  const [newName, setNewName] = React.useState(profile?.full_name || '');
+  const [newPhone, setNewPhone] = React.useState(profile?.phone || '');
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (profile) {
+      setNewName(profile.full_name || '');
+      setNewPhone(profile.phone || '');
+    }
+  }, [profile]);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -184,9 +211,31 @@ export default function ProfileScreen() {
       Alert.alert('Succès', 'Votre photo de profil a été mise à jour !');
     } catch (error: any) {
       console.error('Avatar update error:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour votre photo : ' + (error.message || 'Erreur inconnue'));
+      Alert.alert('Erreur', "Impossible de mettre à jour votre photo.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!newName.trim()) {
+      Alert.alert("Erreur", "Le nom ne peut pas être vide.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        full_name: newName.trim(),
+        phone: newPhone.trim(),
+      });
+      Alert.alert("Succès", "Votre profil a été mis à jour.");
+      setEditProfileModalVisible(false);
+    } catch (error) {
+      console.error("Save Profile Error:", error);
+      Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -243,7 +292,7 @@ export default function ProfileScreen() {
     router.replace('/(coiffeur)');
   };
 
-  const displayName = profile?.full_name || 'Utilisateur';
+  const displayName = profile?.full_name || t('profile.user');
   const displayEmail = profile?.email || user?.email || '';
   const initials = displayName ? displayName.charAt(0).toUpperCase() : 'U';
 
@@ -289,15 +338,15 @@ export default function ProfileScreen() {
         <View style={styles.statsSection}>
           <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
             <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.totalBookings || 0}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>RDV</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('profile.rdv')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
             <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.visitedSalonsCount || 0}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Salons</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('profile.salons')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card }, Shadows.sm]}>
             <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.totalSpent || 0}€</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Dépensé</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('profile.spent')}</Text>
           </View>
         </View>
 
@@ -311,10 +360,10 @@ export default function ProfileScreen() {
             <Ionicons name="cut-outline" size={24} color={colors.primary} />
             <View style={styles.switchContent}>
               <Text style={[styles.switchTitle, { color: colors.text }]}>
-                Mode Coiffeur
+                {t('profile.modeCoiffeur')}
               </Text>
               <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>
-                Basculer vers l&apos;espace coiffeur
+                {t('profile.switchToCoiffeur')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -325,10 +374,10 @@ export default function ProfileScreen() {
         <View style={styles.menuSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-              Mes rendez-vous récents
+              {t('profile.recentBookings')}
             </Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/reservations')}>
-              <Text style={[styles.seeAllText, { color: colors.primary }]}>Tout voir</Text>
+              <Text style={[styles.seeAllText, { color: colors.primary }]}>{t('profile.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.menuGroup, Shadows.sm]}>
@@ -336,7 +385,7 @@ export default function ProfileScreen() {
               <ActivityIndicator size="small" color={colors.primary} style={{ padding: 20 }} />
             ) : recentBookings.length > 0 ? (
               recentBookings.map(booking => {
-                const status = (STATUS_CONFIG[booking.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending);
+                const status = (TRANSLATED_STATUS_CONFIG[booking.status as keyof typeof TRANSLATED_STATUS_CONFIG] || TRANSLATED_STATUS_CONFIG.pending);
                 return (
                   <TouchableOpacity
                     key={booking.id}
@@ -366,7 +415,7 @@ export default function ProfileScreen() {
               })
             ) : (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <Text style={{ color: colors.textMuted }}>Aucun rendez-vous récent</Text>
+                <Text style={{ color: colors.textMuted }}>{t('profile.noRecentBookings')}</Text>
               </View>
             )}
           </View>
@@ -375,19 +424,19 @@ export default function ProfileScreen() {
         {/* ── MESSAGES & ALERTES ── */}
         <View style={styles.menuSection}>
           <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-            Messages & Alertes
+            {t('profile.messagesAlerts')}
           </Text>
           <View style={[styles.menuGroup, Shadows.sm]}>
             <MenuItem
               icon="chatbubbles-outline"
-              title="Mes conversations"
-              subtitle="Échanges avec vos coiffeurs"
+              title={t('profile.myConversations')}
+              subtitle={t('profile.myConversationsDesc')}
               onPress={() => router.push('/(tabs)/reservations')}
             />
             <MenuItem
               icon="notifications-outline"
-              title="Notifications"
-              subtitle="Historique de vos alertes"
+              title={t('profile.notifications')}
+              subtitle={t('profile.notificationsDesc')}
               onPress={() => setNotificationModalVisible(true)}
             />
           </View>
@@ -396,25 +445,25 @@ export default function ProfileScreen() {
         {/* ── COMPTE ── */}
         <View style={styles.menuSection}>
           <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>
-            Compte
+            {t('profile.account')}
           </Text>
           <View style={[styles.menuGroup, Shadows.sm]}>
             <MenuItem
               icon="person-outline"
-              title="Modifier le profil"
-              subtitle="Nom, photo, informations"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité à venir')}
+              title={t('profile.editProfile')}
+              subtitle={t('profile.editProfileDesc')}
+              onPress={() => setEditProfileModalVisible(true)}
             />
             <MenuItem
               icon="settings-outline"
-              title="Paramètres"
-              subtitle="Langue, sécurité"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité à venir')}
+              title={t('profile.settings')}
+              subtitle={t('profile.settingsDesc')}
+              onPress={() => setSettingsModalVisible(true)}
             />
             <MenuItem
               icon="help-circle-outline"
-              title="Aide & Support"
-              onPress={() => Alert.alert('Info', 'Fonctionnalité à venir')}
+              title={t('profile.helpSupport')}
+              onPress={() => Linking.openURL('mailto:support@afroplan.com')}
             />
           </View>
         </View>
@@ -424,7 +473,7 @@ export default function ProfileScreen() {
           <View style={[styles.menuGroup, Shadows.sm]}>
             <MenuItem
               icon="log-out-outline"
-              title="Se déconnecter"
+              title={t('profile.logout')}
               onPress={handleSignOut}
               showChevron={false}
               danger
@@ -440,6 +489,89 @@ export default function ProfileScreen() {
 
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
+
+      {/* MODAL MODIFICATION PROFIL */}
+      <Modal
+        visible={editProfileModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditProfileModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('profile.editProfileTitle')}</Text>
+              <TouchableOpacity onPress={() => setEditProfileModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>{t('profile.fullName')}</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder={t('profile.fullName')}
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>{t('profile.phone')}</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                value={newPhone}
+                onChangeText={setNewPhone}
+                placeholder="Ex: 06 12 34 56 78"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <Button
+              title={isSaving ? t('common.loading') : t('profile.saveChanges')}
+              onPress={handleSaveProfile}
+              loading={isSaving}
+              style={{ marginTop: 10 }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL PARAMÈTRES */}
+      <Modal
+        visible={settingsModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setSettingsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: 40 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('profile.settings')}</Text>
+              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 16, color: colors.text }}>{t('profile.appLanguage')}</Text>
+            <LanguageSelector />
+
+            <View style={{ height: 30 }} />
+            
+            <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 16, color: colors.text }}>{t('profile.preferences')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ color: colors.text }}>{t('profile.pushNotifications')}</Text>
+              <Ionicons name="toggle" size={32} color={colors.primary} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+              <Text style={{ color: colors.text }}>{t('profile.darkMode')}</Text>
+              <Ionicons name="toggle" size={32} color={colors.primary} />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <NotificationModal 
         visible={notificationModalVisible} 
@@ -718,5 +850,42 @@ const styles = StyleSheet.create({
   authLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  /* Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+    paddingBottom: 40,
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
   },
 });

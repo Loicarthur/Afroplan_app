@@ -168,55 +168,10 @@ export const paymentService = {
 
       const clientSecret = data.clientSecret;
       const paymentIntentId = data.paymentIntentId || data.stripe_payment_intent_id || clientSecret.split('_secret')[0];
-
-      // Sécurité : Si l'Edge Function n'a pas renvoyé de paymentId, 
-      // on s'assure que la ligne existe en base (Récupération ou Création)
-      let paymentId = data.paymentId;
+      const paymentId = data.paymentId || '';
       
       if (!paymentId) {
-        console.warn('DEBUG: Pas de paymentId renvoyé, tentative de récupération/création via stripe_payment_intent_id');
-        
-        const { data: existingPayment } = await supabase
-          .from('payments')
-          .select('id')
-          .eq('stripe_payment_intent_id', paymentIntentId)
-          .maybeSingle();
-        
-        if (existingPayment) {
-          paymentId = existingPayment.id;
-        } else {
-          // INSERT de secours si la ligne n'existe vraiment pas
-          console.log('DEBUG: Ligne inexistante, création du paiement de secours...');
-          
-          // Calculs simplifiés pour le secours (l'essentiel est le lien booking_id + intent_id)
-          const payAmount = Math.round(paymentType === 'full' ? amountInCents : amountInCents * DEPOSIT_RATE);
-          const commission = Math.round(payAmount * AFROPLAN_COMMISSION_RATE);
-          
-          const { data: newPayment, error: insertError } = await supabase
-            .from('payments')
-            .insert({
-              booking_id: bookingId,
-              salon_id: salonId,
-              amount: payAmount,
-              total_service_price: amountInCents,
-              remaining_amount: paymentType === 'full' ? 0 : amountInCents - payAmount,
-              commission: commission,
-              salon_amount: payAmount - commission,
-              commission_rate: AFROPLAN_COMMISSION_RATE,
-              status: 'pending',
-              payment_type: paymentType,
-              stripe_payment_intent_id: paymentIntentId,
-            })
-            .select()
-            .single();
-            
-          if (insertError) {
-            console.error('Erreur lors de la création du paiement de secours:', insertError);
-          } else if (newPayment) {
-            paymentId = newPayment.id;
-            console.log('DEBUG: Paiement de secours créé avec ID:', paymentId);
-          }
-        }
+        console.log('DEBUG: Pas de paymentId renvoyé par la fonction, la confirmation se fera via stripe_payment_intent_id');
       }
 
       return {
@@ -317,87 +272,56 @@ export const paymentService = {
   },
 
   /**
-   * Confirmer un paiement (appelé après validation Stripe)
+   * Confirmer un paiement (Attend que le Webhook Stripe mette à jour la DB)
    */
   async confirmPayment(paymentId?: string, stripePaymentIntentId?: string) {
-    console.log('--- DEBUT confirmPayment ---', { paymentId, stripePaymentIntentId });
+    console.log('--- ATTENTE CONFIRMATION WEBHOOK ---', { paymentId, stripePaymentIntentId });
     
     if (!paymentId && !stripePaymentIntentId) {
-      console.error('Erreur confirmPayment: Aucun identifiant fourni');
-      throw new Error('Identifiant de paiement manquant pour la confirmation.');
+      throw new Error('Identifiant de paiement manquant.');
     }
 
-    // On prépare l'objet de mise à jour
-    const updateData = {
-      status: 'completed' as PaymentStatus,
-      paid_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as any;
+    const maxRetries = 5; // On attend jusqu'à 7.5 secondes (le webhook est rapide)
+    let attempt = 0;
 
-    if (stripePaymentIntentId) {
-      updateData.stripe_payment_intent_id = stripePaymentIntentId;
-    }
+    while (attempt < maxRetries) {
+      attempt++;
+      console.log(`DEBUG: Vérification statut (tentative ${attempt}/${maxRetries})...`);
 
-    let query = supabase.from('payments').update(updateData);
+      // On cherche l'enregistrement mis à jour par le Webhook
+      let query = supabase.from('payments').select('*, booking:bookings(*)');
 
-    if (stripePaymentIntentId && stripePaymentIntentId !== '' && stripePaymentIntentId !== 'undefined') {
-      console.log('DEBUG: Filtrage par stripe_payment_intent_id:', stripePaymentIntentId);
-      query = query.eq('stripe_payment_intent_id', stripePaymentIntentId);
-    } else if (paymentId && paymentId !== 'undefined' && paymentId !== 'null' && paymentId !== '') {
-      console.log('DEBUG: Filtrage par paymentId:', paymentId);
-      query = query.eq('id', paymentId);
-    } else {
-      throw new Error('Identifiant de filtrage (Stripe Intent ID) manquant pour la confirmation.');
-    }
+      if (stripePaymentIntentId && stripePaymentIntentId !== '' && stripePaymentIntentId !== 'undefined') {
+        query = query.eq('stripe_payment_intent_id', stripePaymentIntentId);
+      } else if (paymentId && paymentId !== '') {
+        query = query.eq('id', paymentId);
+      }
 
-    const { data, error } = await query.select().maybeSingle();
+      const { data, error } = await query.maybeSingle();
 
-    if (error) {
-      console.error('Erreur SQL confirmPayment:', error);
-      throw new Error(`Erreur lors de la confirmation du paiement: ${error.message}`);
-    }
+      if (error) {
+        console.error('Erreur SQL confirmPayment:', error);
+        throw new Error('Erreur lors de la vérification du paiement.');
+      }
 
-    if (!data) {
-      console.error('CRITIQUE: Paiement introuvable avec les critères fournis', { paymentId, stripePaymentIntentId });
-      
-      // Tentative de secours : chercher si le paiement existe déjà en mode complété
-      const { data: existingPayment } = await supabase
-        .from('payments')
-        .select('*')
-        .or(`id.eq.${paymentId},stripe_payment_intent_id.eq.${stripePaymentIntentId}`)
-        .maybeSingle();
-      
-      if (existingPayment) {
-        console.log('DEBUG: Paiement déjà existant trouvé:', existingPayment);
-        if (existingPayment.status === 'completed') {
-          console.log('INFO: Le paiement est déjà marqué comme complété.');
-          return existingPayment;
+      if (data) {
+        if (data.status === 'completed') {
+          console.log('✅ DEBUG: Webhook reçu et traité ! Paiement complété.');
+          return data;
         }
-      }
-      
-      throw new Error('Paiement introuvable pour la confirmation.');
-    }
-
-    console.log('DEBUG: Paiement mis à jour avec succès:', data.id);
-
-    // Mettre à jour le statut de la réservation
-    if (data.booking_id) {
-      const { error: bookingError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'confirmed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', data.booking_id);
-      
-      if (bookingError) {
-        console.error('Erreur mise à jour réservation:', bookingError);
+        console.log(`DEBUG: Paiement trouvé mais statut = ${data.status}. On attend le Webhook...`);
       } else {
-        console.log('DEBUG: Réservation confirmée:', data.booking_id);
+        console.log('DEBUG: Enregistrement de paiement non encore créé/trouvé...');
       }
+
+      // Attente avant la prochaine vérification
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
-    return data;
+    console.error('TIMEOUT: Le Webhook Stripe met trop de temps à répondre.');
+    // On renvoie quand même un succès "silencieux" si le paiement Stripe était OK (PaymentSheet n'a pas crashé)
+    // Le client verra sa réservation confirmée au prochain rafraîchissement.
+    return { status: 'processing' };
   },
 
   /**

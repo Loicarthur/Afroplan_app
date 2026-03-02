@@ -38,7 +38,7 @@ interface BookingDetails {
 export default function CheckoutScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { t } = useLanguage();
   const params = useLocalSearchParams();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -178,45 +178,14 @@ export default function CheckoutScreen() {
         if (presentError) {
           console.error('DEBUG: Erreur presentPaymentSheet:', presentError);
           if (presentError.code === 'Canceled') {
-            console.log('DEBUG: Paiement annulé par l\'utilisateur. Nettoyage de la réservation pending...');
-            try {
-              // On supprime la réservation si le paiement n'est pas allé au bout
-              const { bookingService } = await import('@/services/booking.service');
-              await bookingService.cancelBooking(bookingDetails.bookingId);
-            } catch (cleanupError) {
-              console.error('Erreur nettoyage réservation:', cleanupError);
-            }
+            console.log('DEBUG: Paiement annulé par l\'utilisateur. On garde la réservation en attente.');
             setIsLoading(false);
             return;
           }
           throw new Error(`Paiement échoué: ${presentError.message}`);
         }
 
-        console.log('DEBUG: Paiement réussi! Confirmation en DB...');
-        await paymentService.confirmPayment(paymentId, paymentIntentId);
-
-        // --- ENVOI AUTOMATIQUE DU MESSAGE DE BIENVENUE PAR DÉFAUT ---
-        try {
-          const salon = await salonService.getSalonById(bookingDetails.salonId);
-          if (salon) {
-            console.log('DEBUG: Envoi du message automatique de bienvenue...');
-            
-            // Construction du message personnalisé
-            const clientFirstName = isAuthenticated && user?.email ? (user.email.split('@')[0]) : 'cher client';
-            const welcomeMessage = `Bonjour ${clientFirstName} ! 👋\n\nMerci pour votre réservation chez ${salon.name}. Nous avons bien reçu votre demande et nous avons hâte de vous sublimer ! ✨\n\nÀ très bientôt,\nL'équipe ${salon.name}`;
-
-            await supabase.from('messages').insert({
-              booking_id: bookingDetails.bookingId,
-              sender_id: salon.owner_id,
-              sender_type: 'coiffeur',
-              content: welcomeMessage,
-              is_read: false
-            });
-          }
-        } catch (msgError) {
-          console.error('Erreur lors de l\'envoi du message automatique:', msgError);
-          // On n'interrompt pas le flux pour une erreur de message
-        }
+        console.log('✅ DEBUG: PaymentSheet terminé avec succès !');
 
         Alert.alert(
           t('checkout.paymentSuccess'),

@@ -234,6 +234,8 @@ export default function ChatScreen() {
 
   // Déterminer qui est l'interlocuteur selon mon rôle ACTIF
   const isCoiffeurView = activeRole === 'coiffeur';
+  const isPending = booking?.status === 'pending';
+
   const otherPersonName = isCoiffeurView 
     ? (booking?.client?.full_name || 'Client') 
     : (booking?.salon?.name || 'Le Salon');
@@ -361,38 +363,51 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Ionicons name="add-circle" size={28} color="#808080" />
-          </TouchableOpacity>
-
-          <View style={[styles.inputWrapper, { backgroundColor: colors.card }]}>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="Écrivez votre message..."
-              placeholderTextColor={colors.placeholder}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={500}
-            />
+        {isPending ? (
+          <View style={[styles.pendingBanner, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.pendingIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="time" size={24} color={colors.primary} />
+            </View>
+            <Text style={[styles.pendingText, { color: colors.textSecondary }]}>
+              {isCoiffeurView 
+                ? "Acceptez ce rendez-vous pour ouvrir la discussion avec votre client."
+                : "Votre rdv est en attente de confirmation. Le chat s'ouvrira dès que votre coiffeur aura accepté."}
+            </Text>
           </View>
+        ) : (
+          <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
+            <TouchableOpacity style={styles.attachButton}>
+              <Ionicons name="add-circle" size={28} color="#808080" />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              inputText.trim() ? styles.sendButtonActive : styles.sendButtonInactive,
-            ]}
-            onPress={sendMessage}
-            disabled={!inputText.trim()}
-          >
-            <Ionicons
-              name="send"
-              size={20}
-              color={inputText.trim() ? '#FFFFFF' : '#808080'}
-            />
-          </TouchableOpacity>
-        </View>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.card }]}>
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="Écrivez votre message..."
+                placeholderTextColor={colors.placeholder}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                inputText.trim() ? styles.sendButtonActive : styles.sendButtonInactive,
+              ]}
+              onPress={sendMessage}
+              disabled={!inputText.trim()}
+            >
+              <Ionicons
+                name="send"
+                size={20}
+                color={inputText.trim() ? '#FFFFFF' : '#808080'}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -626,5 +641,25 @@ const styles = StyleSheet.create({
   },
   sendButtonInactive: {
     backgroundColor: '#E5E5E5',
+  },
+  pendingBanner: {
+    alignItems: 'center',
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  pendingIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  pendingText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
 });

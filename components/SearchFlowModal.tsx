@@ -161,8 +161,8 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             exiting={SlideOutLeft.duration(300)}
             style={styles.stepContent}
           >
-            <Text style={styles.stepTitle}>Choisis ta catégorie</Text>
-            <Text style={styles.stepSubtitle}>Quel type de coiffure cherches-tu ?</Text>
+            <Text style={styles.stepTitle}>{t('search.chooseCategory')}</Text>
+            <Text style={styles.stepSubtitle}>{t('search.whatTypeHairstyle')}</Text>
 
             <View style={styles.hairstyleGrid}>
               {HAIRSTYLE_CATEGORIES.map((cat) => (
@@ -202,7 +202,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
           >
             <Text style={styles.stepTitle}>{t('search.chooseStyle')}</Text>
             <Text style={styles.stepSubtitle}>
-              Lequel de ces styles de {selectedCategory?.title.toLowerCase()} te fait plaisir ?
+              {t('search.whatStyle')}
             </Text>
 
             <View style={styles.subStyleGrid}>
@@ -241,12 +241,12 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             exiting={SlideOutLeft.duration(300)}
             style={styles.stepContent}
           >
-            <Text style={styles.stepTitle}>Filtre rapide</Text>
-            <Text style={styles.stepSubtitle}>Optionnel - Affine ta recherche</Text>
+            <Text style={styles.stepTitle}>{t('search.quickFilter')}</Text>
+            <Text style={styles.stepSubtitle}>{t('search.optional')}</Text>
 
             {/* Type de cheveux */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Type de cheveux</Text>
+              <Text style={styles.filterLabel}>{t('search.hairType')}</Text>
               <View style={styles.hairTypeGrid}>
                 {HAIR_TYPES.map((type) => (
                   <TouchableOpacity
@@ -270,7 +270,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
 
             {/* Lieu */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Où souhaites-tu te faire coiffer ?</Text>
+              <Text style={styles.filterLabel}>{t('search.whereCoiffeur')}</Text>
               <View style={styles.locationOptions}>
                 {LOCATION_OPTIONS.map((loc) => (
                   <TouchableOpacity
@@ -296,13 +296,13 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                         styles.locationName,
                         filters.location === loc.id && styles.locationNameSelected
                       ]}>
-                        {loc.name}
+                        {loc.id === 'salon' ? t('search.inSalon') : loc.id === 'domicile' ? t('search.atHome') : loc.name}
                       </Text>
                       <Text style={[
                         styles.locationDesc,
                         filters.location === loc.id && styles.locationDescSelected
                       ]}>
-                        {loc.description}
+                        {loc.id === 'salon' ? t('search.goToSalon') : loc.id === 'domicile' ? t('search.coiffeurComesHome') : loc.description}
                       </Text>
                     </View>
                     {filters.location === loc.id && (
@@ -338,7 +338,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                   color="#808080"
                 />
                 <Text style={styles.geoButtonTextDisabled}>
-                  Localisation désactivée (temporairement)
+                  {t('search.locationTemporarilyDisabled')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -471,15 +471,15 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
               />
             ))}
           </View>
-          <Text style={styles.stepIndicator}>Étape {step}/{totalSteps}</Text>
+          <Text style={styles.stepIndicator}>{t('search.step')} {step}/{totalSteps}</Text>
         </View>
 
         {/* Welcome text (only on step 1) */}
         {step === 1 && (
           <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.welcomeSection}>
-            <Text style={styles.welcomeTitle}>Trouve facilement ton coiffeur afro</Text>
+            <Text style={styles.welcomeTitle}>{t('search.findCoiffeur')}</Text>
             <Text style={styles.welcomeSubtitle}>
-              Quelques questions rapides pour te proposer les meilleurs salons adaptés à tes besoins.
+              {t('search.quickQuestions')}
             </Text>
           </Animated.View>
         )}
@@ -496,7 +496,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
         {/* Footer */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <Text style={styles.footerHint}>
-            Tu peux revenir en arrière à tout moment
+            {t('search.canGoBack')}
           </Text>
           <TouchableOpacity
             style={[
@@ -507,7 +507,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
             disabled={!canProceed()}
           >
             <Text style={styles.nextButtonText}>
-              {step === totalSteps ? 'Voir les résultats' : 'Suivant'}
+              {step === totalSteps ? t('common.seeResults') : t('common.next')}
             </Text>
             <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </TouchableOpacity>

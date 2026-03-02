@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
@@ -80,6 +81,7 @@ export default function FavoritesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   // Si pas connecté, afficher un écran invitant à se connecter
   if (!isAuthenticated) {
@@ -89,19 +91,19 @@ export default function FavoritesScreen() {
           <View style={styles.authIconContainer}>
             <Ionicons name="heart" size={48} color={colors.textMuted} />
           </View>
-          <Text style={[styles.authTitle, { color: colors.text }]}>Vos favoris</Text>
+          <Text style={[styles.authTitle, { color: colors.text }]}>{t('fav.yourFavorites')}</Text>
           <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
-            Connectez-vous pour sauvegarder vos salons et styles préférés
+            {t('fav.loginMessage')}
           </Text>
           <TouchableOpacity
             style={styles.authButton}
             onPress={() => router.push('/(auth)/login')}
             activeOpacity={0.8}
           >
-            <Text style={styles.authButtonText}>Se connecter</Text>
+            <Text style={styles.authButtonText}>{t('auth.login')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte</Text>
+            <Text style={[styles.authLink, { color: colors.primary }]}>{t('auth.register')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -114,11 +116,11 @@ export default function FavoritesScreen() {
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      braids: 'Braids',
-      natural: 'Natural',
+      braids: t('hairstyle.tresses'),
+      natural: t('hairstyle.afro'),
       twists: 'Twists',
-      locks: 'Locks',
-      weave: 'Weave',
+      locks: t('hairstyle.locks'),
+      weave: t('hairstyle.tissage'),
     };
     return labels[category] || category;
   };
@@ -129,9 +131,9 @@ export default function FavoritesScreen() {
 
         {/* Header simple et élégant */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Favoris</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('fav.favorites')}</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            Vos salons et styles préférés
+            {t('fav.favoritesSubtitle')}
           </Text>
         </View>
 
@@ -139,7 +141,7 @@ export default function FavoritesScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Salons ({FAVORITE_SALONS.length})
+              {t('fav.salons')} ({FAVORITE_SALONS.length})
             </Text>
           </View>
 
@@ -156,7 +158,7 @@ export default function FavoritesScreen() {
                   <Ionicons name="star" size={13} color="#FBBF24" />
                   <Text style={[styles.ratingText, { color: colors.text }]}>{salon.rating}</Text>
                   <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
-                    ({salon.reviews_count} avis)
+                    ({salon.reviews_count} {t('salon.reviews').toLowerCase()})
                   </Text>
                 </View>
                 <View style={styles.locationRow}>
@@ -178,7 +180,7 @@ export default function FavoritesScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Styles ({SAVED_STYLES.length})
+              {t('fav.styles')} ({SAVED_STYLES.length})
             </Text>
           </View>
 

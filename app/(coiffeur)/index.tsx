@@ -171,8 +171,8 @@ export default function CoiffeurDashboard() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
-        <Text style={[styles.userName, { marginTop: 20, textAlign: 'center' }]}>Accès restreint</Text>
-        <Button title="Se connecter" onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20, width: '100%' }} />
+        <Text style={[styles.userName, { marginTop: 20, textAlign: 'center' }]}>{t('coiffeur.restrictedAccess')}</Text>
+        <Button title={t('auth.login')} onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20, width: '100%' }} />
       </SafeAreaView>
     );
   }
@@ -181,7 +181,7 @@ export default function CoiffeurDashboard() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 10, color: colors.textSecondary }}>Initialisation...</Text>
+        <Text style={{ marginTop: 10, color: colors.textSecondary }}>{t('coiffeur.init')}</Text>
       </View>
     );
   }
@@ -192,11 +192,11 @@ export default function CoiffeurDashboard() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <ScrollView contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 }}>
           <Ionicons name="storefront-outline" size={80} color={colors.primary} />
-          <Text style={[styles.userName, { textAlign: 'center', marginTop: 20 }]}>Prêt à lancer votre salon ?</Text>
-          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 10 }}>Configurez votre vitrine pour recevoir vos premiers clients.</Text>
-          <Button title="Créer mon salon" onPress={() => router.push('/(coiffeur)/salon')} style={{ marginTop: 30, width: '100%' }} />
+          <Text style={[styles.userName, { textAlign: 'center', marginTop: 20 }]}>{t('coiffeur.readyToLaunch')}</Text>
+          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 10 }}>{t('coiffeur.setupShowcase')}</Text>
+          <Button title={t('coiffeur.createSalon')} onPress={() => router.push('/(coiffeur)/salon')} style={{ marginTop: 30, width: '100%' }} />
           <TouchableOpacity onPress={handleSwitchToClient} style={{ marginTop: 20 }}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Mode client</Text>
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('role.switchToClient')}</Text>
           </TouchableOpacity>
           {__DEV__ && (
             <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 40 }}>UID: {user?.id}</Text>
@@ -217,7 +217,7 @@ export default function CoiffeurDashboard() {
         {/* Header */}
         <View style={styles.dashboardHeader}>
           <View>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>Tableau de bord</Text>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{t('coiffeur.dashboard')}</Text>
             <Text style={[styles.userName, { color: colors.text }]}>{salon.name || profile?.full_name || 'Coiffeur'}</Text>
           </View>
           <View style={styles.headerRight}>
@@ -235,28 +235,28 @@ export default function CoiffeurDashboard() {
         <Animated.View entering={FadeInDown.delay(200)} style={[styles.businessCard, { backgroundColor: '#191919' }]}>
           <View style={styles.businessHeader}>
             <View>
-              <Text style={styles.businessLabel}>Revenus de la semaine</Text>
-              <Text style={styles.businessValue}>{stats.weeklyRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</Text>
+              <Text style={styles.businessLabel}>{t('coiffeur.weeklyRevenue')}</Text>
+              <Text style={styles.businessValue}>{stats.weeklyRevenue.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2 })} €</Text>
             </View>
             <View style={styles.growthBadge}>
               <Ionicons name="trending-up" size={14} color="#22C55E" />
-              <Text style={styles.growthText}>Activité</Text>
+              <Text style={styles.growthText}>{t('coiffeur.activity')}</Text>
             </View>
           </View>
           <View style={styles.footerStats}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.weeklyBookingsCount}</Text>
-              <Text style={styles.statLabel}>RDV/sem.</Text>
+              <Text style={styles.statLabel}>{t('coiffeur.weeklyAppt')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.todayBookings}</Text>
-              <Text style={styles.statLabel}>Aujourd'hui</Text>
+              <Text style={styles.statLabel}>{t('coiffeur.today')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.averageRating.toFixed(1)}</Text>
-              <Text style={styles.statLabel}>Note</Text>
+              <Text style={styles.statLabel}>{t('coiffeur.rating')}</Text>
             </View>
           </View>
         </Animated.View>
@@ -265,28 +265,28 @@ export default function CoiffeurDashboard() {
         <Animated.View entering={FadeInDown.delay(300)} style={[styles.transparencyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.transparencyHeader}>
             <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-            <Text style={[styles.transparencyTitle, { color: colors.text }]}>Vos revenus (Net estimé)</Text>
+            <Text style={[styles.transparencyTitle, { color: colors.text }]}>{t('coiffeur.estimatedNet')}</Text>
           </View>
           <View style={styles.flowContainer}>
-            <View style={styles.flowStep}><Text style={styles.flowAmount}>{stats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>Total</Text></View>
+            <View style={styles.flowStep}><Text style={styles.flowAmount}>{stats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.total')}</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
-            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.error }]}>-20%</Text><Text style={styles.flowLabel}>Frais</Text></View>
+            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.error }]}>-20%</Text><Text style={styles.flowLabel}>{t('coiffeur.fees')}</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
-            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.success }]}>{(stats.totalRevenue * 0.8).toFixed(0)}€</Text><Text style={styles.flowLabel}>Net</Text></View>
+            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.success }]}>{(stats.totalRevenue * 0.8).toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.net')}</Text></View>
           </View>
         </Animated.View>
 
         {/* Quick Pro Actions */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Actions professionnelles</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('coiffeur.proActions')}</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.proActionButton, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]} onPress={handleLastMinuteBoost}>
               <Ionicons name="rocket-outline" size={24} color={colors.primary} />
-              <Text style={[styles.proActionText, { color: colors.primary }]}>Boost Flash</Text>
+              <Text style={[styles.proActionText, { color: colors.primary }]}>{t('coiffeur.flashBoost')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.proActionButton, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]} onPress={() => setBookingModalVisible(true)}>
               <Ionicons name="add-circle-outline" size={24} color={colors.success} />
-              <Text style={[styles.proActionText, { color: colors.success }]}>RDV Manuel</Text>
+              <Text style={[styles.proActionText, { color: colors.success }]}>{t('coiffeur.manualAppt')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -295,8 +295,8 @@ export default function CoiffeurDashboard() {
         <TouchableOpacity style={[styles.switchCard, { backgroundColor: colors.card }]} onPress={handleSwitchToClient}>
           <Ionicons name="people-outline" size={24} color={colors.primary} />
           <View style={styles.switchContent}>
-            <Text style={[styles.switchTitle, { color: colors.text }]}>Mode Client</Text>
-            <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>Réserver une prestation</Text>
+            <Text style={[styles.switchTitle, { color: colors.text }]}>{t('coiffeur.clientMode')}</Text>
+            <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>{t('coiffeur.bookService')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
@@ -314,18 +314,18 @@ export default function CoiffeurDashboard() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Nouveau RDV Manuel</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('coiffeur.manualApptTitle')}</Text>
               <TouchableOpacity onPress={() => setBookingModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ color: colors.textSecondary, marginBottom: 20 }}>
-                Enregistrez un rendez-vous pris hors application pour bloquer votre créneau.
+                {t('coiffeur.manualApptDesc')}
               </Text>
               
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Nom du client</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{t('coiffeur.clientName')}</Text>
                 <TextInput 
                   style={[styles.input, { color: colors.text, borderColor: colors.border }]}
                   placeholder="Ex: Marie Dupont"
@@ -336,10 +336,10 @@ export default function CoiffeurDashboard() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Prestation</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{t('coiffeur.service')}</Text>
                 <TextInput 
                   style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                  placeholder="Saisissez ou choisissez ci-dessous..."
+                  placeholder={language === 'fr' ? 'Saisissez ou choisissez ci-dessous...' : 'Type or choose below...'}
                   placeholderTextColor={colors.textMuted}
                   value={manualService}
                   onChangeText={setManualService}
@@ -348,7 +348,7 @@ export default function CoiffeurDashboard() {
                 {/* Liste de suggestions (Services déjà configurés) */}
                 {salonServices.length > 0 && (
                   <View style={styles.suggestionContainer}>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>VOS PRESTATIONS :</Text>
+                    <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>{t('coiffeur.yourServices')} :</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                       {salonServices.map((s) => (
                         <TouchableOpacity 
@@ -366,7 +366,7 @@ export default function CoiffeurDashboard() {
 
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>Date</Text>
+                  <Text style={[styles.label, { color: colors.text }]}>{t('coiffeur.date')}</Text>
                   <TextInput 
                     style={[styles.input, { color: colors.text, borderColor: colors.border }]}
                     placeholder="JJ/MM/AAAA"
@@ -376,7 +376,7 @@ export default function CoiffeurDashboard() {
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>Heure</Text>
+                  <Text style={[styles.label, { color: colors.text }]}>{t('coiffeur.time')}</Text>
                   <TextInput 
                     style={[styles.input, { color: colors.text, borderColor: colors.border }]}
                     placeholder="14:00"
@@ -388,17 +388,17 @@ export default function CoiffeurDashboard() {
               </View>
 
               <Button 
-                title={isSavingBooking ? "Enregistrement..." : "Enregistrer le rendez-vous"}
+                title={isSavingBooking ? t('common.loading') : t('coiffeur.saveAppt')}
                 onPress={() => {
                   if (!manualClientName || !manualService) {
-                    Alert.alert('Attention', 'Veuillez remplir au moins le nom et la prestation.');
+                    Alert.alert(t('common.attention'), language === 'fr' ? 'Veuillez remplir au moins le nom et la prestation.' : 'Please fill at least name and service.');
                     return;
                   }
                   setIsSavingBooking(true);
                   // Simulation de sauvegarde
                   setTimeout(() => {
                     setIsSavingBooking(false);
-                    Alert.alert('Succès', 'Le rendez-vous manuel a été enregistré.');
+                    Alert.alert(t('common.success'), language === 'fr' ? 'Le rendez-vous manuel a été enregistré.' : 'The manual appointment has been saved.');
                     setBookingModalVisible(false);
                     setManualClientName('');
                     setManualService('');

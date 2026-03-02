@@ -173,12 +173,34 @@ export const salonService = {
   async getSalonStats(salonId: string) {
     const stats = { totalBookings: 0, completedBookings: 0, confirmedBookings: 0, totalSuccessfulBookings: 0, pendingBookings: 0, cancelledBookings: 0, totalRevenue: 0, weeklyRevenue: 0, weeklyBookingsCount: 0, averageRating: 0, totalReviews: 0, totalServices: 0, activePromotions: 0 };
     try {
-      const { data: bookings } = await supabase.from('bookings').select('status, total_price, booking_date').eq('salon_id', salonId);
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+      const mondayISO = monday.toISOString();
+
+      const { data: bookings } = await supabase.from('bookings').select('status, total_price, booking_date, created_at').eq('salon_id', salonId);
       bookings?.forEach(b => {
-        if (b.status === 'completed' || b.status === 'confirmed') stats.totalSuccessfulBookings++;
+        const isSuccessful = b.status === 'completed' || b.status === 'confirmed';
+        if (isSuccessful) stats.totalSuccessfulBookings++;
+        
         if (b.status === 'completed') stats.completedBookings++;
         else if (b.status === 'pending') stats.pendingBookings++;
-        stats.totalRevenue += Number(b.total_price || 0);
+        else if (b.status === 'cancelled') stats.cancelledBookings++;
+        else if (b.status === 'confirmed') stats.confirmedBookings++;
+
+        const bookingAmount = Number(b.total_price || 0);
+        if (isSuccessful) {
+          stats.totalRevenue += bookingAmount;
+          
+          // Cumul Hebdomadaire (depuis Lundi)
+          if (b.created_at >= mondayISO) {
+            stats.weeklyRevenue += bookingAmount;
+            stats.weeklyBookingsCount++;
+          }
+        }
       });
       const { data: s } = await supabase.from('salons').select('rating, reviews_count').eq('id', salonId).single();
       if (s) { stats.averageRating = s.rating || 0; stats.totalReviews = s.reviews_count || 0; }

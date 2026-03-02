@@ -175,14 +175,6 @@ export default function StylesScreen() {
                         >
                           {style.name}
                         </Text>
-                        {style.duration && (
-                          <View style={styles.styleDurationRow}>
-                            <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-                            <Text style={[styles.styleDuration, { color: colors.textMuted }]}>
-                              {style.duration}
-                            </Text>
-                          </View>
-                        )}
                       </View>
                     </TouchableOpacity>
                   ))}

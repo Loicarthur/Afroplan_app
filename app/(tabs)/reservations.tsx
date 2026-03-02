@@ -23,6 +23,7 @@ import { Image } from 'expo-image';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { bookingService } from '@/services/booking.service';
 import { BookingWithDetails, Booking } from '@/types';
@@ -31,6 +32,7 @@ export default function ClientReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, user } = useAuth();
+  const { t, language } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
@@ -62,7 +64,7 @@ export default function ClientReservationsScreen() {
 
   const handleCallSalon = (phone: string | null) => {
     if (!phone) {
-      Alert.alert('Indisponible', 'Le salon n\'a pas renseigné de numéro de téléphone.');
+      Alert.alert(t('booking.unavailable'), t('booking.noPhone'));
       return;
     }
     Linking.openURL(`tel:${phone}`);
@@ -70,7 +72,7 @@ export default function ClientReservationsScreen() {
 
   const handleGetDirections = (salon: BookingWithDetails['salon']) => {
     if (!salon?.address || !salon?.city) {
-      Alert.alert('Indisponible', 'L\'adresse du salon est incomplète.');
+      Alert.alert(t('booking.unavailable'), t('booking.incompleteAddress'));
       return;
     }
     const query = encodeURIComponent(`${salon.address}, ${salon.postal_code || ''} ${salon.city}`);
@@ -89,15 +91,15 @@ export default function ClientReservationsScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.emptyState}>
           <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Mes reservations</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('booking.myReservations')}</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Connectez-vous pour voir vos rendez-vous
+            {t('booking.loginMessage')}
           </Text>
           <TouchableOpacity
             style={styles.loginButton}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={styles.loginButtonText}>Se connecter</Text>
+            <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -116,11 +118,11 @@ export default function ClientReservationsScreen() {
 
   const getStatusLabel = (status: Booking['status']) => {
     switch (status) {
-      case 'confirmed': return 'Confirme';
-      case 'pending': return 'En attente';
-      case 'completed': return 'Termine';
-      case 'cancelled': return 'Annule';
-      default: return 'Inconnu';
+      case 'confirmed': return t('booking.confirmed');
+      case 'pending': return t('booking.pending');
+      case 'completed': return t('booking.completed');
+      case 'cancelled': return t('booking.cancelled');
+      default: return '?';
     }
   };
 
@@ -138,8 +140,8 @@ export default function ClientReservationsScreen() {
     // Cas 1: Rendez-vous avec acompte (partiellement payé)
     if (booking.status === 'confirmed' && booking.payment_method === 'deposit') {
       Alert.alert(
-        'Annulation impossible',
-        'Ce rendez-vous a été validé par un acompte. Pour toute modification ou annulation, veuillez contacter directement le salon. L\'acompte n\'est pas remboursable via l\'application.'
+        t('booking.cancelImpossible'),
+        t('booking.cancelImpossibleMessage')
       );
       return;
     }
@@ -147,16 +149,16 @@ export default function ClientReservationsScreen() {
     // Cas 2: Rendez-vous entièrement payé (Pénalité 20%)
     if (booking.status === 'confirmed' && booking.payment_method === 'full') {
       Alert.alert(
-        'Annuler et rembourser ?',
-        `Conformément à nos conditions, une pénalité de 20% s'applique pour toute annulation d'une prestation payée d'avance.\n\nMontant payé : ${booking.total_price}€\nFrais d'annulation (20%) : ${(booking.total_price * 0.2).toFixed(2)}€\nMontant qui vous sera remboursé : ${(booking.total_price * 0.8).toFixed(2)}€\n\nVoulez-vous continuer ?`,
+        t('booking.cancelAndRefund'),
+        `${t('booking.cancelPenaltyMessage')}\n\n${t('booking.amountPaid')} : ${booking.total_price}€\n${t('booking.cancelFee')} (20%) : ${(booking.total_price * 0.2).toFixed(2)}€\n${t('booking.amountRefunded')} : ${(booking.total_price * 0.8).toFixed(2)}€\n\n${language === 'fr' ? 'Voulez-vous continuer ?' : 'Do you want to continue?'}`,
         [
-          { text: 'Conserver mon RDV', style: 'cancel' },
+          { text: t('booking.keepAppt'), style: 'cancel' },
           { 
-            text: 'Confirmer l\'annulation', 
+            text: t('booking.confirmCancel'), 
             style: 'destructive', 
             onPress: () => {
               // Logique de remboursement partiel (Stripe) et annulation base de données
-              Alert.alert('Succès', 'Votre rendez-vous a été annulé. Votre remboursement de 80% est en cours de traitement.');
+              Alert.alert(t('common.success'), `${t('booking.cancelSuccess')} ${t('booking.cancelRefundProcessing')}`);
             } 
           }
         ]
@@ -167,12 +169,12 @@ export default function ClientReservationsScreen() {
     // Cas 3: Rendez-vous en attente (Gratuit)
     if (booking.status === 'pending') {
       Alert.alert(
-        'Annuler le rendez-vous',
-        'Voulez-vous vraiment annuler ce rendez-vous ? Cette action est immédiate et gratuite car aucun paiement n\'a été effectué.',
+        t('booking.cancelAppt'),
+        t('booking.cancelConfirmMessage'),
         [
-          { text: 'Non', style: 'cancel' },
+          { text: language === 'fr' ? 'Non' : 'No', style: 'cancel' },
           { 
-            text: 'Oui, annuler', 
+            text: language === 'fr' ? 'Oui, annuler' : 'Yes, cancel', 
             style: 'destructive', 
             onPress: async () => {
               try {
@@ -181,13 +183,13 @@ export default function ClientReservationsScreen() {
                 
                 await bookingService.cancelBooking(booking.id);
                 
-                Alert.alert('Succès', 'Votre rendez-vous a été définitivement supprimé.');
+                Alert.alert(t('common.success'), t('booking.cancelFinalSuccess'));
                 
                 // Rafraîchir quand même pour synchroniser avec le serveur
                 await fetchBookings();
               } catch (error) {
                 console.error('Error deleting booking:', error);
-                Alert.alert('Erreur', 'Impossible de supprimer le rendez-vous.');
+                Alert.alert(t('common.error'), t('booking.deleteError'));
                 // En cas d'erreur, on remet tout à jour
                 await fetchBookings();
               }
@@ -199,7 +201,7 @@ export default function ClientReservationsScreen() {
     }
 
     // Cas par défaut (Déjà terminé ou annulé)
-    Alert.alert('Info', 'Ce rendez-vous ne peut plus être modifié.');
+    Alert.alert('Info', t('booking.noEdit'));
   };
 
   const now = new Date();
@@ -279,7 +281,7 @@ export default function ClientReservationsScreen() {
         <View style={[styles.reasonBox, { backgroundColor: colors.error + '10' }]}>
           <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
           <Text style={[styles.reasonText, { color: colors.error }]}>
-            {item.notes.replace('Annulation coiffeur : ', 'Motif d\'annulation : ')}
+            {item.notes.replace('Annulation coiffeur : ', `${t('booking.cancelReason')} : `)}
           </Text>
         </View>
       )}
@@ -306,7 +308,7 @@ export default function ClientReservationsScreen() {
             >
               <Ionicons name="navigate-outline" size={16} color="#3B82F6" />
               <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>
-                Itinéraire
+                {t('salon.directions')}
               </Text>
             </TouchableOpacity>
 
@@ -317,7 +319,7 @@ export default function ClientReservationsScreen() {
               >
                 <Ionicons name="call-outline" size={16} color="#22C55E" />
                 <Text style={[styles.actionButtonText, { color: '#22C55E' }]}>
-                  Appeler
+                  {t('salon.call')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -330,7 +332,7 @@ export default function ClientReservationsScreen() {
             >
               <Ionicons name="close-circle-outline" size={16} color={colors.error} />
               <Text style={[styles.actionButtonText, { color: colors.error }]}>
-                Annuler
+                {language === 'fr' ? 'Annuler' : 'Cancel'}
               </Text>
             </TouchableOpacity>
           )}
@@ -351,7 +353,7 @@ export default function ClientReservationsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Mes reservations</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('booking.myReservations')}</Text>
       </View>
 
       {/* Filter Tabs */}
@@ -367,7 +369,7 @@ export default function ClientReservationsScreen() {
             styles.filterTabText,
             { color: filter === 'upcoming' ? colors.primary : colors.textMuted },
           ]}>
-            A venir ({upcomingBookings.length})
+            {t('booking.upcoming')} ({upcomingBookings.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -381,7 +383,7 @@ export default function ClientReservationsScreen() {
             styles.filterTabText,
             { color: filter === 'past' ? colors.primary : colors.textMuted },
           ]}>
-            Passees ({pastBookings.length})
+            {t('booking.past')} ({pastBookings.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -390,17 +392,17 @@ export default function ClientReservationsScreen() {
         <View style={styles.emptyState}>
           <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {filter === 'upcoming' ? 'Aucun rendez-vous a venir' : 'Aucun rendez-vous passe'}
+            {filter === 'upcoming' ? t('booking.noUpcoming') : t('booking.noPast')}
           </Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Decouvrez nos salons et prenez rendez-vous !
+            {t('booking.discoverSalonsMessage')}
           </Text>
           {filter === 'upcoming' && (
             <TouchableOpacity
               style={styles.exploreButton}
               onPress={() => router.push('/(tabs)/explore')}
             >
-              <Text style={styles.exploreButtonText}>Explorer les salons</Text>
+              <Text style={styles.exploreButtonText}>{t('booking.exploreSalons')}</Text>
             </TouchableOpacity>
           )}
         </View>
