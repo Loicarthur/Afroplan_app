@@ -14,7 +14,7 @@ export { salonService } from './salon.service';
 export { bookingService } from './booking.service';
 
 // Service de gestion des favoris
-export { favoriteService } from './favorite.service';
+export { favoriteService, favoriteStyleService } from './favorite.service';
 
 // Service de gestion des avis
 export { reviewService } from './review.service';

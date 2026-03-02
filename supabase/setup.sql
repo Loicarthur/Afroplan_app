@@ -1,15 +1,14 @@
 -- ============================================
--- AFROPLAN - SCRIPT COMPLET DE BASE DE DONNÉES (MODE SÉCURISÉ & IDEMPOTENT)
+-- AFROPLAN - SCRIPT COMPLET DE BASE DE DONNÉES (VERSION SÉCURISÉE)
 -- ============================================
 -- Ce script contient l'intégralité de la logique AfroPlan (~1200 lignes).
 -- Il est configuré pour NE PAS supprimer vos données existantes.
--- Il utilise "IF NOT EXISTS" pour chaque table et index.
 -- ============================================
 
 -- ============================================
--- ÉTAPE 1: NETTOYAGE (DÉSACTIVÉ PAR SÉCURITÉ)
+-- ÉTAPE 1: NETTOYAGE COMPLET (DÉSACTIVÉ)
 -- ============================================
--- Pour tout réinitialiser, décommentez les blocs ci-dessous.
+-- Si vous voulez vraiment TOUT supprimer, décommentez le bloc ci-dessous.
 /*
 DROP VIEW IF EXISTS platform_monthly_revenue CASCADE;
 DROP VIEW IF EXISTS salon_revenue_summary CASCADE;
@@ -223,6 +222,17 @@ CREATE TABLE IF NOT EXISTS favorites (
 );
 
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+
+-- FAVORITE_STYLES
+CREATE TABLE IF NOT EXISTS favorite_styles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    style_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (user_id, style_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorite_styles_user ON favorite_styles(user_id);
 
 -- NOTIFICATIONS
 CREATE TABLE IF NOT EXISTS notifications (
@@ -506,6 +516,12 @@ DO $$ BEGIN
     ALTER TABLE gallery_images ENABLE ROW LEVEL SECURITY;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'gallery_select') THEN CREATE POLICY "gallery_select" ON gallery_images FOR SELECT USING (true); END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'gallery_manage') THEN CREATE POLICY "gallery_manage" ON gallery_images FOR ALL USING (EXISTS (SELECT 1 FROM salons WHERE salons.id = salon_id AND salons.owner_id = auth.uid())); END IF;
+
+    -- FAVORITE_STYLES
+    ALTER TABLE favorite_styles ENABLE ROW LEVEL SECURITY;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'favorite_styles_select') THEN CREATE POLICY "favorite_styles_select" ON favorite_styles FOR SELECT USING (auth.uid() = user_id); END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'favorite_styles_insert') THEN CREATE POLICY "favorite_styles_insert" ON favorite_styles FOR INSERT WITH CHECK (auth.uid() = user_id); END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'favorite_styles_delete') THEN CREATE POLICY "favorite_styles_delete" ON favorite_styles FOR DELETE USING (auth.uid() = user_id); END IF;
 END $$;
 
 -- ============================================

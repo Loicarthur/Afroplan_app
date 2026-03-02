@@ -93,7 +93,7 @@ export default function CoiffeurDashboard() {
         });
 
         // 2. Chargement asynchrone des données détaillées (ne bloque pas l'affichage)
-        const todayStr = new Date().toLocaleDateString('en-CA');
+        const todayStr = new Date().toISOString().split('T')[0];
         
         // On lance les appels sans attendre le résultat pour libérer l'UI immédiatement
         Promise.all([
@@ -102,7 +102,10 @@ export default function CoiffeurDashboard() {
           salonService.getSalonStats(salonData.id).catch(() => null)
         ]).then(([fullSalonRes, bookingsRes, statsRes]) => {
           if (fullSalonRes) setSalon(fullSalonRes);
-          if (bookingsRes) setTodayBookings(bookingsRes.data || []);
+          if (bookingsRes) {
+            console.log(`[Dashboard] ${bookingsRes.data?.length || 0} réservations trouvées pour aujourd'hui (${todayStr})`);
+            setTodayBookings(bookingsRes.data || []);
+          }
           if (statsRes) setAllTimeStats(statsRes);
         });
 

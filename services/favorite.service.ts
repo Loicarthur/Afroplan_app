@@ -115,3 +115,89 @@ export const favoriteService = {
     }
   },
 };
+
+export const favoriteStyleService = {
+  /**
+   * Ajouter un style aux favoris
+   */
+  async addFavoriteStyle(userId: string, styleId: string): Promise<FavoriteStyle> {
+    checkSupabaseConfig();
+    const { data, error } = await supabase
+      .from('favorite_styles')
+      .insert({ user_id: userId, style_id: styleId })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  /**
+   * Retirer un style des favoris
+   */
+  async removeFavoriteStyle(userId: string, styleId: string): Promise<void> {
+    const { error } = await supabase
+      .from('favorite_styles')
+      .delete()
+      .eq('user_id', userId)
+      .eq('style_id', styleId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  /**
+   * Vérifier si un style est en favori
+   */
+  async isFavoriteStyle(userId: string, styleId: string): Promise<boolean> {
+    checkSupabaseConfig();
+    const { data, error } = await supabase
+      .from('favorite_styles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('style_id', styleId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(error.message);
+    }
+
+    return !!data;
+  },
+
+  /**
+   * Récupérer tous les styles favoris d'un utilisateur
+   */
+  async getUserFavoriteStyles(userId: string): Promise<string[]> {
+    checkSupabaseConfig();
+    const { data, error } = await supabase
+      .from('favorite_styles')
+      .select('style_id')
+      .eq('user_id', userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data || []).map(f => f.style_id);
+  },
+
+  /**
+   * Toggle favori style
+   */
+  async toggleFavoriteStyle(userId: string, styleId: string): Promise<boolean> {
+    const isFav = await this.isFavoriteStyle(userId, styleId);
+
+    if (isFav) {
+      await this.removeFavoriteStyle(userId, styleId);
+      return false;
+    } else {
+      await this.addFavoriteStyle(userId, styleId);
+      return true;
+    }
+  },
+};

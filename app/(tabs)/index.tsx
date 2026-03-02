@@ -36,6 +36,8 @@ import RatingModal from '@/components/RatingModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useSalons } from '@/hooks/use-salons';
+import { useFavorites } from '@/hooks/use-favorites';
+import { favoriteService } from '@/services/favorite.service';
 import { SalonCard } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
@@ -191,6 +193,22 @@ export default function HomeScreen() {
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
 
   const { salons, isLoading: loadingSalons, refresh: refreshSalons } = useSalons();
+  const { favorites, refresh: refreshFavorites } = useFavorites(user?.id || '');
+  const favoriteIds = React.useMemo(() => favorites.map(f => f.id), [favorites]);
+
+  const handleToggleFavorite = async (salonId: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!user) return;
+    try {
+      await favoriteService.toggleFavorite(user.id, salonId);
+      refreshFavorites();
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   const fetchActiveBookingsCount = React.useCallback(async () => {
     if (isAuthenticated && user) {
@@ -432,7 +450,13 @@ export default function HomeScreen() {
               contentContainerStyle={styles.horizontalScroll}
             >
               {featuredSalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="featured" />
+                <SalonCard 
+                  key={salon.id} 
+                  salon={salon} 
+                  variant="featured"
+                  isFavorite={favoriteIds.includes(salon.id)}
+                  onFavoritePress={() => handleToggleFavorite(salon.id)}
+                />
               ))}
             </ScrollView>
           </Animated.View>
@@ -479,7 +503,13 @@ export default function HomeScreen() {
               contentContainerStyle={styles.horizontalScroll}
             >
               {nearbySalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="default" />
+                <SalonCard 
+                  key={salon.id} 
+                  salon={salon} 
+                  variant="default" 
+                  isFavorite={favoriteIds.includes(salon.id)}
+                  onFavoritePress={() => handleToggleFavorite(salon.id)}
+                />
               ))}
             </ScrollView>
           </Animated.View>
@@ -494,7 +524,13 @@ export default function HomeScreen() {
             <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
             <View style={styles.popularGrid}>
               {popularSalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="horizontal" />
+                <SalonCard 
+                  key={salon.id} 
+                  salon={salon} 
+                  variant="horizontal" 
+                  isFavorite={favoriteIds.includes(salon.id)}
+                  onFavoritePress={() => handleToggleFavorite(salon.id)}
+                />
               ))}
             </View>
           </Animated.View>

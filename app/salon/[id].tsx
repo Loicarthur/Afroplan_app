@@ -168,7 +168,17 @@ export default function SalonDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.roundButton} 
-              onPress={() => toggleFavorite()}
+              onPress={async () => {
+                if (!isAuthenticated) {
+                  router.push('/(auth)/login');
+                  return;
+                }
+                try {
+                  await toggleFavorite();
+                } catch (e) {
+                  console.error('Favorite toggle error:', e);
+                }
+              }}
               disabled={isToggling}
             >
               <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#EF4444" : "#FFF"} />

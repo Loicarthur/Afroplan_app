@@ -11,77 +11,58 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useFavorites, useFavoriteStyles } from '@/hooks/use-favorites';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
+import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - Spacing.md * 2 - Spacing.md) / 2;
-
-// Données de test pour les salons favoris
-const FAVORITE_SALONS = [
-  {
-    id: '1',
-    name: 'Bella Coiffure',
-    rating: 4.9,
-    reviews_count: 234,
-    address: 'Paris 18e',
-    image: require('@/assets/images/Box_Braids.jpg'),
-  },
-  {
-    id: '2',
-    name: 'Afro Style Studio',
-    rating: 4.8,
-    reviews_count: 189,
-    address: 'Lyon 2e',
-    image: require('@/assets/images/Fausse_Locks.jpg'),
-  },
-];
-
-// Données de test pour les styles sauvegardés
-const SAVED_STYLES = [
-  {
-    id: '1',
-    name: 'Box Braids Longues',
-    price: '150-200€',
-    category: 'braids',
-    image: require('@/assets/images/Box_Braids.jpg'),
-  },
-  {
-    id: '2',
-    name: 'Cornrows Design',
-    price: '90-150€',
-    category: 'braids',
-    image: require('@/assets/images/Nattes_Collees.jpg'),
-  },
-  {
-    id: '3',
-    name: 'Faux Locks',
-    price: '180-250€',
-    category: 'locks',
-    image: require('@/assets/images/Fausse_Locks.jpg'),
-  },
-  {
-    id: '4',
-    name: 'Passion Twists',
-    price: '120-180€',
-    category: 'twists',
-    image: require('@/assets/images/Vanille.jpg'),
-  },
-];
+const CARD_WIDTH = (width - Spacing.md * 3) / 2;
 
 export default function FavoritesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { t } = useLanguage();
+  
+  const { favorites, isLoading: loadingSalons, refresh: refreshSalons, removeFavorite } = useFavorites(user?.id || '');
+  const { favoriteStyleIds, isLoading: loadingStyles, refresh: refreshStyles, toggleFavoriteStyle } = useFavoriteStyles(user?.id || '');
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const isLoading = loadingSalons || loadingStyles;
+
+  const allStyles = React.useMemo(() => 
+    HAIRSTYLE_CATEGORIES.flatMap(cat => cat.styles), 
+  []);
+
+  const favoriteStyles = React.useMemo(() => 
+    allStyles.filter(style => favoriteStyleIds.includes(style.id)),
+  [allStyles, favoriteStyleIds]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated && user?.id) {
+        refreshSalons();
+        refreshStyles();
+      }
+    }, [isAuthenticated, user?.id, refreshSalons, refreshStyles])
+  );
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refreshSalons(), refreshStyles()]);
+    setRefreshing(false);
+  }, [refreshSalons, refreshStyles]);
 
   // Si pas connecté, afficher un écran invitant à se connecter
   if (!isAuthenticated) {
@@ -110,24 +91,37 @@ export default function FavoritesScreen() {
     );
   }
 
-  const handleRemoveSalon = (salonId: string) => {
-    // TODO: appel API suppression favori
+  const handleRemoveSalon = async (salonId: string) => {
+    try {
+      await removeFavorite(salonId);
+    } catch (error) {
+      console.error('Erreur lors de la suppression du favori:', error);
+    }
   };
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      braids: t('hairstyle.tresses'),
-      natural: t('hairstyle.afro'),
-      twists: 'Twists',
-      locks: t('hairstyle.locks'),
-      weave: t('hairstyle.tissage'),
-    };
-    return labels[category] || category;
+  const handleRemoveStyle = async (styleId: string) => {
+    try {
+      await toggleFavoriteStyle(styleId);
+    } catch (error) {
+      console.error('Erreur lors de la suppression du style favori:', error);
+    }
+  };
+
+  const getCategoryLabel = (styleId: string) => {
+    const category = HAIRSTYLE_CATEGORIES.find(cat => 
+      cat.styles.some(s => s.id === styleId)
+    );
+    return category ? category.title : '';
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
 
         {/* Header simple et élégant */}
         <View style={styles.header}>
@@ -137,80 +131,123 @@ export default function FavoritesScreen() {
           </Text>
         </View>
 
-        {/* Salons Favoris */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('fav.salons')} ({FAVORITE_SALONS.length})
-            </Text>
+        {isLoading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
-
-          {FAVORITE_SALONS.map((salon) => (
-            <TouchableOpacity
-              key={salon.id}
-              style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
-              activeOpacity={0.7}
-            >
-              <Image source={salon.image} style={styles.salonImage} contentFit="cover" />
-              <View style={styles.salonContent}>
-                <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={13} color="#FBBF24" />
-                  <Text style={[styles.ratingText, { color: colors.text }]}>{salon.rating}</Text>
-                  <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
-                    ({salon.reviews_count} {t('salon.reviews').toLowerCase()})
-                  </Text>
-                </View>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-                  <Text style={[styles.addressText, { color: colors.textSecondary }]}>{salon.address}</Text>
-                </View>
+        ) : (
+          <>
+            {/* Salons Favoris */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('fav.salons')} ({favorites.length})
+                </Text>
               </View>
-              <TouchableOpacity
-                style={[styles.removeButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => handleRemoveSalon(salon.id)}
-              >
-                <Ionicons name="heart" size={18} color="#EF4444" />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-        </View>
 
-        {/* Styles sauvegardés */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('fav.styles')} ({SAVED_STYLES.length})
-            </Text>
-          </View>
+              {favorites.length > 0 ? (
+                favorites.map((salon) => (
+                  <TouchableOpacity
+                    key={salon.id}
+                    style={[styles.salonCard, { backgroundColor: colors.card }, Shadows.sm]}
+                    activeOpacity={0.7}
+                    onPress={() => router.push(`/salon/${salon.id}`)}
+                  >
+                    <Image 
+                      source={salon.image_url ? { uri: salon.image_url } : require('@/assets/images/logo_afroplan.jpeg')} 
+                      style={styles.salonImage} 
+                      contentFit="cover" 
+                    />
+                    <View style={styles.salonContent}>
+                      <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+                      <View style={styles.ratingRow}>
+                        <Ionicons name="star" size={13} color="#FBBF24" />
+                        <Text style={[styles.ratingText, { color: colors.text }]}>{salon.rating?.toFixed(1) || '0.0'}</Text>
+                        <Text style={[styles.reviewsText, { color: colors.textMuted }]}>
+                          ({salon.reviews_count || 0} {t('salon.reviews').toLowerCase()})
+                        </Text>
+                      </View>
+                      <View style={styles.locationRow}>
+                        <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+                        <Text style={[styles.addressText, { color: colors.textSecondary }]}>{salon.city}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.removeButton, { backgroundColor: colors.backgroundSecondary }]}
+                      onPress={() => handleRemoveSalon(salon.id)}
+                    >
+                      <Ionicons name="heart" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="heart-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {t('fav.noFavorites')}
+                  </Text>
+                </View>
+              )}
+            </View>
 
-          <View style={styles.stylesGrid}>
-            {SAVED_STYLES.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.styleCard, { backgroundColor: colors.card }, Shadows.sm]}
-                activeOpacity={0.7}
-              >
-                <View style={styles.styleImageContainer}>
-                  <Image source={item.image} style={styles.styleImage} contentFit="cover" />
-                  <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.categoryText, { color: colorScheme === 'dark' ? '#191919' : '#FFFFFF' }]}>
-                      {getCategoryLabel(item.category)}
-                    </Text>
-                  </View>
+            {/* Styles sauvegardés */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('fav.styles')} ({favoriteStyles.length})
+                </Text>
+              </View>
+
+              {favoriteStyles.length > 0 ? (
+                <View style={styles.stylesGrid}>
+                  {favoriteStyles.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.styleCard, { backgroundColor: colors.card }, Shadows.sm]}
+                      activeOpacity={0.7}
+                      onPress={() => router.push({
+                        pathname: '/style-salons/[styleId]',
+                        params: { styleId: item.id, styleName: item.name }
+                      })}
+                    >
+                      <View style={styles.styleImageContainer}>
+                        <Image source={item.image} style={styles.styleImage} contentFit="cover" />
+                        <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={[styles.categoryText, { color: '#FFFFFF' }]}>
+                            {getCategoryLabel(item.id)}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.styleRemoveButton}
+                          onPress={() => handleRemoveStyle(item.id)}
+                        >
+                          <Ionicons name="heart" size={16} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.styleInfo}>
+                        <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {item.duration && (
+                          <Text style={[styles.stylePrice, { color: colors.textSecondary }]}>
+                            {item.duration}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <View style={styles.styleInfo}>
-                  <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.stylePrice, { color: colors.textSecondary }]}>
-                    {item.price}
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="sparkles-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {t('fav.noStylesSaved') || 'Aucun style sauvegardé'}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+              )}
+            </View>
+          </>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -336,6 +373,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
+  styleRemoveButton: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   styleInfo: {
     padding: Spacing.sm,
   },
@@ -391,5 +439,19 @@ const styles = StyleSheet.create({
   authLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    width: '100%',
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
 });

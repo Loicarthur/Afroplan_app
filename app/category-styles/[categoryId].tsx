@@ -19,6 +19,8 @@ import { Image } from 'expo-image';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFavoriteStyles } from '@/hooks/use-favorites';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
@@ -26,9 +28,24 @@ export default function CategoryStylesScreen() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user, isAuthenticated } = useAuth();
+  
+  const { favoriteStyleIds, toggleFavoriteStyle } = useFavoriteStyles(user?.id || '');
 
   // Trouver la catégorie et ses styles
   const category = HAIRSTYLE_CATEGORIES.find(c => c.id === categoryId);
+
+  const handleToggleFavorite = async (styleId: string) => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    try {
+      await toggleFavoriteStyle(styleId);
+    } catch (error) {
+      console.error('Error toggling style favorite:', error);
+    }
+  };
 
   if (!category) {
     return (
@@ -78,7 +95,19 @@ export default function CategoryStylesScreen() {
                   params: { styleId: style.id, styleName: style.name }
                 })}
               >
-                <Image source={style.image} style={styles.styleImage} contentFit="cover" />
+                <View style={styles.imageContainer}>
+                  <Image source={style.image} style={styles.styleImage} contentFit="cover" />
+                  <TouchableOpacity 
+                    style={styles.favoriteButton}
+                    onPress={() => handleToggleFavorite(style.id)}
+                  >
+                    <Ionicons 
+                      name={favoriteStyleIds.includes(style.id) ? "heart" : "heart-outline"} 
+                      size={20} 
+                      color={favoriteStyleIds.includes(style.id) ? "#EF4444" : "#FFFFFF"} 
+                    />
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.styleInfo}>
                   <Text style={[styles.styleName, { color: colors.text }]} numberOfLines={2}>
                     {style.name}
@@ -152,9 +181,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     height: 220,
   },
+  imageContainer: {
+    position: 'relative',
+    height: 140,
+    width: '100%',
+  },
   styleImage: {
     width: '100%',
-    height: 140,
+    height: '100%',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   styleInfo: {
     padding: 12,

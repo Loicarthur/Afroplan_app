@@ -1071,6 +1071,9 @@ export type ReviewUpdate = Database['public']['Tables']['reviews']['Update'];
 export type Favorite = Database['public']['Tables']['favorites']['Row'];
 export type FavoriteInsert = Database['public']['Tables']['favorites']['Insert'];
 
+export type FavoriteStyle = Database['public']['Tables']['favorite_styles']['Row'];
+export type FavoriteStyleInsert = Database['public']['Tables']['favorite_styles']['Insert'];
+
 export type Category = Database['public']['Tables']['categories']['Row'];
 export type GalleryImage = Database['public']['Tables']['gallery_images']['Row'];
 
