@@ -192,8 +192,7 @@ export default function CheckoutScreen() {
           throw new Error(`Paiement échoué: ${presentError.message}`);
         }
 
-        console.log('DEBUG: Paiement réussi! Confirmation en DB...');
-        await paymentService.confirmPayment(paymentId, paymentIntentId);
+        console.log('DEBUG: Paiement réussi via Stripe! Le Webhook se chargera de la mise à jour DB.');
 
         // --- ENVOI AUTOMATIQUE DU MESSAGE DE BIENVENUE PAR DÉFAUT ---
         try {
