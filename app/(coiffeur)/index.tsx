@@ -55,6 +55,8 @@ export default function CoiffeurDashboard() {
   // Modals & States
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [walletModalVisible, setWalletModalVisible] = useState(false);
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [salonServices, setSalonServices] = useState<any[]>([]);
   
   // Formulaire RDV Manuel
@@ -93,7 +95,8 @@ export default function CoiffeurDashboard() {
         });
 
         // 2. Chargement asynchrone des données détaillées (ne bloque pas l'affichage)
-        const todayStr = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         
         // On lance les appels sans attendre le résultat pour libérer l'UI immédiatement
         Promise.all([
@@ -103,7 +106,6 @@ export default function CoiffeurDashboard() {
         ]).then(([fullSalonRes, bookingsRes, statsRes]) => {
           if (fullSalonRes) setSalon(fullSalonRes);
           if (bookingsRes) {
-            console.log(`[Dashboard] ${bookingsRes.data?.length || 0} réservations trouvées pour aujourd'hui (${todayStr})`);
             setTodayBookings(bookingsRes.data || []);
           }
           if (statsRes) setAllTimeStats(statsRes);
@@ -158,10 +160,10 @@ export default function CoiffeurDashboard() {
   };
 
   const pendingBookingsCount = todayBookings.filter(b => b.status === 'pending').length;
-  const confirmedTodayCount = todayBookings.filter(b => b.status === 'confirmed' || b.status === 'completed').length;
+  const activeTodayCount = todayBookings.filter(b => b.status !== 'cancelled').length;
 
-  const stats = {
-    todayBookings: confirmedTodayCount,
+  const dashboardStats = {
+    todayBookings: activeTodayCount,
     pendingBookings: pendingBookingsCount,
     totalRevenue: allTimeStats?.totalRevenue || 0,
     weeklyRevenue: allTimeStats?.weeklyRevenue || 0,
@@ -229,8 +231,8 @@ export default function CoiffeurDashboard() {
               onPress={() => setNotificationModalVisible(true)}
             >
               <Ionicons name="notifications-outline" size={24} color={colors.text} />
-              {stats.pendingBookings > 0 && <View style={styles.badge} />}
-            </TouchableOpacity>
+              {dashboardStats.pendingBookings > 0 && <View style={styles.badge} />}
+              </TouchableOpacity>
           </View>
         </View>
 
@@ -239,7 +241,7 @@ export default function CoiffeurDashboard() {
           <View style={styles.businessHeader}>
             <View>
               <Text style={styles.businessLabel}>{t('coiffeur.weeklyRevenue')}</Text>
-              <Text style={styles.businessValue}>{stats.weeklyRevenue.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2 })} €</Text>
+              <Text style={styles.businessValue}>{dashboardStats.weeklyRevenue.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2 })} €</Text>
             </View>
             <View style={styles.growthBadge}>
               <Ionicons name="trending-up" size={14} color="#22C55E" />
@@ -248,17 +250,17 @@ export default function CoiffeurDashboard() {
           </View>
           <View style={styles.footerStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.weeklyBookingsCount}</Text>
+              <Text style={styles.statValue}>{dashboardStats.weeklyBookingsCount}</Text>
               <Text style={styles.statLabel}>{t('coiffeur.weeklyAppt')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.todayBookings}</Text>
+              <Text style={styles.statValue}>{dashboardStats.todayBookings}</Text>
               <Text style={styles.statLabel}>{t('coiffeur.today')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.averageRating.toFixed(1)}</Text>
+              <Text style={styles.statValue}>{dashboardStats.averageRating.toFixed(1)}</Text>
               <Text style={styles.statLabel}>{t('coiffeur.rating')}</Text>
             </View>
           </View>
@@ -271,11 +273,11 @@ export default function CoiffeurDashboard() {
             <Text style={[styles.transparencyTitle, { color: colors.text }]}>{t('coiffeur.estimatedNet')}</Text>
           </View>
           <View style={styles.flowContainer}>
-            <View style={styles.flowStep}><Text style={styles.flowAmount}>{stats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.total')}</Text></View>
+            <View style={styles.flowStep}><Text style={styles.flowAmount}>{dashboardStats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.total')}</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
             <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.error }]}>-20%</Text><Text style={styles.flowLabel}>{t('coiffeur.fees')}</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
-            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.success }]}>{(stats.totalRevenue * 0.8).toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.net')}</Text></View>
+            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.success }]}>{(dashboardStats.totalRevenue * 0.8).toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.net')}</Text></View>
           </View>
         </Animated.View>
 
@@ -415,6 +417,83 @@ export default function CoiffeurDashboard() {
         </View>
       </Modal>
 
+      {/* ── PORTEFEUILLE MODAL ── */}
+      <Modal
+        visible={walletModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setWalletModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Mon Portefeuille</Text>
+              <TouchableOpacity onPress={() => setWalletModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.balanceBox, { backgroundColor: '#191919' }]}>
+              <Text style={styles.balanceLabel}>Solde disponible (Net 80%)</Text>
+              <Text style={styles.balanceValue}>
+                {((dashboardStats?.totalRevenue || 0) * 0.8).toFixed(2)} €
+              </Text>
+              <TouchableOpacity 
+                style={styles.payoutButton}
+                onPress={() => Alert.alert('Virement', 'Demande de virement envoyée vers votre RIB.')}
+              >
+                <Text style={styles.payoutButtonText}>Demander un virement</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                Les virements sont effectués sous 48h ouvrées.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── HISTORIQUE GAINS MODAL ── */}
+      <Modal
+        visible={historyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setHistoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Historique des gains</Text>
+              <TouchableOpacity onPress={() => setHistoryModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.historySummary}>
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Chiffre d'affaires</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{dashboardStats?.totalRevenue?.toFixed(2)}€</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Commission (20%)</Text>
+                  <Text style={[styles.summaryValue, { color: colors.error }]}>-{(dashboardStats?.totalRevenue * 0.2)?.toFixed(2)}€</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionTitleModal, { color: colors.text }]}>Dernières transactions</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 20 }]}>
+                Aucune transaction récente à afficher.
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
     </SafeAreaView>
   );
@@ -502,5 +581,75 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
+  },
+  balanceBox: {
+    padding: 24,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  balanceValue: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 20,
+  },
+  payoutButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  payoutButtonText: {
+    color: '#191919',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 12,
+    flex: 1,
+  },
+  historySummary: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginHorizontal: 10,
+  },
+  sectionTitleModal: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
   },
 });

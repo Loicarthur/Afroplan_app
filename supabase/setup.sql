@@ -548,7 +548,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
 -- ============================================
--- ÉTAPE 10: DONNÉES INITIALES
+-- ÉTAPE 11: DONNÉES INITIALES
 -- ============================================
 INSERT INTO categories (name, slug, description, icon, "order") VALUES
     ('Tresses et Nattes', 'tresses-nattes', 'Box Braids, Knotless, Cornrows...', 'git-branch-outline', 1),
@@ -557,6 +557,36 @@ INSERT INTO categories (name, slug, description, icon, "order") VALUES
     ('Tissages et Perruques', 'tissages-perruques', 'Pose et entretien...', 'layers-outline', 4),
     ('Coupe et Soins', 'coupes-soins', 'Coupes et soins profonds...', 'cut-outline', 5)
 ON CONFLICT (slug) DO NOTHING;
+
+-- ============================================
+-- ÉTAPE 12: CONFIGURATION DU STOCKAGE (BUCKETS)
+-- ============================================
+
+-- Créer le bucket salon-photos s'il n'existe pas
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('salon-photos', 'salon-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Supprimer les anciennes politiques pour éviter les erreurs
+DROP POLICY IF EXISTS "Salon Photos Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Owner Delete" ON storage.objects;
+
+-- Politiques de sécurité pour les photos
+CREATE POLICY "Salon Photos Public Access" ON storage.objects
+    FOR SELECT USING (bucket_id = 'salon-photos');
+
+CREATE POLICY "Authenticated Upload" ON storage.objects
+    FOR INSERT WITH CHECK (
+        bucket_id = 'salon-photos' 
+        AND auth.role() = 'authenticated'
+    );
+
+CREATE POLICY "Owner Delete" ON storage.objects
+    FOR DELETE USING (
+        bucket_id = 'salon-photos' 
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
 
 -- ============================================
 -- TERMINÉ !

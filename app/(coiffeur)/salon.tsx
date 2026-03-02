@@ -139,7 +139,7 @@ export default function SalonManagementScreen() {
   const pickMedia = async (type: 'cover' | 'gallery', index?: number) => {
     try {
       const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: 'images',
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.7,

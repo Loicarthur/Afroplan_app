@@ -128,57 +128,61 @@ export default function CoiffeurPortfolioScreen() {
   }, [activeFilter, realizations]);
 
   const pickMedia = async () => {
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images', 'videos'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    };
+    try {
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images', 'videos'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      };
 
-    Alert.alert(
-      'Ajouter une réalisation',
-      'Quelle source souhaitez-vous utiliser ?',
-      [
-        {
-          text: 'Prendre une photo',
-          onPress: async () => {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission requise', 'Accès caméra refusé');
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              ...options,
-              mediaTypes: ['images'],
-            });
-            if (!result.canceled) setNewImage(result.assets[0].uri);
+      Alert.alert(
+        'Ajouter une réalisation',
+        'Quelle source souhaitez-vous utiliser ?',
+        [
+          {
+            text: 'Prendre une photo',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission requise', 'Accès caméra refusé');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                ...options,
+                mediaTypes: ['images'],
+              });
+              if (!result.canceled) setNewImage(result.assets[0].uri);
+            },
           },
-        },
-        {
-          text: 'Enregistrer une vidéo',
-          onPress: async () => {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission requise', 'Accès caméra refusé');
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              ...options,
-              mediaTypes: ['videos'],
-            });
-            if (!result.canceled) setNewImage(result.assets[0].uri);
+          {
+            text: 'Enregistrer une vidéo',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission requise', 'Accès caméra refusé');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                ...options,
+                mediaTypes: ['videos'],
+              });
+              if (!result.canceled) setNewImage(result.assets[0].uri);
+            },
           },
-        },
-        {
-          text: 'Choisir dans la galerie',
-          onPress: async () => {
-            const result = await ImagePicker.launchImageLibraryAsync(options);
-            if (!result.canceled) setNewImage(result.assets[0].uri);
+          {
+            text: 'Choisir dans la galerie',
+            onPress: async () => {
+              const result = await ImagePicker.launchImageLibraryAsync(options);
+              if (!result.canceled) setNewImage(result.assets[0].uri);
+            },
           },
-        },
-        { text: 'Annuler', style: 'cancel' },
-      ]
-    );
+          { text: 'Annuler', style: 'cancel' },
+        ]
+      );
+    } catch (e) {
+      console.warn('Error picking media:', e);
+    }
   };
 
   const handleSave = async () => {

@@ -105,6 +105,7 @@ export default function ProfileScreen() {
   
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
@@ -125,6 +126,7 @@ export default function ProfileScreen() {
     if (profile) {
       setNewName(profile.full_name || '');
       setNewPhone(profile.phone || '');
+      setImageError(false);
     }
   }, [profile]);
 
@@ -162,7 +164,7 @@ export default function ProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
@@ -173,21 +175,20 @@ export default function ProfileScreen() {
       setUploading(true);
       const uri = result.assets[0].uri;
 
-      // Correction Android: Utiliser FormData au lieu de blob()
-      const formData = new FormData();
       const fileExt = uri.split('.').pop() || 'jpg';
-      const fileName = `${user.id}/avatar_${Date.now()}.${fileExt}`;
+      const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
       
-      const file = {
-        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+      const formData = new FormData();
+      formData.append('file', {
+        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
         name: fileName,
         type: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-      } as any;
+      } as any);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('salon-photos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
+        .upload(fileName, formData, {
+          contentType: 'image/jpeg',
           upsert: true,
         });
 
@@ -195,9 +196,10 @@ export default function ProfileScreen() {
 
       const { data: { publicUrl } } = supabase.storage
         .from('salon-photos')
-        .getPublicUrl(uploadData.path);
+        .getPublicUrl(fileName);
 
       await updateProfile({ avatar_url: publicUrl });
+      setImageError(false);
       Alert.alert('Succès', 'Votre photo de profil a été mise à jour !');
     } catch (error: any) {
       console.error('Avatar update error:', error);
@@ -255,7 +257,6 @@ export default function ProfileScreen() {
     router.replace('/(coiffeur)');
   };
 
-  // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -294,11 +295,13 @@ export default function ProfileScreen() {
         {/* ── PROFILE HEADER ── */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            {profile?.avatar_url ? (
+            {profile?.avatar_url && !imageError ? (
               <Image
-                source={{ uri: profile.avatar_url }}
+                source={{ uri: `${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${Date.now()}` }}
                 style={styles.avatar}
                 contentFit="cover"
+                cachePolicy="none"
+                onError={() => setImageError(true)}
               />
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>

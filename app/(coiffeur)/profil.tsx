@@ -3,7 +3,7 @@
  * Refonte Premium - Design épuré et professionnel
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,14 +23,12 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
-import { paymentService } from '@/services/payment.service';
 import { supabase } from '@/lib/supabase';
 import NotificationModal from '@/components/NotificationModal';
 
@@ -84,14 +82,15 @@ export default function CoiffeurProfilScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile, signOut, isAuthenticated, updateProfile } = useAuth();
 
-  const [stats, setStats] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [notificationModalVisible, setNotificationModalVisible] = React.useState(false);
-  const [walletModalVisible, setWalletModalVisible] = React.useState(false);
-  const [historyModalVisible, setHistoryModalVisible] = React.useState(false);
-  const [personalInfoModalVisible, setPersonalInfoModalVisible] = React.useState(false);
-  const [securityModalVisible, setSecurityModalVisible] = React.useState(false);
-  const [uploading, setUploading] = React.useState(false);
+  const [coiffeurStats, setCoiffeurStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [walletModalVisible, setWalletModalVisible] = useState(false);
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [personalInfoModalVisible, setPersonalInfoModalVisible] = useState(false);
+  const [securityModalVisible, setSecurityModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const fetchStats = async () => {
     if (!user?.id) return;
@@ -99,7 +98,7 @@ export default function CoiffeurProfilScreen() {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
         const statsData = await salonService.getSalonStats(salon.id);
-        setStats(statsData);
+        setCoiffeurStats(statsData);
       }
     } catch (error) {
       console.error('Error fetching coiffeur stats:', error);
@@ -119,7 +118,7 @@ export default function CoiffeurProfilScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
@@ -130,24 +129,20 @@ export default function CoiffeurProfilScreen() {
       setUploading(true);
       const uri = result.assets[0].uri;
 
-      const base64: string = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = function () {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        };
-        xhr.onerror = () => reject(new Error('Read error'));
-        xhr.open('GET', uri);
-        xhr.responseType = 'blob';
-        xhr.send();
-      });
-
-      const arrayBuffer = base64js.toByteArray(base64);
-      const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
+      // Nom de fichier unique pour tuer le cache
+      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
+      
+      const formData = new FormData();
+      formData.append('file', {
+        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+        name: fileName,
+        type: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+      } as any);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('salon-photos')
-        .upload(fileName, arrayBuffer, {
+        .upload(fileName, formData, {
           contentType: 'image/jpeg',
           upsert: true,
         });
@@ -156,21 +151,21 @@ export default function CoiffeurProfilScreen() {
 
       const { data: { publicUrl } } = supabase.storage
         .from('salon-photos')
-        .getPublicUrl(uploadData.path);
+        .getPublicUrl(fileName);
 
       await updateProfile({ avatar_url: publicUrl });
-
-      Alert.alert('Succès', 'Votre photo de profil a été mise à jour !');
+      setImageError(false);
+      Alert.alert('Succès', 'Votre photo de profil coiffeur est à jour !');
     } catch (error: any) {
       console.error('Avatar update error:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour votre photo.');
+      Alert.alert('Erreur', "Impossible de mettre à jour votre photo.");
     } finally {
       setUploading(false);
     }
   };
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (isAuthenticated) {
         fetchStats();
       }
@@ -204,7 +199,6 @@ export default function CoiffeurProfilScreen() {
     router.replace('/(tabs)');
   };
 
-  // Contenu pour utilisateur non connecté
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -234,11 +228,13 @@ export default function CoiffeurProfilScreen() {
         {/* ── PROFILE HEADER ── */}
         <View style={styles.header}>
           <View style={styles.avatarWrapper}>
-            {profile?.avatar_url ? (
+            {profile?.avatar_url && !imageError ? (
               <Image
-                source={{ uri: profile.avatar_url }}
+                source={{ uri: `${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${Date.now()}` }}
                 style={styles.avatar}
                 contentFit="cover"
+                cachePolicy="none"
+                onError={() => setImageError(true)}
               />
             ) : (
               <LinearGradient
@@ -281,11 +277,11 @@ export default function CoiffeurProfilScreen() {
         {/* ── QUICK STATS ── */}
         <View style={styles.statsRow}>
           <View style={[styles.statItem, { borderRightWidth: 1, borderRightColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{stats?.averageRating?.toFixed(1) || '0.0'}</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{coiffeurStats?.averageRating?.toFixed(1) || '0.0'}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Note</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{stats?.totalSuccessfulBookings || 0}</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{coiffeurStats?.totalSuccessfulBookings || 0}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>RDV</Text>
           </View>
         </View>
@@ -417,7 +413,7 @@ export default function CoiffeurProfilScreen() {
             <View style={[styles.balanceBox, { backgroundColor: '#191919' }]}>
               <Text style={styles.balanceLabel}>Solde disponible (Net 80%)</Text>
               <Text style={styles.balanceValue}>
-                {((stats?.totalRevenue || 0) * 0.8).toFixed(2)} €
+                {((coiffeurStats?.totalRevenue || 0) * 0.8).toFixed(2)} €
               </Text>
               <TouchableOpacity 
                 style={styles.payoutButton}
@@ -457,12 +453,12 @@ export default function CoiffeurProfilScreen() {
               <View style={styles.historySummary}>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Chiffre d'affaires</Text>
-                  <Text style={[styles.summaryValue, { color: colors.text }]}>{stats?.totalRevenue?.toFixed(2)}€</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{coiffeurStats?.totalRevenue?.toFixed(2)}€</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Commission (20%)</Text>
-                  <Text style={[styles.summaryValue, { color: colors.error }]}>-{(stats?.totalRevenue * 0.2)?.toFixed(2)}€</Text>
+                  <Text style={[styles.summaryValue, { color: colors.error }]}>-{(coiffeurStats?.totalRevenue * 0.2)?.toFixed(2)}€</Text>
                 </View>
               </View>
 
