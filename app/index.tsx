@@ -16,6 +16,7 @@ export default function Index() {
   const { isAuthenticated, isLoading, profile } = useAuth();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [roleLoaded, setRoleLoaded] = useState(false);
+  const [profileTimeout, setProfileTimeout] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SELECTED_ROLE_KEY).then((role) => {
@@ -23,6 +24,17 @@ export default function Index() {
       setRoleLoaded(true);
     });
   }, []);
+
+  // Sécurité: Si le profil met trop de temps à charger alors qu'on est authentifié
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isAuthenticated && !profile && !isLoading) {
+      timer = setTimeout(() => {
+        setProfileTimeout(true);
+      }, 5000); // 5 secondes max
+    }
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, profile, isLoading]);
 
   // Cacher le splash screen uniquement quand auth ET role sont chargés
   useEffect(() => {
@@ -42,6 +54,10 @@ export default function Index() {
   // Connecté → direction l'app selon le choix manuel de l'utilisateur (Priorité au Switch)
   if (isAuthenticated) {
     if (!profile) {
+      // Si timeout atteint, on tente de rediriger quand même vers (tabs) en mode dégradé
+      if (profileTimeout) {
+        return <Redirect href="/(tabs)" />;
+      }
       return (
         <View style={styles.container}>
           <ActivityIndicator size="large" color="#191919" />

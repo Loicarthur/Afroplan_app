@@ -35,21 +35,25 @@ export function useBookingReminders() {
           const diffMs = bookingDate.getTime() - now.getTime();
           const diffMins = Math.floor(diffMs / 60000);
 
-          // Seuils de rappel : 60 min, 30 min, 10 min
-          const thresholds = [60, 30, 10];
+          // Seuils de rappel : 60, 30, 10 min avant ET 5 min après (seuil -5)
+          const thresholds = [60, 30, 10, -5];
           
           for (const threshold of thresholds) {
-            // Si on est dans la fenêtre du seuil (ex: entre 55 et 60 min avant)
+            // Fenêtre de détection de 5 minutes
             if (diffMins <= threshold && diffMins > threshold - 5) {
               const storageKey = `@reminder_${booking.id}_${threshold}`;
               const alreadyNotified = await AsyncStorage.getItem(storageKey);
 
               if (!alreadyNotified) {
+                const isPostBooking = threshold === -5;
+                
                 await notificationService.createNotification({
                   user_id: user.id,
-                  title: 'Rendez-vous proche !',
-                  message: `Votre RDV chez ${booking.salon?.name || 'le salon'} commence dans ${threshold} minutes.`,
-                  type: 'booking_reminder',
+                  title: isPostBooking ? 'Donnez votre avis ! ✨' : 'Rendez-vous proche !',
+                  message: isPostBooking 
+                    ? `Comment s'est passée votre coiffure chez ${booking.salon?.name || 'votre salon'} ? Laissez une note !`
+                    : `Votre RDV chez ${booking.salon?.name || 'le salon'} commence dans ${threshold} minutes.`,
+                  type: isPostBooking ? 'rating_prompt' : 'booking_reminder',
                   booking_id: booking.id,
                 });
                 await AsyncStorage.setItem(storageKey, 'true');

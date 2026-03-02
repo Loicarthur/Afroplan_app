@@ -32,7 +32,9 @@ import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 import LanguageSelector from '@/components/LanguageSelector';
 import NotificationModal from '@/components/NotificationModal';
+import RatingModal from '@/components/RatingModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useSalons } from '@/hooks/use-salons';
 import { SalonCard } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
@@ -184,6 +186,8 @@ export default function HomeScreen() {
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [pendingReviewBooking, setPendingReviewBooking] = useState<any>(null);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
 
   const { salons, isLoading: loadingSalons, refresh: refreshSalons } = useSalons();
@@ -201,11 +205,52 @@ export default function HomeScreen() {
     }
   }, [isAuthenticated, user]);
 
+  // Vérifier s'il y a un RDV à noter (terminé depuis > 30 min)
+  const checkForPendingReviews = React.useCallback(async () => {
+    if (!isAuthenticated || !user) return;
+    try {
+      const { bookingService } = await import('@/services/booking.service');
+      const { reviewService } = await import('@/services/review.service');
+      
+      const response = await bookingService.getClientBookings(user.id);
+      // On filtre les terminés
+      const completed = response.data.filter(b => b.status === 'completed');
+      
+      if (completed.length > 0) {
+        const now = new Date().getTime();
+        
+        for (const booking of completed) {
+          // Calcul de la fin de prestation
+          const bookingDate = new Date(booking.booking_date);
+          const [hours, minutes] = booking.start_time.split(':').map(Number);
+          bookingDate.setHours(hours, minutes + (booking.duration_minutes || 60), 0, 0);
+          
+          const timeSinceEnd = now - bookingDate.getTime();
+          const fiveMinutes = 5 * 60 * 1000;
+
+          if (timeSinceEnd > fiveMinutes) {
+            const reviewed = await reviewService.hasClientReviewed(user.id, booking.salon_id);
+            if (!reviewed) {
+              setPendingReviewBooking(booking);
+              setRatingModalVisible(true);
+              break; 
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error checking for reviews:', e);
+    }
+  }, [isAuthenticated, user]);
+
   useFocusEffect(
     React.useCallback(() => {
       fetchActiveBookingsCount();
       refreshSalons();
-    }, [fetchActiveBookingsCount, refreshSalons])
+      if (isAuthenticated) {
+        checkForPendingReviews();
+      }
+    }, [fetchActiveBookingsCount, refreshSalons, isAuthenticated, checkForPendingReviews])
   );
 
   const handleSwitchToCoiffeur = async () => {
@@ -213,9 +258,15 @@ export default function HomeScreen() {
     router.replace('/(coiffeur)');
   };
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    refreshSalons().finally(() => setRefreshing(false));
+    try {
+      await refreshSalons();
+    } catch (e) {
+      console.warn('Refresh error:', e);
+    } finally {
+      setRefreshing(false);
+    }
   }, [refreshSalons]);
 
   const openLink = (url: string) => {
@@ -333,10 +384,10 @@ export default function HomeScreen() {
           {isAuthenticated && profile && (
             <View style={styles.welcomeMessage}>
               <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-                {language === 'fr' ? 'Bonjour' : 'Hello'} {profile.full_name?.split(' ')[0] || 'toi'} 👋
+                {t('home.hello')} {profile.full_name?.split(' ')[0] || t('profile.user')} 👋
               </Text>
               <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                {language === 'fr' ? 'Disponible pour une nouvelle coiffure ?' : 'Available for a new hairstyle?'}
+                {t('home.readyForHairstyle')}
               </Text>
             </View>
           )}
@@ -372,7 +423,7 @@ export default function HomeScreen() {
             style={styles.section}
           >
             <SectionHeader 
-              title={language === 'fr' ? 'À la une' : 'Featured Salons'} 
+              title={t('home.featured')} 
               onSeeAll={() => router.push('/(tabs)/explore')} 
             />
             <ScrollView
@@ -393,9 +444,9 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <SectionHeader
-            title={language === 'fr' ? 'Catégories de coiffures' : 'Hairstyle Categories'}
+            title={t('home.hairstyleCategories')}
             onSeeAll={() => setShowAllStyles(!showAllStyles)}
-            seeAllLabel={showAllStyles ? (language === 'fr' ? 'Voir moins' : 'See less') : t('common.seeAll')}
+            seeAllLabel={showAllStyles ? t('home.seeLess') : t('common.seeAll')}
           />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
@@ -421,7 +472,7 @@ export default function HomeScreen() {
             entering={FadeInUp.delay(400).duration(500)}
             style={styles.section}
           >
-            <SectionHeader title={language === 'fr' ? 'Nouveautés à proximité' : 'Nearby New Salons'} onSeeAll={() => router.push('/(tabs)/explore')} />
+            <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -553,6 +604,22 @@ export default function HomeScreen() {
         onClose={() => setShowAuthModal(false)}
         message="Connectez-vous pour voir les détails du salon et réserver"
       />
+
+      <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
+      
+      {pendingReviewBooking && (
+        <RatingModal
+          visible={ratingModalVisible}
+          onClose={() => setRatingModalVisible(false)}
+          bookingId={pendingReviewBooking.id}
+          salonId={pendingReviewBooking.salon_id}
+          salonName={pendingReviewBooking.salon?.name || 'le salon'}
+          onSuccess={() => {
+            setPendingReviewBooking(null);
+            refreshSalons();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }

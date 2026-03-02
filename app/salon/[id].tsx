@@ -1,5 +1,5 @@
 /**
- * Page de detail d'un salon AfroPlan
+ * Page de detail d'un salon AfroPlan - Design Premium & Épuré
  */
 
 import React, { useState } from 'react';
@@ -11,1016 +11,417 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Dimensions,
+  Platform,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-// Import sécurisé de expo-av
-let Video: any = null;
-let ResizeMode: any = { COVER: 'cover', CONTAIN: 'contain' };
-try {
-  const ExpoAV = require('expo-av');
-  Video = ExpoAV.Video;
-  ResizeMode = ExpoAV.ResizeMode;
-} catch (e) {
-  console.warn("Module expo-av non chargé sur cet appareil.");
-}
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useSalon } from '@/hooks/use-salons';
-import { useFavorite } from '@/hooks/use-favorites';
-import { bookingService } from '@/services/booking.service';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSalon, useFavorite } from '@/hooks';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
-import { Button, Rating } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { Service } from '@/types';
+import { bookingService } from '@/services/booking.service';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
-const HEADER_HEIGHT = 300;
+const { width } = Dimensions.get('window');
 
-export default function SalonDetailScreen() {
-  const { id, preselectService } = useLocalSearchParams<{ id: string, preselectService?: string }>();
+function Rating({ value, count, showValue = false, showCount = false }: { value: number; count?: number; showValue?: boolean; showCount?: boolean }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, isAuthenticated, signOut } = useAuth();
-  const { t, language } = useLanguage();
-  const { salon, isLoading, error } = useSalon(id || '');
-  const { isFavorite, toggle: toggleFavorite, isToggling } = useFavorite(
-    user?.id || '',
-    id || ''
+  return (
+    <View style={styles.ratingContainer}>
+      <Ionicons name="star" size={16} color="#FFB800" />
+      {showValue && <Text style={[styles.ratingValue, { color: colors.text }]}>{value.toFixed(1)}</Text>}
+      {showCount && <Text style={[styles.ratingCount, { color: colors.textSecondary }]}>({count || 0})</Text>}
+    </View>
   );
+}
+
+export default function SalonDetailScreen() {
+  const { id, service: preselectService } = useLocalSearchParams<{ id: string; service?: string }>();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const { isAuthenticated, user, profile } = useAuth();
+  const { t, language } = useLanguage();
+  
+  const { salon, isLoading } = useSalon(id || '');
+  const { isFavorite, toggleFavorite, isToggling } = useFavorite(user?.id || '', id || '');
 
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
-  const [hasBooking, setHasBooking] = useState(false);
   const [activeRole, setActiveRole] = useState<string | null>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState<'services' | 'about' | 'reviews'>('services');
-
-  // Auto-sélection du service s'il a été recherché depuis la page précédente
-  React.useEffect(() => {
-    if (salon?.services && preselectService && selectedServices.length === 0) {
-      const targetService = salon.services.find(
-        (s) => s.name.toLowerCase() === preselectService.toLowerCase() && s.is_active
-      );
-      if (targetService) {
-        setSelectedServices([targetService]);
-      }
-    }
-  }, [salon, preselectService]);
+  const [hasBooking, setHasBooking] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'services' | 'reviews' | 'about'>('services');
 
   React.useEffect(() => {
-    const loadRole = async () => {
+    const init = async () => {
       const role = await AsyncStorage.getItem('@afroplan_selected_role');
       setActiveRole(role);
-    };
-    loadRole();
-  }, []);
 
-  React.useEffect(() => {
-    const checkBooking = async () => {
+      // Vérifier si le client a déjà réservé (et payé/confirmé) dans ce salon
       if (user?.id && id) {
         try {
-          const bookings = await bookingService.getSalonBookings(id);
-          // On vérifie si l'utilisateur actuel est parmi les clients ayant réservé
-          const userHasBooked = bookings.data.some(b => b.client_id === user.id && (b.status === 'confirmed' || b.status === 'pending' || b.status === 'completed'));
+          const { bookingService } = await import('@/services/booking.service');
+          const response = await bookingService.getClientBookings(user.id);
+          const userHasBooked = response.data.some(b => 
+            b.salon_id === id && 
+            (b.status === 'confirmed' || b.status === 'completed')
+          );
           setHasBooking(userHasBooked);
         } catch (e) {
           setHasBooking(false);
         }
       }
     };
-    checkBooking();
+    init();
   }, [user?.id, id]);
 
-  const handleCall = () => {
-    if (salon?.phone) {
-      Linking.openURL(`tel:${salon.phone}`);
+  React.useEffect(() => {
+    if (salon?.services && preselectService && selectedServices.length === 0) {
+      const target = salon.services.find(s => s.name.toLowerCase() === preselectService.toLowerCase());
+      if (target) setSelectedServices([target]);
     }
-  };
+  }, [salon, preselectService]);
 
-  const handleDirections = () => {
-    if (salon?.latitude && salon?.longitude) {
-      const url = `https://maps.google.com/?q=${salon.latitude},${salon.longitude}`;
-      Linking.openURL(url);
-    } else if (salon?.address) {
-      const query = encodeURIComponent(`${salon.address}, ${salon.city}`);
-      Linking.openURL(`https://maps.google.com/?q=${query}`);
-    }
-  };
+  const groupedServices = React.useMemo(() => {
+    if (!salon?.services) return {};
+    return salon.services.reduce((acc: Record<string, Service[]>, s: Service) => {
+      const cat = s.category || 'Autres';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(s);
+      return acc;
+    }, {});
+  }, [salon?.services]);
 
   const toggleService = (service: Service) => {
-    setSelectedServices(prev => {
-      const isSelected = prev.find(s => s.id === service.id);
-      if (isSelected) {
-        return prev.filter(s => s.id !== service.id);
-      } else {
-        return [...prev, service];
+    setSelectedServices(prev => prev.find(s => s.id === service.id) ? prev.filter(s => s.id !== service.id) : [...prev, service]);
+  };
+
+  const handleBook = () => {
+    if ((salon as any)?.is_today_blocked) {
+      Alert.alert(t('common.attention'), language === 'fr' ? 'Ce salon est exceptionnellement fermé aujourd\'hui.' : 'This salon is exceptionally closed today.');
+      return;
+    }
+    if (!isAuthenticated) {
+      Alert.alert(
+        t('auth.loginRequired'),
+        t('auth.loginRequiredMessage'),
+        [
+          { text: t('common.cancel') },
+          { text: t('auth.login'), onPress: () => router.push('/(auth)/login') }
+        ]
+      );
+      return;
+    }
+    if (selectedServices.length === 0) {
+      Alert.alert(t('common.attention'), language === 'fr' ? 'Veuillez sélectionner au moins une prestation.' : 'Please select at least one service.');
+      return;
+    }
+    const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
+    const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
+    
+    router.push({
+      pathname: '/booking/[id]',
+      params: { 
+        id, 
+        serviceId: selectedServices.map(s => s.id).join(','), 
+        serviceName: selectedServices.map(s => s.name).join(', '), 
+        servicePrice: totalPrice.toString(), 
+        serviceDuration: totalDuration.toString() 
       }
     });
   };
 
-  const handleBook = () => {
-    if ((salon as any).is_today_blocked) {
-      Alert.alert(
-        'Salon fermé',
-        'Ce salon est exceptionnellement fermé aujourd\'hui. Vous ne pouvez pas effectuer de réservation pour cette date.'
-      );
-      return;
-    }
-
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez etre connecte pour reserver',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push('/(auth)/login') },
-        ]
-      );
-      return;
-    }
-
-    if (selectedServices.length === 0) {
-      Alert.alert('Attention', 'Veuillez selectionner au moins un service');
-      return;
-    }
-
-    // Calculer les totaux
-    const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
-    const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
-    const serviceIds = selectedServices.map(s => s.id).join(',');
-    const serviceNames = selectedServices.map(s => s.name).join(', ');
-
-    // Navigate to booking flow with service details
-    router.push({
-      pathname: '/booking/[id]',
-      params: {
-        id: id,
-        serviceId: serviceIds,
-        serviceName: serviceNames,
-        servicePrice: totalPrice.toString(),
-        serviceDuration: totalDuration.toString(),
-        requiresExtensions: selectedServices.some(s => s.requires_extensions) ? 'true' : 'false',
-        extensionsIncluded: selectedServices.every(s => s.extensions_included) ? 'true' : 'false',
-      },
-    });
-  };
-
-  const handleFavorite = async () => {
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez etre connecte pour ajouter aux favoris',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push('/(auth)/login') },
-        ]
-      );
-      return;
-    }
-    await toggleFavorite();
-  };
-
-  if (isLoading) {
+  if (isLoading || !salon) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.textSecondary }}>Chargement...</Text>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  if (error || !salon) {
-    return (
-      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
-        <Text style={[styles.errorTitle, { color: colors.text }]}>
-          Salon introuvable
-        </Text>
-        <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>
-          Ce salon n&apos;existe pas ou a ete supprime
-        </Text>
-        <Button
-          title="Retour"
-          onPress={() => router.back()}
-          style={{ marginTop: Spacing.lg }}
-        />
-      </View>
-    );
-  }
-
-  // Group services by category
-  const servicesByCategory = salon.services?.reduce((acc, service) => {
-    const category = service.category || 'Autres';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(service);
-    return acc;
-  }, {} as Record<string, Service[]>) || {};
+  const imageUri = salon.cover_image_url || salon.image_url || (salon.photos?.[0]);
+  const imageSource = typeof imageUri === 'string' ? { uri: imageUri } : imageUri;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" />
+      
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Banner Urgent: Journée bloquée */}
-        {(salon as any).is_today_blocked && (
-          <View style={[styles.blockedBanner, { backgroundColor: colors.error }]}>
-            <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.blockedBannerText}>
-              Le salon est exceptionnellement fermé aujourd&apos;hui.
-            </Text>
-          </View>
-        )}
-
-        {/* Header Image */}
-        <View style={styles.headerImage}>
-          {(() => {
-            const imageUri = (salon.cover_image_url && salon.cover_image_url !== '') 
-              ? salon.cover_image_url 
-              : (salon.image_url && salon.image_url !== '')
-                ? salon.image_url
-                : (salon.photos && salon.photos.length > 0)
-                  ? salon.photos[0]
-                  : (salon.gallery && salon.gallery.length > 0)
-                    ? salon.gallery[0].image_url
-                    : null;
-
-            const imageSource = typeof imageUri === 'string' ? { uri: imageUri } : imageUri;
-
-            return (
-              <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }}>
-                <Image
-                  source={imageSource || { uri: 'https://via.placeholder.com/400x300' }}
-                  style={styles.coverImage}
-                  contentFit="cover"
-                  transition={500}
-                />
-                {!imageUri && (
-                  <View style={StyleSheet.absoluteFill}>
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <Ionicons name="image-outline" size={48} color={colors.textMuted} />
-                      <Text style={{ color: colors.textMuted, marginTop: 8 }}>Aucune photo</Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-            );
-          })()}
-          <View style={styles.headerOverlay} />
-          <TouchableOpacity
-            style={[styles.favoriteButton, { backgroundColor: colors.card }]}
-            onPress={handleFavorite}
-            disabled={isToggling}
-          >
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={24}
-              color={isFavorite ? colors.error : colors.text}
-            />
-          </TouchableOpacity>
-
-          {/* Bouton Modifier (visible UNIQUEMENT si on est en mode pro et proprio) */}
-          {isAuthenticated && activeRole === 'coiffeur' && user?.id === salon.owner_id && (
-            <TouchableOpacity
-              style={[styles.editButton, { backgroundColor: '#191919' }]}
-              onPress={() => router.push('/(coiffeur)/salon')}
-            >
-              <Ionicons name="pencil" size={20} color="#FFFFFF" />
-              <Text style={styles.editButtonText}>Modifier mon salon</Text>
+        {/* 1. Photo de couverture IMMERSIVE */}
+        <View style={styles.headerPhoto}>
+          <Image source={imageSource || { uri: 'https://via.placeholder.com/600x400' }} style={styles.coverImage} contentFit="cover" />
+          <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent', 'rgba(0,0,0,0.8)']} style={StyleSheet.absoluteFill} />
+          
+          <SafeAreaView style={styles.headerButtons} edges={['top']}>
+            <TouchableOpacity style={styles.roundButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
-          )}
+            <TouchableOpacity 
+              style={styles.roundButton} 
+              onPress={() => toggleFavorite()}
+              disabled={isToggling}
+            >
+              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#EF4444" : "#FFF"} />
+            </TouchableOpacity>
+          </SafeAreaView>
         </View>
 
-        {/* Salon Info */}
-        <View style={styles.content}>
-          <View style={styles.salonHeader}>
-            <View style={styles.salonInfo}>
-              <Text style={[styles.salonName, { color: colors.text }]}>
-                {salon.name}
-              </Text>
-              {salon.is_verified && (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                  <Text style={[styles.verifiedText, { color: colors.success }]}>
-                    Verifie
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Rating
-              value={salon.rating}
-              showValue
-              showCount
-              count={salon.reviews_count}
-            />
+        {/* 2. Infos de base */}
+        <View style={[styles.mainInfo, { backgroundColor: colors.background }]}>
+          <View style={styles.titleRow}>
+            <Text style={[styles.salonName, { color: colors.text }]}>{salon.name}</Text>
+            {salon.is_verified && <Ionicons name="checkmark-circle" size={20} color={colors.success} />}
           </View>
+          <View style={styles.metaRow}>
+            <Rating value={salon.rating} count={salon.reviews_count} showValue showCount />
+            <Text style={{ color: colors.textMuted }}> • </Text>
+            <Text style={{ color: colors.textSecondary }}>{salon.city}</Text>
+          </View>
+          
+          {/* 3. VITRINE IMMÉDIATE (Vos réalisations) */}
+          {salon.gallery && salon.gallery.length > 0 && (
+            <View style={styles.vitrineSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12 }]}>{t('salon.gallery')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vitrineScroll}>
+                {salon.gallery.map((img) => (
+                  <View key={img.id} style={styles.vitrineThumb}>
+                    <Image source={{ uri: img.image_url }} style={styles.vitrineImg} contentFit="cover" />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
-          {/* Address */}
-          <TouchableOpacity style={styles.addressContainer} onPress={handleDirections}>
-            <Ionicons name="location-outline" size={20} color={colors.textSecondary} />
-            <Text style={[styles.address, { color: colors.textSecondary }]}>
-              {salon.address}, {salon.postal_code} {salon.city}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Quick Actions */}
           <View style={styles.quickActions}>
             {hasBooking ? (
               <>
-                {salon.phone && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                    onPress={handleCall}
-                  >
-                    <Ionicons name="call-outline" size={20} color={colors.primary} />
-                    <Text style={[styles.actionText, { color: colors.text }]}>Appeler</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={handleDirections}
-                >
-                  <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Itineraire</Text>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary + '10' }]} onPress={() => Linking.openURL(`tel:${salon.phone}`)}>
+                  <Ionicons name="call" size={18} color={colors.primary} />
+                  <Text style={[styles.actionBtnText, { color: colors.primary }]}>{t('salon.call')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary + '10' }]} onPress={() => Linking.openURL(`https://maps.google.com/?q=${salon.address}`)}>
+                  <Ionicons name="navigate" size={18} color={colors.primary} />
+                  <Text style={[styles.actionBtnText, { color: colors.primary }]}>{t('salon.directions')}</Text>
                 </TouchableOpacity>
               </>
             ) : (
-              <View style={[styles.restrictedContactBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
-                <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
-                <Text style={[styles.restrictedContactText, { color: colors.textSecondary }]}>
-                  Réservez une prestation pour débloquer l&apos;itinéraire et le contact direct.
+              <View style={[styles.restrictedBox, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '15' }]}>
+                <Ionicons name="lock-closed-outline" size={16} color={colors.primary} />
+                <Text style={[styles.restrictedText, { color: colors.textSecondary }]}>
+                  {language === 'fr' ? 'Réservez pour débloquer le contact et l\'itinéraire' : 'Book to unlock contact and directions'}
                 </Text>
               </View>
             )}
           </View>
+        </View>
 
-          {/* Tab Navigation */}
-          <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-            {[
-              { id: 'services', label: 'Prestations' },
-              { id: 'about', label: 'À propos' },
-              { id: 'reviews', label: 'Avis' },
-            ].map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                style={[
-                  styles.tabItem,
-                  activeDetailTab === tab.id && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
-                ]}
-                onPress={() => setActiveDetailTab(tab.id as any)}
-              >
-                <Text style={[
-                  styles.tabLabel,
-                  { color: activeDetailTab === tab.id ? colors.primary : colors.textMuted }
-                ]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* 4. Onglets de Navigation */}
+        <View style={[styles.tabContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+          {[
+            { id: 'services', label: t('salon.services') },
+            { id: 'reviews', label: t('salon.reviews') },
+            { id: 'about', label: t('salon.about') },
+          ].map((tTab) => (
+            <TouchableOpacity 
+              key={tTab.id} 
+              style={[styles.tabItem, activeDetailTab === tTab.id && { borderBottomColor: colors.primary, borderBottomWidth: 3 }]} 
+              onPress={() => setActiveDetailTab(tTab.id as any)}
+            >
+              <Text style={[styles.tabLabel, { color: activeDetailTab === tTab.id ? colors.primary : colors.textMuted }]}>{tTab.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-          {activeDetailTab === 'about' && (
-            <>
-              {/* Description */}
-              {salon.description && (
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    {language === 'fr' ? 'À propos' : 'About'}
-                  </Text>
-                  <Text style={[styles.description, { color: colors.textSecondary }]}>
-                    {salon.description}
-                  </Text>
-                </View>
-              )}
-
-              {/* Opening Hours */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  {language === 'fr' ? 'Horaires d\'ouverture' : 'Opening Hours'}
-                </Text>
-                <View style={[styles.hoursContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {(() => {
-                    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                    const dayLabels: Record<string, string> = {
-                      monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi',
-                      thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'
-                    };
-                    const dayLabelsEn: Record<string, string> = {
-                      monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
-                      thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
-                    };
-                    
-                    const hours = typeof salon.opening_hours === 'string' 
-                      ? JSON.parse(salon.opening_hours) 
-                      : salon.opening_hours;
-                    
-                    const now = new Date();
-                    const currentDayIndex = (now.getDay() + 6) % 7; // Convert Sun=0 to Mon=0, Tue=1... Sun=6
-                    
-                    return days.map((day, index) => {
-                      const schedule = hours ? (hours[day] || hours[day.charAt(0).toUpperCase() + day.slice(1)]) : null;
-                      const isToday = index === currentDayIndex;
-                      
-                      let timeText = language === 'fr' ? 'Fermé' : 'Closed';
-                      let isOpen = false;
-
-                      // Si aujourd'hui est bloqué par urgence
-                      if (isToday && (salon as any).is_today_blocked) {
-                        timeText = language === 'fr' ? 'Fermé (Urgence)' : 'Closed (Emergency)';
-                        isOpen = false;
-                      } else if (schedule) {
-                        const isClosed = schedule.closed === true || schedule.isClosed === true || schedule.active === false;
-                        if (!isClosed) {
-                          const open = schedule.open || schedule.start;
-                          const close = schedule.close || schedule.end;
-                          if (open && close) {
-                            timeText = `${open} - ${close}`;
-                            isOpen = true;
-                          }
-                        }
-                      } else if (!hours || Object.keys(hours).length === 0) {
-                        // If no hours set at all, we don't know, so maybe show a placeholder
-                        timeText = '09:00 - 19:00'; // Default
-                        isOpen = true;
-                      }
-
+        {/* 5. Contenu des Onglets */}
+        <View style={styles.tabContent}>
+          {activeDetailTab === 'services' && (
+            <View>
+              {Object.entries(groupedServices).map(([cat, svcs]) => (
+                <View key={cat} style={styles.catSection}>
+                  <Text style={[styles.catHeader, { color: colors.text }]}>{cat}</Text>
+                  <View style={styles.servicesGrid}>
+                    {svcs.map(s => {
+                      const sel = selectedServices.some(x => x.id === s.id);
+                      const catalogImg = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(cs => cs.name === s.name)?.image;
                       return (
-                        <View key={day} style={[styles.hourRow, isToday && { backgroundColor: colors.primary + '10' }]}>
-                          <Text style={[styles.hourDay, { color: isToday ? colors.primary : colors.text, fontWeight: isToday ? '700' : '400' }]}>
-                            {language === 'fr' ? dayLabels[day] : dayLabelsEn[day]}
-                          </Text>
-                          <Text style={[styles.hourTime, { color: isOpen ? (isToday ? colors.primary : colors.textSecondary) : colors.error }]}>
-                            {timeText}
-                          </Text>
-                        </View>
-                      );
-                    });
-                  })()}
-                </View>
-              </View>
-
-              {/* Gallery */}
-              {salon.gallery && salon.gallery.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    {language === 'fr' ? 'Nos réalisations' : 'Our creations'}
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                    {salon.gallery.map((image) => {
-                      const isVideo = image.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/);
-                      return (
-                        <View key={image.id} style={[styles.galleryThumbnail, { backgroundColor: colors.card }]}>
-                          <Image source={{ uri: image.image_url }} style={styles.thumbnailImage} contentFit="cover" />
-                          {isVideo && <View style={styles.videoBadge}><Ionicons name="play" size={16} color="#FFF" /></View>}
-                        </View>
+                        <TouchableOpacity 
+                          key={s.id} 
+                          style={[styles.svcLargeCard, { backgroundColor: colors.card, borderColor: sel ? colors.primary : colors.border }]} 
+                          onPress={() => toggleService(s)}
+                          activeOpacity={0.8}
+                        >
+                          <Image source={s.image_url ? { uri: s.image_url } : catalogImg} style={styles.svcLargeImg} contentFit="cover" />
+                          <View style={styles.svcLargeInfo}>
+                            <Text style={[styles.svcNameLarge, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
+                            <Text style={[styles.svcPriceLarge, { color: colors.primary }]}>{s.price}€</Text>
+                            <View style={styles.svcMetaRow}>
+                              <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+                              <Text style={styles.svcMetaText}>{s.duration_minutes} min</Text>
+                            </View>
+                          </View>
+                          {sel && (
+                            <View style={[styles.selectionBadge, { backgroundColor: colors.primary }]}>
+                              <Ionicons name="checkmark" size={16} color="#FFF" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
                       );
                     })}
-                  </ScrollView>
-                </View>
-              )}
-            </>
-          )}
-
-          {activeDetailTab === 'services' && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {language === 'fr' ? 'Choisissez vos prestations' : 'Choose your services'}
-              </Text>
-              {Object.keys(servicesByCategory).length > 0 ? (
-                Object.entries(servicesByCategory).map(([category, services]) => (
-                  <View key={category} style={styles.serviceCategory}>
-                    <Text style={[styles.categoryName, { color: colors.textSecondary }]}>
-                      {category}
-                    </Text>
-                    <View style={styles.servicesGrid}>
-                      {services.map((service) => {
-                        if (!service?.id) return null;
-                        const isSelected = selectedServices.some(s => s.id === service.id);
-                        const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(s => s.name === service.name);
-                        const imageSource = service.image_url ? { uri: service.image_url } : catalogStyle?.image;
-
-                        return (
-                          <TouchableOpacity 
-                            key={service.id} 
-                            activeOpacity={0.9}
-                            style={[
-                              styles.serviceCardGrid,
-                              { 
-                                backgroundColor: colors.card,
-                                borderColor: isSelected ? colors.primary : 'transparent',
-                                borderWidth: 2,
-                              },
-                              Shadows.sm,
-                            ]}
-                            onPress={() => toggleService(service)}
-                          >
-                            <View style={styles.serviceMainContentGrid}>
-                              <Image
-                                source={imageSource || { uri: 'https://via.placeholder.com/300?text=Style' }}
-                                style={styles.serviceImageGrid}
-                                contentFit="cover"
-                              />
-                              <View style={styles.serviceInfoGrid}>
-                                <Text style={[styles.serviceNameGrid, { color: colors.text }]} numberOfLines={1}>
-                                  {service.name}
-                                </Text>
-                                <Text style={[styles.serviceDuration, { color: colors.textMuted, fontSize: 11 }]}>
-                                  {service.duration_minutes} min
-                                </Text>
-                                <Text style={[styles.servicePriceGrid, { color: colors.primary }]}>
-                                  {service.price}€
-                                </Text>
-                              </View>
-                              {isSelected && (
-                                <View style={styles.checkBadge}>
-                                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                                </View>
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
                   </View>
-                ))
-              ) : (
-                <Text style={[styles.noServices, { color: colors.textMuted }]}>
-                  {language === 'fr' ? 'Aucun service disponible' : 'No services available'}
-                </Text>
-              )}
+                </View>
+              ))}
             </View>
           )}
 
           {activeDetailTab === 'reviews' && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {language === 'fr' ? 'Avis clients' : 'Customer reviews'}
-              </Text>
-              {/* Avis réels ici... (placeholder pour l'instant) */}
-              <View style={styles.reviewSummary}>
-                <Text style={[styles.bigRating, { color: colors.text }]}>{salon.rating.toFixed(1)}</Text>
-                <Rating value={salon.rating} size={20} />
-                <Text style={[styles.reviewTotal, { color: colors.textMuted }]}>
-                  Basé sur {salon.reviews_count} avis
-                </Text>
+            <View style={styles.reviewsContainer}>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 16 }]}>{t('salon.reviews')}</Text>
+              {salon.reviews && salon.reviews.length > 0 ? (
+                salon.reviews.map((review: any) => (
+                  <View key={review.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={styles.reviewHeader}><Text style={[styles.reviewerName, { color: colors.text }]}>{review.client_name || t('profile.user')}</Text><Rating value={review.rating} /></View>
+                    <Text style={[styles.reviewText, { color: colors.textSecondary }]}>{review.comment}</Text>
+                    <Text style={[styles.reviewDate, { color: colors.textMuted }]}>{new Date(review.created_at).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}</Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}><Ionicons name="star-outline" size={48} color={colors.textMuted} /><Text style={{ color: colors.textSecondary, marginTop: 12 }}>{t('salon.noReviews')}</Text></View>
+              )}
+            </View>
+          )}
+
+          {activeDetailTab === 'about' && (
+            <View style={styles.aboutContainer}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('salon.about')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{salon.description || t('home.welcome')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>{t('salon.openingHours')}</Text>
+              <View style={[styles.hoursBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {(() => {
+                  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                  const labels: Record<string, string> = { 
+                    monday: language === 'fr' ? 'Lundi' : language === 'en' ? 'Monday' : language === 'de' ? 'Montag' : 'Lunes', 
+                    tuesday: language === 'fr' ? 'Mardi' : language === 'en' ? 'Tuesday' : language === 'de' ? 'Dienstag' : 'Martes', 
+                    wednesday: language === 'fr' ? 'Mercredi' : language === 'en' ? 'Wednesday' : language === 'de' ? 'Mittwoch' : 'Miércoles', 
+                    thursday: language === 'fr' ? 'Jeudi' : language === 'en' ? 'Thursday' : language === 'de' ? 'Donnerstag' : 'Jueves', 
+                    friday: language === 'fr' ? 'Vendredi' : language === 'en' ? 'Friday' : language === 'de' ? 'Freitag' : 'Viernes', 
+                    saturday: language === 'fr' ? 'Samedi' : language === 'en' ? 'Saturday' : language === 'de' ? 'Samstag' : 'Sábado', 
+                    sunday: language === 'fr' ? 'Dimanche' : language === 'en' ? 'Sunday' : language === 'de' ? 'Sonntag' : 'Domingo' 
+                  };
+                  const hours = typeof salon.opening_hours === 'string' ? JSON.parse(salon.opening_hours) : salon.opening_hours;
+                  const currentDay = (new Date().getDay() + 6) % 7;
+                  return days.map((day, idx) => {
+                    const sched = hours?.[day] || hours?.[day.charAt(0).toUpperCase() + day.slice(1)];
+                    const isToday = idx === currentDay;
+                    let text = language === 'fr' ? 'Fermé' : language === 'en' ? 'Closed' : language === 'de' ? 'Geschlossen' : 'Cerrado';
+                    if (sched && !sched.closed && !sched.isClosed) text = `${sched.open || sched.start} - ${sched.close || sched.end}`;
+                    return (
+                      <View key={day} style={styles.hourRow}>
+                        <Text style={{ color: isToday ? colors.primary : colors.text, fontWeight: isToday ? '700' : '400' }}>{labels[day]}</Text>
+                        <Text style={{ color: isToday ? colors.primary : colors.textSecondary, fontWeight: isToday ? '700' : '400' }}>{text}</Text>
+                      </View>
+                    );
+                  });
+                })()}
               </View>
             </View>
           )}
-
-          {/* Spacing for bottom button */}
-          <View style={{ height: 100 }} />
         </View>
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Book Button */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
-        <View style={styles.bottomBarContent}>
-          {selectedServices.length > 0 ? (
-            <View>
-              <Text style={[styles.selectedServiceName, { color: colors.text }]}>
-                {selectedServices.length} {selectedServices.length > 1 ? 'prestations' : 'prestation'}
-              </Text>
-              <Text style={[styles.selectedServicePrice, { color: colors.primary }]}>
-                {selectedServices.reduce((sum, s) => sum + s.price, 0)} EUR
-              </Text>
-            </View>
-          ) : (
-            <Text style={[styles.selectServiceHint, { color: colors.textSecondary }]}>
-              {language === 'fr' ? 'Sélectionnez un service' : 'Select a service'}
-            </Text>
-          )}
-          <Button
-            title={t('booking.book')}
-            onPress={handleBook}
-            disabled={selectedServices.length === 0}
-            style={{ minWidth: 120 }}
-          />
+      {/* Footer Flottant */}
+      <View style={[styles.floatingFooter, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        <View style={styles.footerInfo}>
+          <Text style={[styles.footerCount, { color: colors.text }]}>{selectedServices.length} {t('salon.selectedServices')}</Text>
+          <Text style={[styles.footerPrice, { color: colors.primary }]}>{selectedServices.reduce((sum, s) => sum + s.price, 0)}€</Text>
         </View>
+        <Button title={t('booking.book')} onPress={handleBook} style={{ flex: 1, marginLeft: 20 }} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  blockedBanner: {
+  container: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerPhoto: { width: '100%', height: 280 },
+  coverImage: { width: '100%', height: '100%' },
+  headerButtons: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
+  roundButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
+  mainInfo: { padding: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: -30 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  salonName: { fontSize: 24, fontWeight: '800' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  ratingContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ratingValue: { fontWeight: '700', fontSize: 14 },
+  ratingCount: { fontSize: 12 },
+  quickActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
+  actionBtnText: { fontWeight: '700', fontSize: 13 },
+  restrictedBox: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    gap: 8,
-    zIndex: 100,
-  },
-  blockedBannerText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  errorTitle: {
-    fontSize: FontSizes.xxl,
-    fontWeight: '700',
-    marginTop: Spacing.lg,
-  },
-  errorSubtitle: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-  },
-  headerImage: {
-    height: HEADER_HEIGHT,
-    position: 'relative',
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 60,
-    right: Spacing.md,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  editButton: {
-    position: 'absolute',
-    top: 60,
-    left: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 25,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  editButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  content: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-  },
-  salonHeader: {
-    marginBottom: Spacing.md,
-  },
-  salonInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  salonName: {
-    fontSize: FontSizes.xxl,
-    fontWeight: '700',
-    flex: 1,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: Spacing.sm,
-  },
-  verifiedText: {
-    fontSize: FontSizes.sm,
-    marginLeft: Spacing.xs,
-    fontWeight: '500',
-  },
-  addressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  address: {
-    flex: 1,
-    fontSize: FontSizes.md,
-    marginLeft: Spacing.sm,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.xs,
-  },
-  actionText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
-  },
-  restrictedContactBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    gap: 12,
-  },
-  restrictedContactText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
-
-  /* Tab Bar */
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    borderBottomWidth: 1,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  tabItem: {
-    paddingVertical: Spacing.md,
-    marginRight: Spacing.lg,
-  },
-  tabLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
-  /* Gallery Thumbnails */
-  galleryThumbnail: {
-    width: 140,
-    height: 140,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  hoursContainer: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  hourRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  hourDay: {
-    fontSize: 14,
-  },
-  hourTime: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  videoBadge: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -15,
-    marginTop: -15,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* Reviews */
-  reviewSummary: {
-    alignItems: 'center',
-    padding: Spacing.xl,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.02)',
-  },
-  bigRating: {
-    fontSize: 48,
-    fontWeight: '800',
-    marginBottom: Spacing.xs,
-  },
-  reviewTotal: {
-    fontSize: 14,
-    marginTop: Spacing.sm,
-  },
-
-  /* Badges & Overlays */
-  checkBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 12,
-    padding: 2,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 10,
   },
+  restrictedText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  
+  // Vitrine Section
+  vitrineSection: { marginVertical: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: '800' },
+  vitrineScroll: { gap: 12 },
+  vitrineThumb: { width: 150, height: 150, borderRadius: 20, overflow: 'hidden' },
+  vitrineImg: { width: '100%', height: '100%' },
 
-  section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '700',
-    marginBottom: Spacing.md,
-  },
-  description: {
-    fontSize: FontSizes.md,
-    lineHeight: 24,
-  },
-  serviceCategory: {
-    marginBottom: Spacing.md,
-  },
-  categoryName: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-  },
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  serviceCardGrid: {
-    width: '48%',
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    overflow: 'hidden',
-  },
-  serviceMainContentGrid: {
-    position: 'relative',
-  },
-  serviceImageGrid: {
-    width: '100%',
-    height: 150, // Hauteur fixe pour garantir la visibilité
-    backgroundColor: '#F3F4F6',
-  },
-  serviceInfoGrid: {
-    padding: Spacing.sm,
-  },
-  serviceNameGrid: {
-    fontSize: FontSizes.sm,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  servicePriceGrid: {
-    fontSize: FontSizes.md,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  selectedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  serviceCard: {
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    overflow: 'hidden',
-  },
-  serviceMainContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  serviceImage: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.md,
-    marginRight: Spacing.md,
-    backgroundColor: '#F3F4F6',
-  },
-  serviceInfo: {
-    flex: 1,
-  },
-  serviceName: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  serviceDescription: {
-    fontSize: FontSizes.sm,
-    marginTop: Spacing.xs,
-  },
-  serviceDuration: {
-    fontSize: FontSizes.sm,
-    marginTop: Spacing.xs,
-  },
-  servicePriceContainer: {
-    alignItems: 'flex-end',
-    marginLeft: Spacing.sm,
-    gap: 4,
-  },
-  servicePrice: {
-    fontSize: FontSizes.lg,
-    fontWeight: '700',
-  },
-  extensionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  extensionText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  noServices: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    paddingVertical: Spacing.lg,
-  },
-  salonPhotosScroll: {
-    gap: Spacing.md,
-    paddingRight: Spacing.md,
-  },
-  salonPhotoItem: {
-    width: 240,
-    height: 160,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-  },
-  salonPhoto: {
-    width: '100%',
-    height: '100%',
-  },
-  galleryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  galleryItem: {
-    width: '48%',
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-  },
-  galleryImage: {
-    width: '100%',
-    height: 160,
-  },
-  galleryCaption: {
-    fontSize: 12,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  bottomBarContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedServiceName: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  selectedServicePrice: {
-    fontSize: FontSizes.lg,
-    fontWeight: '700',
-  },
-  selectServiceHint: {
-    fontSize: FontSizes.md,
-  },
+  // Tabs
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 20, borderBottomWidth: 1 },
+  tabItem: { paddingVertical: 15, marginRight: 30 },
+  tabLabel: { fontSize: 15, fontWeight: '700' },
+  tabContent: { padding: 20 },
+
+  // Prestations Grid (EN PLUS GRAND)
+  catSection: { marginBottom: 30 },
+  catHeader: { fontSize: 18, fontWeight: '800', marginBottom: 15 },
+  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  svcLargeCard: { width: (width - 52) / 2, borderRadius: 20, borderWidth: 1, overflow: 'hidden', position: 'relative' },
+  svcLargeImg: { width: '100%', height: 140 },
+  svcLargeInfo: { padding: 12 },
+  svcNameLarge: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  svcPriceLarge: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  svcMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  svcMetaText: { fontSize: 11, color: '#999' },
+  selectionBadge: { position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+
+  floatingFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, ...Shadows.lg },
+  footerInfo: { justifyContent: 'center' },
+  footerCount: { fontSize: 11, opacity: 0.6 },
+  footerPrice: { fontSize: 20, fontWeight: '800' },
+  
+  aboutContainer: { gap: 15 },
+  description: { fontSize: 15, lineHeight: 22 },
+  hoursBox: { padding: 15, borderRadius: 16, borderWidth: 1, gap: 10 },
+  hourRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  reviewsContainer: { gap: 12 },
+  reviewCard: { padding: 16, borderRadius: 16, borderWidth: 1 },
+  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  reviewerName: { fontSize: 14, fontWeight: '700' },
+  reviewText: { fontSize: 13, lineHeight: 20 },
+  reviewDate: { fontSize: 10, opacity: 0.5 },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
 });

@@ -304,10 +304,10 @@ export const clientService = {
     favoriteCategories: string[];
     visitedSalonsCount: number;
   }> {
-    // 1. Reservations
+    // 1. Récupérer toutes les réservations avec les infos salon
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('status, service:services(category)')
+      .select('status, total_price, salon_id, service:services(category)')
       .eq('client_id', userId);
 
     const stats = {
@@ -320,44 +320,40 @@ export const clientService = {
     };
 
     const categoryCount: Record<string, number> = {};
+    const uniqueSalonIds = new Set<string>();
 
     bookings?.forEach(booking => {
-      switch (booking.status) {
-        case 'completed':
-          stats.completedBookings++;
-          if (booking.service?.category) {
-            categoryCount[booking.service.category] = (categoryCount[booking.service.category] || 0) + 1;
-          }
-          break;
-        case 'cancelled':
-          stats.cancelledBookings++;
-          break;
+      const isSuccessful = booking.status === 'completed' || booking.status === 'confirmed';
+      
+      if (booking.status === 'completed') {
+        stats.completedBookings++;
+      } else if (booking.status === 'cancelled') {
+        stats.cancelledBookings++;
+      }
+
+      if (isSuccessful) {
+        // Cumul des dépenses
+        stats.totalSpent += Number(booking.total_price || 0);
+        
+        // Comptage des salons uniques
+        if (booking.salon_id) {
+          uniqueSalonIds.add(booking.salon_id);
+        }
+
+        // Catégories préférées
+        if (booking.service?.category) {
+          categoryCount[booking.service.category] = (categoryCount[booking.service.category] || 0) + 1;
+        }
       }
     });
 
-    // 2. Dépenses Réelles (Basé sur les paiements Stripe réussis)
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('amount')
-      .eq('status', 'completed')
-      .in('booking_id', (await supabase.from('bookings').select('id').eq('client_id', userId)).data?.map(b => b.id) || []);
-
-    stats.totalSpent = (payments?.reduce((sum, p) => sum + p.amount, 0) || 0) / 100;
+    stats.visitedSalonsCount = uniqueSalonIds.size;
 
     // Trier les categories par frequence
     stats.favoriteCategories = Object.entries(categoryCount)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([category]) => category);
-
-    // Salons visites
-    const { count: salonCount } = await supabase
-      .from('bookings')
-      .select('salon_id', { count: 'exact', head: true })
-      .eq('client_id', userId)
-      .eq('status', 'completed');
-
-    stats.visitedSalonsCount = salonCount || 0;
 
     return stats;
   },

@@ -88,5 +88,5 @@ export function useFavorite(userId: string, salonId: string) {
     }
   };
 
-  return { isFavorite, isLoading, isToggling, toggle };
+  return { isFavorite, isLoading, isToggling, toggleFavorite: toggle };
 }
