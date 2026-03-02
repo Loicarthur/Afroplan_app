@@ -95,19 +95,27 @@ export default function CoiffeurServicesScreen() {
 
   // Vue catalogue ou vue "mes styles"
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_styles'>('catalog');
+  const [isPublished, setIsPublished] = useState(false);
+  const [salonId, setSalonId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadConfiguredStyles = React.useCallback(async () => {
     if (!user) return;
+    setIsLoading(true);
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
+        setSalonId(salon.id);
+        setIsPublished(salon.is_active === true);
         const services = await salonService.getSalonServices(salon.id);
         const mapped: ConfiguredStyle[] = services.map(s => {
-          // Trouver le style correspondant dans le catalogue pour l'image par défaut
-          const catalogStyle = STYLE_CATALOG.flatMap(c => c.styles).find(cs => cs.name === s.name);
+          // Recherche insensible à la casse dans le catalogue pour retrouver l'image
+          const catalogStyle = HAIRSTYLE_CATEGORIES.flatMap(c => c.styles).find(cs => 
+            cs.name.toLowerCase() === s.name.toLowerCase()
+          );
           
           return {
-            styleId: s.id, // On utilise l'ID réel du service
+            styleId: s.id,
             styleName: s.name,
             categoryLabel: s.category,
             price: s.price.toString(),
@@ -124,6 +132,8 @@ export default function CoiffeurServicesScreen() {
       }
     } catch (error) {
       console.error('Erreur chargement services:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -254,13 +264,26 @@ export default function CoiffeurServicesScreen() {
         return;
       }
 
-      // 2. Nettoyage : On supprime les anciens services pour repartir sur une base propre
-      await salonService.deleteServicesBySalonId(salon.id);
+      // 1. Filtrer pour ne pas ajouter des styles qui existent déjà
+      const newStylesToSave = stylesToSave.filter(style => {
+        const alreadyExists = configuredStyles.some(
+          existing => existing.styleName.toLowerCase() === style.styleName.toLowerCase()
+        );
+        return !alreadyExists;
+      });
+
+      if (newStylesToSave.length === 0 && stylesToSave.length > 0) {
+        Alert.alert('Info', 'Tous les styles sélectionnés sont déjà présents dans vos prestations.');
+        setIsSaving(false);
+        setIsBatchConfiguring(false);
+        setSelectedStyleIds([]);
+        return;
+      }
 
       // 3. Upload des images et préparation du payload
       const servicesPayload = [];
       
-      for (const style of stylesToSave) {
+      for (const style of newStylesToSave) {
         // On garde l'image actuelle par défaut
         let finalImageUrl = style.customImage || null;
 
@@ -347,6 +370,42 @@ export default function CoiffeurServicesScreen() {
     }
   };
 
+  const handlePublishSalon = async () => {
+    if (!salonId) return;
+    
+    if (configuredStyles.length === 0) {
+      Alert.alert('Impossible', 'Vous devez configurer au moins un service avant de publier votre salon.');
+      return;
+    }
+
+    Alert.alert(
+      'Publier votre salon',
+      'Votre salon sera visible par tous les clients AfroPlan. Souhaitez-vous continuer ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Oui, publier', 
+          onPress: async () => {
+            try {
+              setIsSaving(true);
+              await salonService.updateSalon(salonId, { is_active: true });
+              setIsPublished(true);
+              Alert.alert(
+                'Félicitations ! 🎉', 
+                'Votre salon est désormais en ligne et prêt à recevoir des réservations.',
+                [{ text: 'Super !', onPress: () => router.push('/(coiffeur)') }]
+              );
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de publier le salon pour le moment.');
+            } finally {
+              setIsSaving(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleRemoveStyle = (styleId: string) => {
     Alert.alert(
       'Retirer ce style',
@@ -422,6 +481,15 @@ export default function CoiffeurServicesScreen() {
   }
 
   // ─── RENDU PRINCIPAL ───────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textSecondary }}>Chargement de vos prestations...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       {/* Tabs */}
@@ -526,15 +594,25 @@ export default function CoiffeurServicesScreen() {
           {activeTab === 'my_styles' && (
             <View style={styles.myStylesContainer}>
               {configuredStyles.length > 0 && (
-                <View style={[styles.boostBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
-                  <View style={styles.boostIcon}>
-                    <Ionicons name="flash" size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.boostContent}>
-                    <Text style={[styles.boostTitle, { color: colors.text }]}>Boostez vos réservations ! 🚀</Text>
-                    <Text style={[styles.boostText, { color: colors.textSecondary }]}>
-                      Les coiffeurs avec leurs <Text style={{ fontWeight: '700' }}>propres photos</Text> reçoivent en moyenne <Text style={{ color: colors.primary, fontWeight: '700' }}>3x plus de demandes</Text>. Montrez votre talent !
-                    </Text>
+                <View style={{ marginBottom: 20 }}>
+                  <TouchableOpacity 
+                    style={[styles.addPrestationBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '08' }]}
+                    onPress={() => setActiveTab('catalog')}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.addPrestationText, { color: colors.primary }]}>Ajouter d&apos;autres prestations</Text>
+                  </TouchableOpacity>
+
+                  <View style={[styles.boostBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+                    <View style={styles.boostIcon}>
+                      <Ionicons name="flash" size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.boostContent}>
+                      <Text style={[styles.boostTitle, { color: colors.text }]}>Boostez vos réservations ! 🚀</Text>
+                      <Text style={[styles.boostText, { color: colors.textSecondary }]}>
+                        Les coiffeurs avec leurs <Text style={{ fontWeight: '700' }}>propres photos</Text> reçoivent en moyenne <Text style={{ color: colors.primary, fontWeight: '700' }}>3x plus de demandes</Text>.
+                      </Text>
+                    </View>
                   </View>
                 </View>
               )}
@@ -611,10 +689,54 @@ export default function CoiffeurServicesScreen() {
                   </View>
                 ))
               )}
-              <View style={{ height: Spacing.xxl }} />
+
+              <View style={{ height: 100 }} />
             </View>
           )}
         </ScrollView>
+
+        {/* Global Publication Button - Fixed at bottom of tab content */}
+        {activeTab === 'my_styles' && salonId && (
+          <View style={[styles.bottomPublishContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+            {!isPublished ? (
+              <TouchableOpacity 
+                style={[styles.mainPublishBtn, { backgroundColor: colors.primary }]}
+                onPress={handlePublishSalon}
+                disabled={isSaving}
+              >
+                <Ionicons name="rocket" size={20} color="#FFFFFF" />
+                <Text style={styles.mainPublishBtnText}>
+                  {configuredStyles.length > 0 ? 'PUBLIER MON SALON MAINTENANT' : 'SERVICES REQUIS POUR PUBLIER'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.onlineStatusRow}>
+                <View style={styles.onlineBadge}>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineText}>SALON EN LIGNE</Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={async () => {
+                    Alert.alert('Retirer de la publication ?', 'Votre salon ne sera plus visible.', [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Oui, dépublier', style: 'destructive', onPress: async () => {
+                        try {
+                          setIsSaving(true);
+                          await salonService.updateSalon(salonId, { is_active: false });
+                          setIsPublished(false);
+                          Alert.alert('Succès', 'Votre salon est hors ligne.');
+                        } catch (e) { Alert.alert('Erreur', 'Impossible de modifier le statut.'); }
+                        finally { setIsSaving(false); }
+                      }}
+                    ]);
+                  }}
+                >
+                  <Text style={{ color: colors.error, fontWeight: '600', fontSize: 13 }}>Dépublier</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Floating Configuration Button */}
         {activeTab === 'catalog' && selectedStyleIds.length > 0 && (
@@ -814,8 +936,34 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 20,
+    marginTop: 12,
     gap: 12,
+  },
+  addPrestationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  addPrestationText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  unpublishBtn: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unpublishText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   boostIcon: {
     width: 40,
@@ -1187,6 +1335,38 @@ const styles = StyleSheet.create({
     height: 60,
     textAlignVertical: 'top',
   },
+  /* Publication Banner */
+  publishAction: {
+    marginVertical: 20,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  publishHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 15,
+  },
+  publishTextContainer: {
+    flex: 1,
+  },
+  publishTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  publishSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   formGroup: { marginBottom: Spacing.lg },
   formLabel: {
     fontSize: FontSizes.md,
@@ -1292,5 +1472,56 @@ const styles = StyleSheet.create({
   authLink: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+  },
+  /* Fixed Bottom Publish Button */
+  bottomPublishContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  mainPublishBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 16,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mainPublishBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  onlineStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22C55E15',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  onlineText: {
+    color: '#22C55E',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

@@ -74,7 +74,7 @@ function RootContent() {
 
   return (
     <ThemeProvider value={theme}>
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="role-selection" options={{ headerShown: false, animation: 'fade' }} />
@@ -82,27 +82,34 @@ function RootContent() {
         <Stack.Screen name="(coiffeur)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(salon)" options={{ headerShown: false }} />
-        <Stack.Screen name="checkout" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="checkout" options={{ headerShown: true, title: 'Paiement sécurisé', presentation: 'modal' }} />
         <Stack.Screen
           name="salon/[id]"
           options={{
-            headerShown: true,
-            headerTitle: '',
-            headerTransparent: true,
-            headerBackTitle: 'Retour',
+            headerShown: false, // On utilise notre propre bouton retour
           }}
         />
         <Stack.Screen
           name="booking/[id]"
           options={{
-            headerShown: true,
-            headerTitle: 'Reservation',
-            headerBackTitle: 'Retour',
+            headerShown: false, // On utilise notre propre bouton retour
+          }}
+        />
+        <Stack.Screen
+          name="category-styles/[categoryId]"
+          options={{
+            headerShown: false, // On utilise notre propre bouton retour
           }}
         />
         <Stack.Screen
           name="style-salons/[styleId]"
           options={{ headerShown: false, animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="chat"
+          options={{ 
+            headerShown: false, // On laisse le layout interne gérer son propre header
+          }}
         />
         <Stack.Screen
           name="privacy-policy"

@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
-import { bookingService } from '@/services/booking.service';
+import { bookingService, messageService, Message as DbMessage } from '@/services';
 import { BookingWithDetails } from '@/types';
 
 interface Message {
@@ -41,35 +42,20 @@ interface Message {
   isAutomatic?: boolean;
 }
 
-// Message de remerciement automatique envoyé par le salon dès la réservation
-const AUTOMATIC_THANK_YOU = (salonName: string, service: string): string =>
-  `Bonjour ! Merci pour votre réservation pour "${service}" 🙏\n\nNous sommes ravis de vous accueillir prochainement. N'hésitez pas à nous contacter si vous avez des questions ou des précisions sur votre coiffure.\n\nÀ très bientôt !\nL'équipe ${salonName}`;
-
-const buildInitialMessages = (booking: BookingWithDetails, isMe: boolean): Message[] => {
-  const createdAt = booking.created_at ? new Date(booking.created_at).getTime() : Date.now();
-  const salonOwnerId = booking.salon?.owner_id || 'coiffeur';
+const mapDbToLocalMessage = (dbMsg: DbMessage, currentUserId: string, salonName: string, clientName: string): Message => {
+  const isMe = dbMsg.sender_id === currentUserId;
+  const isAutomatic = dbMsg.content.includes('Merci pour votre réservation'); // Heuristic for older messages if needed
   
-  return [
-    {
-      id: 'sys-0',
-      text: 'Réservation confirmée ! Vous pouvez maintenant échanger avec votre coiffeuse.',
-      senderId: 'system',
-      senderName: 'Système',
-      timestamp: new Date(createdAt),
-      isMe: false,
-      type: 'system',
-    },
-    {
-      id: 'auto-1',
-      text: AUTOMATIC_THANK_YOU(booking.salon?.name || 'Le Salon', booking.service?.name || 'votre coiffure'),
-      senderId: salonOwnerId,
-      senderName: booking.salon?.name || 'Le Salon',
-      timestamp: new Date(createdAt + 2000),
-      isMe: isMe, // Basé sur le rôle actif passé en paramètre
-      type: 'text',
-      isAutomatic: true,
-    },
-  ];
+  return {
+    id: dbMsg.id,
+    text: dbMsg.content,
+    senderId: dbMsg.sender_id,
+    senderName: dbMsg.sender_type === 'coiffeur' ? salonName : clientName,
+    timestamp: new Date(dbMsg.created_at),
+    isMe: isMe,
+    type: 'text',
+    isAutomatic: isAutomatic
+  };
 };
 
 // Suggestions de messages rapides selon le rôle
@@ -115,8 +101,8 @@ function MessageBubble({ message, currentUserId }: { message: Message; currentUs
         isMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
       ]}
     >
-      {message.isAutomatic && !isMe && (
-        <View style={styles.automaticTag}>
+      {message.isAutomatic && (
+        <View style={[styles.automaticTag, isMe && { alignSelf: 'flex-end' }]}>
           <Ionicons name="flash" size={10} color="#7C3AED" />
           <Text style={styles.automaticTagText}>Message automatique</Text>
         </View>
@@ -168,7 +154,9 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    const loadBookingAndRole = async () => {
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    const loadBookingAndMessages = async () => {
       if (!bookingId || !user) return;
       try {
         // 1. Charger le rôle actif
@@ -176,12 +164,59 @@ export default function ChatScreen() {
         setActiveRole(role);
 
         // 2. Charger les données de réservation
-        const data = await bookingService.getBookingById(bookingId);
-        if (data) {
-          setBooking(data);
-          // Le message automatique vient du salon. 
-          // "isMe" est vrai si le rôle actif est 'coiffeur'
-          setMessages(buildInitialMessages(data, role === 'coiffeur'));
+        const bookingData = await bookingService.getBookingById(bookingId);
+        if (bookingData) {
+          setBooking(bookingData);
+          
+          // 3. Charger les messages réels depuis la DB
+          const dbMessages = await messageService.getMessages(bookingId);
+          const mappedMessages = dbMessages.map(m => 
+            mapDbToLocalMessage(
+              m, 
+              user.id, 
+              bookingData.salon?.name || 'Le Salon', 
+              bookingData.client?.full_name || 'Client'
+            )
+          );
+          setMessages(mappedMessages);
+
+          // 4. Marquer comme lus
+          messageService.markAsRead(bookingId, user.id);
+
+          // 5. S'abonner aux nouveaux messages
+          subscription = messageService.subscribeToMessages(bookingId, (newDbMsg) => {
+            // Ignorer si c'est notre propre message (déjà ajouté localement pour la réactivité)
+            // Mais en fait, pour la robustesse, on peut juste vérifier si l'ID existe déjà
+            setMessages(prev => {
+              if (prev.find(m => m.id === newDbMsg.id)) return prev;
+              
+              const newLocalMsg = mapDbToLocalMessage(
+                newDbMsg, 
+                user.id, 
+                bookingData.salon?.name || 'Le Salon', 
+                bookingData.client?.full_name || 'Client'
+              );
+              
+              // Scroll to bottom
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+              
+              return [...prev, newLocalMsg];
+            });
+
+            // Marquer le nouveau message comme lu s'il n'est pas de nous
+            if (newDbMsg.sender_id !== user.id) {
+              messageService.markAsRead(bookingId, user.id);
+            }
+          });
+        } else {
+          // Réservation introuvable ou supprimée
+          Alert.alert(
+            'Erreur', 
+            'Cette réservation n\'existe plus ou a été annulée.',
+            [{ text: 'Retour', onPress: () => router.back() }]
+          );
         }
       } catch (error) {
         console.error('Error loading chat booking:', error);
@@ -190,7 +225,11 @@ export default function ChatScreen() {
       }
     };
 
-    loadBookingAndRole();
+    loadBookingAndMessages();
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, [bookingId, user?.id]);
 
   // Déterminer qui est l'interlocuteur selon mon rôle ACTIF
@@ -205,26 +244,39 @@ export default function ChatScreen() {
 
   const quickMessages = isCoiffeurView ? QUICK_MESSAGES_COIFFEUR : QUICK_MESSAGES_CLIENT;
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!inputText.trim() || !user || !booking) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      senderId: user.id,
-      senderName: isCoiffeurView ? (booking.salon?.name || 'Le Salon') : (profile?.full_name || 'Moi'),
-      timestamp: new Date(),
-      isMe: true,
-      type: 'text',
-    };
+    const content = inputText.trim();
+    setInputText(''); // Clear input immediately for UX
 
-    setMessages([...messages, newMessage]);
-    setInputText('');
+    try {
+      // Envoyer à la DB
+      const senderType = isCoiffeurView ? 'coiffeur' : 'client';
+      const newDbMsg = await messageService.sendMessage(bookingId, user.id, senderType, content);
+      
+      // L'ajout local sera géré par le retour de sendMessage ou par la souscription
+      // Pour éviter les doublons, on vérifie dans le setMessages
+      const newLocalMsg = mapDbToLocalMessage(
+        newDbMsg, 
+        user.id, 
+        booking.salon?.name || 'Le Salon', 
+        booking.client?.full_name || 'Client'
+      );
 
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      setMessages(prev => {
+        if (prev.find(m => m.id === newLocalMsg.id)) return prev;
+        return [...prev, newLocalMsg];
+      });
+
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message.');
+    }
   };
 
   const sendQuickMessage = (text: string) => {

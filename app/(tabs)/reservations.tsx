@@ -13,6 +13,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,6 +58,30 @@ export default function ClientReservationsScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchBookings();
+  };
+
+  const handleCallSalon = (phone: string | null) => {
+    if (!phone) {
+      Alert.alert('Indisponible', 'Le salon n\'a pas renseigné de numéro de téléphone.');
+      return;
+    }
+    Linking.openURL(`tel:${phone}`);
+  };
+
+  const handleGetDirections = (salon: BookingWithDetails['salon']) => {
+    if (!salon?.address || !salon?.city) {
+      Alert.alert('Indisponible', 'L\'adresse du salon est incomplète.');
+      return;
+    }
+    const query = encodeURIComponent(`${salon.address}, ${salon.postal_code || ''} ${salon.city}`);
+    const url = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+    });
+    
+    if (url) {
+      Linking.openURL(url);
+    }
   };
 
   if (!isAuthenticated) {
@@ -260,18 +286,43 @@ export default function ClientReservationsScreen() {
 
       {(item.status === 'confirmed' || item.status === 'pending') && (
         <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
-            onPress={() => router.push({
-              pathname: '/chat/[bookingId]',
-              params: { bookingId: item.id },
-            })}
-          >
-            <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
-            <Text style={[styles.actionButtonText, { color: colors.primary }]}>
-              Message
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.quickActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
+              onPress={() => router.push({
+                pathname: '/chat/[bookingId]',
+                params: { bookingId: item.id },
+              })}
+            >
+              <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+              <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+                Chat
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#3B82F615' }]}
+              onPress={() => handleGetDirections(item.salon)}
+            >
+              <Ionicons name="navigate-outline" size={16} color="#3B82F6" />
+              <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>
+                Itinéraire
+              </Text>
+            </TouchableOpacity>
+
+            {item.salon?.phone && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#22C55E15' }]}
+                onPress={() => handleCallSalon(item.salon.phone)}
+              >
+                <Ionicons name="call-outline" size={16} color="#22C55E" />
+                <Text style={[styles.actionButtonText, { color: '#22C55E' }]}>
+                  Appeler
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {item.status === 'pending' && (
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton]}
@@ -462,22 +513,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardActions: {
-    flexDirection: 'row',
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
-    gap: Spacing.md,
+    gap: Spacing.sm,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
+    minWidth: '28%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.sm,
+    paddingVertical: 10,
     borderRadius: BorderRadius.md,
     gap: Spacing.xs,
   },
   actionButtonText: {
-    fontSize: FontSizes.sm,
+    fontSize: 13,
     fontWeight: '600',
   },
   cancelButton: {

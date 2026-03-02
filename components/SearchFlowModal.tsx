@@ -179,7 +179,7 @@ export default function SearchFlowModal({ visible, onClose, onSearch }: SearchFl
                     style={styles.hairstyleImage}
                     contentFit="cover"
                   />
-                  <View style={[styles.hairstyleOverlay, { backgroundColor: cat.color + 'BB' }]}>
+                  <View style={styles.hairstyleOverlay}>
                     <Text style={styles.hairstyleName} numberOfLines={2}>{cat.title}</Text>
                   </View>
                   {filters.hairstyle === cat.id && (
@@ -618,9 +618,10 @@ const styles = StyleSheet.create({
   },
   hairstyleOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)', // Lightest possible overlay for readability
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 6,
   },
   hairstyleEmoji: {
     fontSize: 22,
@@ -628,9 +629,13 @@ const styles = StyleSheet.create({
   },
   hairstyleName: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    textTransform: 'uppercase',
   },
   subStyleGrid: {
     flexDirection: 'row',
@@ -654,16 +659,20 @@ const styles = StyleSheet.create({
   },
   subStyleOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 4,
+    padding: 6,
   },
   subStyleName: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    textTransform: 'uppercase',
   },
   selectedBadge: {
     position: 'absolute',

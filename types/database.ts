@@ -74,6 +74,7 @@ export interface Database {
           offers_home_service: boolean;
           home_service_description: string | null;
           min_home_service_amount: number;
+          auto_reply_message: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -103,6 +104,7 @@ export interface Database {
           offers_home_service?: boolean;
           home_service_description?: string | null;
           min_home_service_amount?: number;
+          auto_reply_message?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -132,6 +134,7 @@ export interface Database {
           offers_home_service?: boolean;
           home_service_description?: string | null;
           min_home_service_amount?: number;
+          auto_reply_message?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -745,6 +748,49 @@ export interface Database {
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
+        ];
+      };
+      messages: {
+        Row: {
+          id: string;
+          booking_id: string;
+          sender_id: string;
+          sender_type: 'client' | 'coiffeur';
+          content: string;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          booking_id: string;
+          sender_id: string;
+          sender_type: 'client' | 'coiffeur';
+          content: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          booking_id?: string;
+          sender_id?: string;
+          sender_type?: 'client' | 'coiffeur';
+          content?: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "messages_booking_id_fkey";
+            columns: ["booking_id"];
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey";
+            columns: ["sender_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
         ];
       };
       client_addresses: {

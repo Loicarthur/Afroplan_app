@@ -18,11 +18,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { clientService } from '@/services/client.service';
+import { supabase } from '@/lib/supabase';
 import { BookingWithDetails } from '@/types';
 import NotificationModal from '@/components/NotificationModal';
 
@@ -88,11 +91,12 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, signOut, isAuthenticated } = useAuth();
+  const { user, profile, signOut, isAuthenticated, updateProfile } = useAuth();
 
   const [stats, setStats] = React.useState<any>(null);
   const [recentBookings, setRecentBookings] = React.useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [uploading, setUploading] = React.useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = React.useState(false);
 
   React.useEffect(() => {
@@ -116,6 +120,75 @@ export default function ProfileScreen() {
       fetchData();
     }
   }, [user?.id, isAuthenticated]);
+
+  const handleUpdateAvatar = async () => {
+    if (!user?.id) return;
+
+    try {
+      // 1. Demander les permissions et choisir l'image
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Nous avons besoin de votre permission pour accéder à la galerie.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      setUploading(true);
+      const uri = result.assets[0].uri;
+
+      // 2. Convertir en Base64 pour l'upload (méthode robuste pour React Native)
+      const base64: string = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve((reader.result as string).split(',')[1]);
+          };
+          reader.readAsDataURL(xhr.response);
+        };
+        xhr.onerror = () => reject(new Error('Read error'));
+        xhr.open('GET', uri);
+        xhr.responseType = 'blob';
+        xhr.send();
+      });
+
+      const arrayBuffer = base64js.toByteArray(base64);
+      const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
+
+      // 3. Uploader vers Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('salon-photos')
+        .upload(fileName, arrayBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 4. Récupérer l'URL publique
+      const { data: { publicUrl } } = supabase.storage
+        .from('salon-photos')
+        .getPublicUrl(uploadData.path);
+
+      // 5. Mettre à jour le profil via le contexte (pour refresh immédiat)
+      await updateProfile({ avatar_url: publicUrl });
+
+      Alert.alert('Succès', 'Votre photo de profil a été mise à jour !');
+    } catch (error: any) {
+      console.error('Avatar update error:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour votre photo : ' + (error.message || 'Erreur inconnue'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
@@ -194,9 +267,14 @@ export default function ProfileScreen() {
             )}
             <TouchableOpacity
               style={[styles.editAvatarButton, { backgroundColor: colors.card }]}
-              onPress={() => Alert.alert('Info', 'Modification de la photo à venir')}
+              onPress={handleUpdateAvatar}
+              disabled={uploading}
             >
-              <Ionicons name="camera" size={16} color={colors.primary} />
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="camera" size={16} color={colors.primary} />
+              )}
             </TouchableOpacity>
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>

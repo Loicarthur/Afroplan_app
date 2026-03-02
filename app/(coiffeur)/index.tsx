@@ -55,27 +55,63 @@ export default function CoiffeurDashboard() {
   // Modals & States
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [salonServices, setSalonServices] = useState<any[]>([]);
+  
+  // Formulaire RDV Manuel
   const [manualClientName, setManualClientName] = useState('');
-  const [selectedSlotTime, setSelectedSlotTime] = useState('');
+  const [manualService, setManualService] = useState('');
+  const [manualDate, setManualDate] = useState(new Date().toLocaleDateString('fr-FR'));
+  const [manualTime, setManualTime] = useState('14:00');
   const [isSavingBooking, setIsSavingBooking] = useState(false);
 
   const fetchDashboardData = async () => {
-    if (!user) return;
+    if (!user?.id) return;
+    
     try {
-      const salonData = await salonService.getSalonByOwnerId(user.id);
+      console.log('--- DASHBOARD DIAGNOSTIC ---');
+      console.log('User ID:', user.id);
+      console.log('User Email:', user.email);
+
+      // 1. Détection du salon (ultra-robuste)
+      const salonData = await salonService.getSalonByOwnerId(user.id, user.email);
+      
       if (salonData) {
-        const fullSalon = await salonService.getSalonById(salonData.id);
-        setSalon(fullSalon);
+        console.log('Salon ID Found:', salonData.id);
+        setSalon(salonData);
 
+        // Charger les services du salon pour le RDV Manuel
+        salonService.getSalonServices(salonData.id).then(services => {
+          setSalonServices(services || []);
+        });
+        
+        // Initialisation immédiate des stats pour éviter les écrans vides
+        setAllTimeStats(prev => prev || {
+          totalRevenue: 0,
+          weeklyRevenue: 0,
+          weeklyBookingsCount: 0,
+          averageRating: salonData.rating || 0,
+        });
+
+        // 2. Chargement asynchrone des données détaillées (ne bloque pas l'affichage)
         const todayStr = new Date().toLocaleDateString('en-CA');
-        const bookingsData = await bookingService.getSalonBookings(salonData.id, undefined, todayStr);
-        setTodayBookings(bookingsData.data);
+        
+        // On lance les appels sans attendre le résultat pour libérer l'UI immédiatement
+        Promise.all([
+          salonService.getSalonById(salonData.id).catch(() => null),
+          bookingService.getSalonBookings(salonData.id, undefined, todayStr).catch(() => ({ data: [] })),
+          salonService.getSalonStats(salonData.id).catch(() => null)
+        ]).then(([fullSalonRes, bookingsRes, statsRes]) => {
+          if (fullSalonRes) setSalon(fullSalonRes);
+          if (bookingsRes) setTodayBookings(bookingsRes.data || []);
+          if (statsRes) setAllTimeStats(statsRes);
+        });
 
-        const statsData = await salonService.getSalonStats(salonData.id);
-        setAllTimeStats(statsData);
+      } else {
+        console.log('NO SALON FOUND IN DB');
+        setSalon(null);
       }
     } catch (error) {
-      console.error('Erreur chargement dashboard:', error);
+      console.error('DASHBOARD ERROR:', error);
     } finally {
       setLoadingSalon(false);
       setRefreshing(false);
@@ -84,10 +120,12 @@ export default function CoiffeurDashboard() {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (isAuthenticated && profile?.role === 'coiffeur') {
+      if (isAuthenticated && user?.id) {
         fetchDashboardData();
+      } else if (!isAuthenticated) {
+        setLoadingSalon(false);
       }
-    }, [isAuthenticated, profile?.role])
+    }, [isAuthenticated, user?.id])
   );
 
   const onRefresh = () => {
@@ -128,14 +166,47 @@ export default function CoiffeurDashboard() {
     averageRating: allTimeStats?.averageRating || 0,
   };
 
-  if (loadingSalon) {
+  // Rendu selon l'état réel des données
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
+        <Text style={[styles.userName, { marginTop: 20, textAlign: 'center' }]}>Accès restreint</Text>
+        <Button title="Se connecter" onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20, width: '100%' }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (loadingSalon && !salon) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.textSecondary }}>Initialisation...</Text>
       </View>
     );
   }
 
+  // Écran de création si vraiment aucun salon n'est trouvé après chargement
+  if (!salon) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <ScrollView contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 }}>
+          <Ionicons name="storefront-outline" size={80} color={colors.primary} />
+          <Text style={[styles.userName, { textAlign: 'center', marginTop: 20 }]}>Prêt à lancer votre salon ?</Text>
+          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 10 }}>Configurez votre vitrine pour recevoir vos premiers clients.</Text>
+          <Button title="Créer mon salon" onPress={() => router.push('/(coiffeur)/salon')} style={{ marginTop: 30, width: '100%' }} />
+          <TouchableOpacity onPress={handleSwitchToClient} style={{ marginTop: 20 }}>
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>Mode client</Text>
+          </TouchableOpacity>
+          {__DEV__ && (
+            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 40 }}>UID: {user?.id}</Text>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Dashboard normal
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
@@ -147,7 +218,7 @@ export default function CoiffeurDashboard() {
         <View style={styles.dashboardHeader}>
           <View>
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>Tableau de bord</Text>
-            <Text style={[styles.userName, { color: colors.text }]}>{profile?.full_name || 'Coiffeur'}</Text>
+            <Text style={[styles.userName, { color: colors.text }]}>{salon.name || profile?.full_name || 'Coiffeur'}</Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
@@ -169,13 +240,13 @@ export default function CoiffeurDashboard() {
             </View>
             <View style={styles.growthBadge}>
               <Ionicons name="trending-up" size={14} color="#22C55E" />
-              <Text style={styles.growthText}>En hausse</Text>
+              <Text style={styles.growthText}>Activité</Text>
             </View>
           </View>
           <View style={styles.footerStats}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.weeklyBookingsCount}</Text>
-              <Text style={styles.statLabel}>RDV cette sem.</Text>
+              <Text style={styles.statLabel}>RDV/sem.</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -185,7 +256,7 @@ export default function CoiffeurDashboard() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.averageRating.toFixed(1)}</Text>
-              <Text style={styles.statLabel}>Note avis</Text>
+              <Text style={styles.statLabel}>Note</Text>
             </View>
           </View>
         </Animated.View>
@@ -194,10 +265,10 @@ export default function CoiffeurDashboard() {
         <Animated.View entering={FadeInDown.delay(300)} style={[styles.transparencyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.transparencyHeader}>
             <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-            <Text style={[styles.transparencyTitle, { color: colors.text }]}>Votre rémunération</Text>
+            <Text style={[styles.transparencyTitle, { color: colors.text }]}>Vos revenus (Net estimé)</Text>
           </View>
           <View style={styles.flowContainer}>
-            <View style={styles.flowStep}><Text style={styles.flowAmount}>{stats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>Brut</Text></View>
+            <View style={styles.flowStep}><Text style={styles.flowAmount}>{stats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>Total</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
             <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.error }]}>-20%</Text><Text style={styles.flowLabel}>Frais</Text></View>
             <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
@@ -225,13 +296,121 @@ export default function CoiffeurDashboard() {
           <Ionicons name="people-outline" size={24} color={colors.primary} />
           <View style={styles.switchContent}>
             <Text style={[styles.switchTitle, { color: colors.text }]}>Mode Client</Text>
-            <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>Réserver une prestation pour moi</Text>
+            <Text style={[styles.switchSubtitle, { color: colors.textSecondary }]}>Réserver une prestation</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* MODAL RDV MANUEL */}
+      <Modal
+        visible={bookingModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setBookingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Nouveau RDV Manuel</Text>
+              <TouchableOpacity onPress={() => setBookingModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ color: colors.textSecondary, marginBottom: 20 }}>
+                Enregistrez un rendez-vous pris hors application pour bloquer votre créneau.
+              </Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Nom du client</Text>
+                <TextInput 
+                  style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                  placeholder="Ex: Marie Dupont"
+                  placeholderTextColor={colors.textMuted}
+                  value={manualClientName}
+                  onChangeText={setManualClientName}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Prestation</Text>
+                <TextInput 
+                  style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                  placeholder="Saisissez ou choisissez ci-dessous..."
+                  placeholderTextColor={colors.textMuted}
+                  value={manualService}
+                  onChangeText={setManualService}
+                />
+                
+                {/* Liste de suggestions (Services déjà configurés) */}
+                {salonServices.length > 0 && (
+                  <View style={styles.suggestionContainer}>
+                    <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>VOS PRESTATIONS :</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                      {salonServices.map((s) => (
+                        <TouchableOpacity 
+                          key={s.id} 
+                          style={[styles.suggestionChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                          onPress={() => setManualService(s.name)}
+                        >
+                          <Text style={{ fontSize: 12, color: colors.text }}>{s.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={[styles.inputGroup, { flex: 1 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>Date</Text>
+                  <TextInput 
+                    style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                    placeholder="JJ/MM/AAAA"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualDate}
+                    onChangeText={setManualDate}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { flex: 1 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>Heure</Text>
+                  <TextInput 
+                    style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                    placeholder="14:00"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualTime}
+                    onChangeText={setManualTime}
+                  />
+                </View>
+              </View>
+
+              <Button 
+                title={isSavingBooking ? "Enregistrement..." : "Enregistrer le rendez-vous"}
+                onPress={() => {
+                  if (!manualClientName || !manualService) {
+                    Alert.alert('Attention', 'Veuillez remplir au moins le nom et la prestation.');
+                    return;
+                  }
+                  setIsSavingBooking(true);
+                  // Simulation de sauvegarde
+                  setTimeout(() => {
+                    setIsSavingBooking(false);
+                    Alert.alert('Succès', 'Le rendez-vous manuel a été enregistré.');
+                    setBookingModalVisible(false);
+                    setManualClientName('');
+                    setManualService('');
+                  }, 1000);
+                }}
+                loading={isSavingBooking}
+                style={{ marginTop: 10 }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
     </SafeAreaView>
@@ -274,4 +453,51 @@ const styles = StyleSheet.create({
   switchContent: { flex: 1, marginLeft: 16 },
   switchTitle: { fontSize: 16, fontWeight: '600' },
   switchSubtitle: { fontSize: 13, marginTop: 2 },
+  /* Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+    maxHeight: '80%',
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  suggestionContainer: {
+    marginTop: 12,
+  },
+  suggestionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
 });

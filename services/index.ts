@@ -32,6 +32,10 @@ export { coiffeurService } from './coiffeur.service';
 // Service de gestion des clients
 export { clientService } from './client.service';
 
+// Service de messagerie
+export { messageService } from './message.service';
+export type { Message } from './message.service';
+
 /**
  * Resume des services disponibles:
  *

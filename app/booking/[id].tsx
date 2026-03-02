@@ -24,6 +24,8 @@ import { useSalon } from '@/hooks/use-salons';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { PaymentMethod, DEPOSIT_AMOUNT } from '@/types/database';
+import { supabase } from '@/lib/supabase';
+import { salonService } from '@/services/salon.service';
 
 type TimeSlot = {
   start: string;
@@ -81,19 +83,21 @@ export default function BookingScreen() {
     if (!id) return;
     setRefreshing(true);
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const { salonService } = await import('@/services/salon.service');
+      const dateStr = selectedDate.toLocaleDateString('en-CA');
       
-      // 1. Re-charger les infos du salon (pour les horaires d'ouverture mis à jour)
-      const freshSalon = await salonService.getSalonById(id);
-      if (freshSalon) {
+      // 1. On récupère les deux infos en parallèle
+      const freshSalonPromise = !localSalon ? salonService.getSalonById(id) : Promise.resolve(localSalon);
+      
+      const [freshSalon] = await Promise.all([
+        freshSalonPromise
+      ]);
+
+      if (freshSalon && !localSalon) {
         setLocalSalon(freshSalon);
       }
 
-      // 2. Charger les indisponibilités spécifiques
       const ownerId = freshSalon?.owner_id || localSalon?.owner_id;
       if (ownerId) {
-        const dateStr = selectedDate.toLocaleDateString('en-CA');
         const { data } = await supabase
           .from('coiffeur_availability')
           .select('*')
@@ -107,7 +111,7 @@ export default function BookingScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [selectedDate, id, localSalon?.owner_id]);
+  }, [selectedDate, id, localSalon]);
 
   // Charger les indisponibilités spécifiques (bloquage d'urgence, etc.)
   React.useEffect(() => {
@@ -280,7 +284,6 @@ export default function BookingScreen() {
     setIsSubmitting(true);
 
     try {
-      const { supabase } = await import('@/lib/supabase');
       const todayStr = selectedDate.toLocaleDateString('en-CA');
       const startDateTime = `${selectedSlot.start}:00`;
       const endDateTime = `${selectedSlot.end}:00`;

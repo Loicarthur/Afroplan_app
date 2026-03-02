@@ -1,5 +1,6 @@
 /**
  * Page de gestion du salon - Espace Coiffeur AfroPlan
+ * Gère uniquement les informations de base du salon
  */
 
 import React, { useState } from 'react';
@@ -12,6 +13,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -30,15 +32,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 type SalonLocationType = 'salon' | 'coiffeur_home' | 'domicile' | 'both';
-
-// Liste des spécialités synchronisée avec les catégories globales de l'app
-const AFRO_SPECIALTIES = HAIRSTYLE_CATEGORIES.map(cat => ({
-  id: cat.id,
-  name: cat.title,
-  icon: cat.emoji, // On peut utiliser l'emoji comme icône ou mapper vers Ionicons
-}));
-
-const MAX_PHOTOS = 4;
 
 // Opening hours structure
 const DAYS_OF_WEEK = [
@@ -76,10 +69,9 @@ export default function SalonManagementScreen() {
   const { t, language } = useLanguage();
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [isPublished, setIsPublished] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [existingSalonId, setExistingSalonId] = useState<string | null>(null);
-  const [servicesCount, setServicesCount] = useState<number | null>(null);
+  const [isPublished, setIsPublished] = useState(false);
 
   // Informations du salon
   const [salonName, setSalonName] = useState('');
@@ -92,10 +84,6 @@ export default function SalonManagementScreen() {
   // Médias du salon
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
-  const [videos, setVideos] = useState<string[]>([]);
-
-  // Specialites selectionnees
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
 
   // Opening hours
   const [openingHours, setOpeningHours] = useState<OpeningHours>(DEFAULT_HOURS);
@@ -104,61 +92,47 @@ export default function SalonManagementScreen() {
   const [serviceLocationType, setServiceLocationType] = useState<SalonLocationType>('salon');
   const [homeServiceFee, setHomeServiceFee] = useState('');
 
-  // Email par defaut (celui de l'inscription)
   const email = user?.email || '';
 
-  // Charger le salon existant si disponible
-  React.useEffect(() => {
-    const loadExistingSalon = async () => {
-      if (!user?.id || !isSupabaseConfigured()) return;
-      try {
-        const salon = await salonService.getSalonByOwnerId(user.id);
-        if (salon) {
-          setExistingSalonId(salon.id);
-          setSalonName(salon.name || '');
-          setDescription(salon.description || '');
-          setPhone(salon.phone || '');
-          setAddress(salon.address || '');
-          setCity(salon.city || '');
-          setPostalCode(salon.postal_code || '');
-          setIsPublished(salon.is_active === true);
-          
-          // Répartir les photos avec repli intelligent
-          const initialCover = salon.cover_image_url || salon.image_url || (salon.photos && salon.photos.length > 0 ? salon.photos[0] : null);
-          if (initialCover) {
-            setCoverPhoto(initialCover);
-          }
-          
-          if (salon.photos && salon.photos.length > 0) {
-            // Si la première photo du tableau est la cover, on l'ignore pour la galerie ambiance
-            const galleryStartIdx = (salon.photos[0] === initialCover) ? 1 : 0;
-            setGalleryPhotos(salon.photos.slice(galleryStartIdx, galleryStartIdx + 2));
-          }
-          
-          // Déduire le type de localisation depuis les données existantes
-          if (salon.service_location) {
-            setServiceLocationType(salon.service_location as any);
-          } else if (salon.offers_home_service) {
-            setServiceLocationType('both');
-          } else {
-            setServiceLocationType('salon');
-          }
-          if (salon.opening_hours) {
-            setOpeningHours(salon.opening_hours as unknown as OpeningHours);
-          }
-
-          // Vérifier si des services sont configurés
-          try {
-            const services = await salonService.getSalonServices(salon.id);
-            setServicesCount(services?.length || 0);
-          } catch (e) {
-            setServicesCount(0);
-          }
+  const loadExistingSalon = async () => {
+    if (!user?.id || !isSupabaseConfigured()) return;
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        setExistingSalonId(salon.id);
+        setSalonName(salon.name || '');
+        setDescription(salon.description || '');
+        setPhone(salon.phone || '');
+        setAddress(salon.address || '');
+        setCity(salon.city || '');
+        setPostalCode(salon.postal_code || '');
+        setIsPublished(salon.is_active === true);
+        
+        const initialCover = salon.cover_image_url || salon.image_url || (salon.photos && salon.photos.length > 0 ? salon.photos[0] : null);
+        if (initialCover) setCoverPhoto(initialCover);
+        
+        if (salon.photos && salon.photos.length > 0) {
+          const galleryStartIdx = (salon.photos[0] === initialCover) ? 1 : 0;
+          setGalleryPhotos(salon.photos.slice(galleryStartIdx, galleryStartIdx + 2));
         }
-      } catch {
-        // Pas de salon existant
+        
+        if (salon.service_location) setServiceLocationType(salon.service_location as any);
+        else if (salon.offers_home_service) setServiceLocationType('both');
+        
+        if (salon.opening_hours) setOpeningHours(salon.opening_hours as unknown as OpeningHours);
       }
-    };
+    } catch (e) {
+      console.warn('Error loading salon:', e);
+    }
+  };
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await loadExistingSalon();
+    setRefreshing(false);
+  }, [user?.id]);
+
+  React.useEffect(() => {
     loadExistingSalon();
   }, [user?.id]);
 
@@ -230,15 +204,6 @@ export default function SalonManagementScreen() {
     else if (type === 'gallery') setGalleryPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const toggleSpecialty = (specialtyId: string) => {
-    setSelectedSpecialties(prev => {
-      if (prev.includes(specialtyId)) {
-        return prev.filter(id => id !== specialtyId);
-      }
-      return [...prev, specialtyId];
-    });
-  };
-
   const updateDayHours = (day: string, field: keyof DayHours, value: string | boolean) => {
     setOpeningHours(prev => ({
       ...prev,
@@ -247,112 +212,44 @@ export default function SalonManagementScreen() {
   };
 
   const handleSave = async () => {
-    // Validation
-    if (!salonName.trim()) {
-      Alert.alert(t('common.error'), 'Le nom du salon est requis');
+    if (!salonName.trim() || !address.trim() || !city.trim() || !postalCode.trim() || !phone.trim()) {
+      Alert.alert(t('common.error'), 'Veuillez remplir tous les champs obligatoires (*)');
       return;
     }
-    if (!address.trim() || !city.trim() || !postalCode.trim()) {
-      Alert.alert(t('common.error'), 'L\'adresse complete est requise');
-      return;
-    }
-    if (!phone.trim()) {
-      Alert.alert(t('common.error'), 'Le telephone est requis');
-      return;
-    }
-    if (selectedSpecialties.length === 0) {
-      Alert.alert(t('common.error'), 'Selectionnez au moins une specialite');
-      return;
-    }
-
-    if (!isSupabaseConfigured()) {
-      Alert.alert(
-        'Mode Démo',
-        'Supabase n\'est pas configuré. Les données ne seront pas sauvegardées sur le serveur.'
-      );
-      setIsSaving(false);
-      return;
-    }
-
-    if (!user?.id) {
-      Alert.alert(t('common.error'), 'Vous devez être connecté pour créer un salon.');
-      return;
-    }
+    if (!user?.id) return;
 
     setIsSaving(true);
 
     try {
-      // Helper pour upload ultra-stable (Base64 -> ArrayBuffer)
       const uploadFile = async (uri: string, prefix: string) => {
         if (uri.startsWith('http')) return uri;
-        
-        try {
-          const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `${user?.id}/${prefix}_${Date.now()}.${extension}`;
-          const contentType = prefix === 'video' ? 'video/mp4' : `image/${extension === 'png' ? 'png' : 'jpeg'}`;
+        const base64: string = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = function () {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(xhr.response);
+          };
+          xhr.onerror = () => reject(new Error('Read error'));
+          xhr.open('GET', uri);
+          xhr.responseType = 'blob';
+          xhr.send();
+        });
 
-          // 1. Lire le fichier en Base64 via XHR (le plus compatible)
-          const base64: string = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.onload = function () {
-              const reader = new FileReader();
-              reader.onloadend = function () {
-                const result = reader.result as string;
-                // Extraire uniquement la partie data
-                resolve(result.split(',')[1]);
-              };
-              reader.readAsDataURL(xhr.response);
-            };
-            xhr.onerror = () => reject(new Error('Erreur lecture fichier local'));
-            xhr.open('GET', uri);
-            xhr.responseType = 'blob';
-            xhr.send();
-          });
-
-          // 2. Décoder le base64 en ArrayBuffer (données binaires pures)
-          const arrayBuffer = base64js.toByteArray(base64);
-
-          // 3. Envoyer à Supabase
-          const { data, error } = await supabase.storage
-            .from('salon-photos')
-            .upload(fileName, arrayBuffer, {
-              contentType,
-              upsert: true
-            });
-
-          if (error) throw error;
-          
-          const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
-          return urlData.publicUrl;
-        } catch (err: any) {
-          console.error('Stable Upload Error:', err);
-          throw new Error(`Upload échoué: ${err.message || 'Problème réseau'}`);
-        }
+        const arrayBuffer = base64js.toByteArray(base64);
+        const fileName = `${user.id}/${prefix}_${Date.now()}.jpg`;
+        const { data, error } = await supabase.storage.from('salon-photos').upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw error;
+        return supabase.storage.from('salon-photos').getPublicUrl(data.path).data.publicUrl;
       };
 
-      // 1. Upload Cover
-      let finalCoverUrl = null;
-      if (coverPhoto) {
-        finalCoverUrl = await uploadFile(coverPhoto, 'cover');
-      }
-
-      // 2. Upload Gallery
+      let finalCoverUrl = coverPhoto ? await uploadFile(coverPhoto, 'cover') : null;
       const finalGalleryUrls = [];
       for (const uri of galleryPhotos) {
-        const url = await uploadFile(uri, 'gallery');
-        finalGalleryUrls.push(url);
+        finalGalleryUrls.push(await uploadFile(uri, 'gallery'));
       }
 
-      // Préparer le tableau photos final (Cover + Gallery)
       const allPhotos = finalCoverUrl ? [finalCoverUrl, ...finalGalleryUrls] : finalGalleryUrls;
-
-      // 3. Upload Videos (simple mapping for now as storage bucket might need config)
-      const finalVideoUrls = [];
-      for (const uri of videos) {
-        // En prod, on uploaderait dans un bucket 'salon-videos'
-        const url = await uploadFile(uri, 'video'); 
-        finalVideoUrls.push(url);
-      }
 
       const salonPayload = {
         name: salonName.trim(),
@@ -362,166 +259,42 @@ export default function SalonManagementScreen() {
         address: address.trim(),
         city: city.trim(),
         postal_code: postalCode.trim(),
-        specialties: selectedSpecialties,
         cover_image_url: finalCoverUrl,
-        image_url: finalCoverUrl, 
+        image_url: finalCoverUrl,
         photos: allPhotos,
-        // On pourrait stocker les vidéos dans une colonne 'videos' si on l'ajoute plus tard
         opening_hours: openingHours,
         offers_home_service: serviceLocationType === 'domicile' || serviceLocationType === 'both',
         service_location: serviceLocationType === 'coiffeur_home' ? 'salon' : serviceLocationType,
-        min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both')
-          ? parseFloat(homeServiceFee || '0')
-          : 0,
-        is_active: isPublished,
+        min_home_service_amount: (serviceLocationType === 'domicile' || serviceLocationType === 'both') ? parseFloat(homeServiceFee || '0') : 0,
+        owner_id: user.id,
+        is_active: isPublished
       };
 
       if (existingSalonId) {
         await salonService.updateSalon(existingSalonId, salonPayload as any);
       } else {
-        const newSalon = await salonService.createSalon({
-          ...salonPayload,
-          owner_id: user.id,
-        } as any);
+        const newSalon = await salonService.createSalon(salonPayload as any);
         setExistingSalonId(newSalon.id);
       }
 
-      Alert.alert(
-        'Salon enregistré !',
-        'Votre vitrine est prête. Prochaine étape : définissez vos tarifs pour être visible des clients.',
-        [
-          { 
-            text: 'Plus tard', 
-            style: 'cancel' 
-          },
-          { 
-            text: 'Configurer mes tarifs', 
-            onPress: () => router.push('/(coiffeur)/services') 
-          }
-        ]
-      );
+      Alert.alert('Succès', 'Informations du salon enregistrées !', [
+        { text: 'OK' },
+        { text: 'Gérer mes tarifs', onPress: () => router.push('/(coiffeur)/services') }
+      ]);
     } catch (err: any) {
-      const errorMessage = err?.message || t('common.errorOccurred');
-      Alert.alert(t('common.error'), errorMessage);
-      if (__DEV__) console.warn('Salon save error:', err);
+      Alert.alert('Erreur', err?.message || 'Une erreur est survenue');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handlePublish = async () => {
-    // Validation complète avant publication
-    if (!salonName.trim() || !address.trim() || !city.trim() || !postalCode.trim() || !phone.trim()) {
-      Alert.alert(
-        t('common.error'),
-        language === 'en'
-          ? 'Please fill in all required fields before publishing.'
-          : 'Veuillez remplir tous les champs obligatoires avant de publier.'
-      );
-      return;
-    }
-    if (selectedSpecialties.length === 0) {
-      Alert.alert(
-        t('common.error'),
-        language === 'en'
-          ? 'Select at least one specialty before publishing.'
-          : 'Sélectionnez au moins une spécialité avant de publier.'
-      );
-      return;
-    }
-
-    setIsPublishing(true);
-    try {
-      // 1. Vérifier si des services sont configurés
-      if (existingSalonId) {
-        const services = await salonService.getSalonServices(existingSalonId);
-        if (!services || services.length === 0) {
-          Alert.alert(
-            'Services manquants',
-            'Vous devez configurer au moins un service (prix/durée) avant de publier votre salon.',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Gérer mes services', onPress: () => router.push('/(coiffeur)/services') }
-            ]
-          );
-          setIsPublishing(false);
-          return;
-        }
-      }
-
-      // 2. Sauvegarder d'abord, puis publier
-      await handleSave();
-
-      if (existingSalonId) {
-        await salonService.updateSalon(existingSalonId, { is_active: true } as any);
-      }
-
-      setIsPublished(true);
-      Alert.alert(
-        language === 'en' ? 'Salon Published!' : 'Salon publié !',
-        language === 'en'
-          ? 'Your salon is now visible to clients. They can find you using search and filters.'
-          : 'Votre salon est maintenant visible par les clients. Ils peuvent vous trouver via la recherche et les filtres.',
-        [{ text: 'OK' }]
-      );
-    } catch (err: any) {
-      const errorMessage = err?.message || t('common.errorOccurred');
-      Alert.alert(t('common.error'), errorMessage);
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
-  const handleUnpublish = async () => {
-    Alert.alert(
-      'Dépublier le salon ?',
-      'Votre salon ne sera plus visible par les clients dans la recherche. Vos rendez-vous en cours restent valides.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Oui, dépublier',
-          style: 'destructive',
-          onPress: async () => {
-            setIsPublishing(true);
-            try {
-              if (existingSalonId) {
-                await salonService.updateSalon(existingSalonId, { is_active: false } as any);
-                setIsPublished(false);
-                Alert.alert('Succès', 'Votre salon a été retiré de la publication.');
-              }
-            } catch (err) {
-              Alert.alert('Erreur', 'Impossible de dépublier le salon.');
-            } finally {
-              setIsPublishing(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  // Si pas connecté → écran invitant à se connecter
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.authPrompt}>
-          <View style={styles.authIconContainer}>
-            <Ionicons name="storefront" size={48} color={colors.textMuted} />
-          </View>
+          <Ionicons name="storefront" size={64} color={colors.textMuted} />
           <Text style={[styles.authTitle, { color: colors.text }]}>Mon salon</Text>
-          <Text style={[styles.authMessage, { color: colors.textSecondary }]}>
-            Connectez-vous pour créer et gérer votre salon, ajouter vos photos et spécialités
-          </Text>
-          <TouchableOpacity
-            style={styles.authButton}
-            onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'coiffeur' } })}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.authButtonText}>Se connecter</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
-            <Text style={[styles.authLink, { color: colors.primary }]}>Créer un compte Pro</Text>
-          </TouchableOpacity>
+          <Button title="Se connecter" onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20 }} />
         </View>
       </SafeAreaView>
     );
@@ -529,39 +302,10 @@ export default function SalonManagementScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Bandeau d'alerte si services manquants */}
-        {servicesCount === 0 && (
-          <View style={[styles.warningBanner, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
-            <Ionicons name="warning" size={22} color="#DC2626" />
-            <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>Action requise</Text>
-              <Text style={styles.warningText}>
-                Vous devez configurer vos tarifs dans l&apos;onglet &quot;Services&quot; pour pouvoir être visible.
-              </Text>
-              <TouchableOpacity 
-                style={styles.warningButton}
-                onPress={() => router.push('/(coiffeur)/services')}
-              >
-                <Text style={styles.warningButtonText}>Configurer mes services</Text>
-                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Section Médias du salon */}
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Photo de face professionnelle</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Cette photo sera l&apos;image principale de votre salon. Elle doit être de haute qualité pour attirer les clients.
-          </Text>
-
-          {/* Photo de Couverture (Unique et Professionnelle) */}
-          <TouchableOpacity
-            style={[styles.coverPhotoCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, height: 220 }]}
-            onPress={() => pickMedia('cover')}
-          >
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Photo de couverture</Text>
+          <TouchableOpacity style={[styles.coverPhotoCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => pickMedia('cover')}>
             {coverPhoto ? (
               <View style={styles.photoWrapper}>
                 <Image source={{ uri: coverPhoto }} style={styles.photo} contentFit="cover" />
@@ -572,319 +316,104 @@ export default function SalonManagementScreen() {
             ) : (
               <View style={styles.photoPlaceholder}>
                 <Ionicons name="camera-outline" size={48} color={colors.textMuted} />
-                <Text style={{ color: colors.textMuted, marginTop: 12, fontWeight: '600' }}>Ajouter la photo de face</Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>Format paysage recommandé</Text>
+                <Text style={{ color: colors.textMuted }}>Ajouter une photo</Text>
               </View>
             )}
           </TouchableOpacity>
+        </View>
 
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
-            <Ionicons name="sparkles" size={18} color={colors.primary} />
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              Conseil : Les photos de vos styles de coiffure doivent être ajoutées dans la rubrique &quot;Services&quot; pour être visibles par les clients.
-            </Text>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Informations générales</Text>
+          <TextInput style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]} placeholder="Nom du salon *" value={salonName} onChangeText={setSalonName} />
+          <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, marginTop: 10 }]} placeholder="Description" value={description} onChangeText={setDescription} multiline />
+          <TextInput style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, marginTop: 10 }]} placeholder="Téléphone *" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Localisation</Text>
+          <TextInput style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]} placeholder="Adresse *" value={address} onChangeText={setAddress} />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+            <TextInput style={[styles.input, { flex: 2, backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]} placeholder="Ville *" value={city} onChangeText={setCity} />
+            <TextInput style={[styles.input, { flex: 1, backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]} placeholder="Code postal *" value={postalCode} onChangeText={setPostalCode} keyboardType="numeric" />
           </View>
         </View>
 
-        {/* Informations du salon */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Informations du salon
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Nom du salon *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: Afro Beauty Paris"
-              placeholderTextColor={colors.textMuted}
-              value={salonName}
-              onChangeText={setSalonName}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-              <TouchableOpacity 
-                onPress={() => setDescription("Bienvenue dans notre salon, où l’art de la coiffure afro rencontre l’excellence. Spécialistes des tresses de précision, des locks sculpturales et des soins profonds, nous mettons notre savoir-faire au service de votre couronne naturelle. Dans un cadre raffiné et chaleureux, chaque prestation est une expérience unique pensée pour sublimer votre beauté et préserver la santé de vos cheveux. Venez révéler tout l'éclat de votre style avec nos experts.")}
-              >
-                <Text style={[styles.templateLink, { color: colors.primary }]}>Utiliser un modèle</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Décrivez votre savoir-faire, l'ambiance de votre salon..."
-              placeholderTextColor={colors.textMuted}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Telephone *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: +33 6 12 34 56 78"
-              placeholderTextColor={colors.textMuted}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.backgroundSecondary, color: colors.textSecondary, borderColor: colors.border }]}
-              value={email}
-              editable={false}
-            />
-            <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-              L&apos;email est celui de votre compte et ne peut pas etre modifie
-            </Text>
-          </View>
-        </View>
-
-        {/* Localisation */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Localisation
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Adresse *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-              placeholder="Ex: 123 Rue de la Paix"
-              placeholderTextColor={colors.textMuted}
-              value={address}
-              onChangeText={setAddress}
-            />
-          </View>
-
-          <View style={styles.inputRow}>
-            <View style={[styles.inputGroup, { flex: 2 }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Ville *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="Ex: Paris"
-                placeholderTextColor={colors.textMuted}
-                value={city}
-                onChangeText={setCity}
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: Spacing.md }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Code postal *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="75001"
-                placeholderTextColor={colors.textMuted}
-                value={postalCode}
-                onChangeText={setPostalCode}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Specialites */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Specialites de coiffure afro
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Selectionnez vos specialites ({selectedSpecialties.length} selectionnees)
-          </Text>
-
-          <View style={styles.specialtiesGrid}>
-            {AFRO_SPECIALTIES.map((specialty) => {
-              const isSelected = selectedSpecialties.includes(specialty.id);
-              // Détection robuste d'emoji (Unicode)
-              const isEmoji = specialty.icon && /\p{Emoji}/u.test(specialty.icon);
-
-              return (
-                <TouchableOpacity
-                  key={specialty.id}
-                  style={[
-                    styles.specialtyCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
-                  ]}
-                  onPress={() => toggleSpecialty(specialty.id)}
-                >
-                  {isEmoji ? (
-                    <Text style={{ fontSize: 24 }}>{specialty.icon}</Text>
-                  ) : (
-                    <Ionicons
-                      name={specialty.icon as any}
-                      size={24}
-                      color={isSelected ? '#FFFFFF' : colors.textSecondary}
-                    />
-                  )}
-                  <Text
-                    style={[
-                      styles.specialtyName,
-                      { color: isSelected ? '#FFFFFF' : colors.text },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {specialty.name}
-                  </Text>
-                  {isSelected && (
-                    <View style={styles.specialtyCheck}>
-                      <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Horaires d'ouverture */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('salon.openingHours')}
-          </Text>
-
-          {DAYS_OF_WEEK.map((day) => {
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Horaires d&apos;ouverture</Text>
+          {DAYS_OF_WEEK.map(day => {
             const hours = openingHours[day.key];
             return (
               <View key={day.key} style={[styles.dayRow, { borderColor: colors.border }]}>
                 <TouchableOpacity
-                  style={styles.dayToggle}
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
                   onPress={() => updateDayHours(day.key, 'closed', !hours.closed)}
                 >
                   <View style={[
-                    styles.dayCheckbox,
-                    !hours.closed && { backgroundColor: colors.primary, borderColor: colors.primary },
-                    { borderColor: colors.border },
+                    { width: 20, height: 20, borderRadius: 4, borderWidth: 1, marginRight: 10, alignItems: 'center', justifyContent: 'center' },
+                    !hours.closed ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.border }
                   ]}>
-                    {!hours.closed && (
-                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                    )}
+                    {!hours.closed && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Text style={[
-                    styles.dayLabel,
-                    { color: hours.closed ? colors.textMuted : colors.text },
-                  ]}>
-                    {language === 'en' ? day.labelEn : day.label}
-                  </Text>
+                  <Text style={{ color: hours.closed ? colors.textMuted : colors.text, fontWeight: '500' }}>{day.label}</Text>
                 </TouchableOpacity>
+
                 {!hours.closed ? (
-                  <View style={styles.hoursInputRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                     <TextInput
-                      style={[styles.hoursInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                      style={[styles.timeInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                       value={hours.open}
                       onChangeText={(v) => updateDayHours(day.key, 'open', v)}
                       placeholder="09:00"
-                      placeholderTextColor={colors.textMuted}
                       keyboardType="numbers-and-punctuation"
                     />
-                    <Text style={[styles.hoursSeparator, { color: colors.textSecondary }]}>-</Text>
+                    <Text style={{ color: colors.textSecondary }}>-</Text>
                     <TextInput
-                      style={[styles.hoursInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                      style={[styles.timeInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                       value={hours.close}
                       onChangeText={(v) => updateDayHours(day.key, 'close', v)}
                       placeholder="19:00"
-                      placeholderTextColor={colors.textMuted}
                       keyboardType="numbers-and-punctuation"
                     />
                   </View>
                 ) : (
-                  <Text style={[styles.closedText, { color: colors.textMuted }]}>
-                    {language === 'en' ? 'Closed' : 'Fermé'}
-                  </Text>
+                  <Text style={{ color: colors.textMuted, fontStyle: 'italic', fontSize: 13 }}>Fermé</Text>
                 )}
               </View>
             );
           })}
         </View>
 
-        {/* Lieu de prestation */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Type d&apos;établissement
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Où recevez-vous vos clients ?
-          </Text>
-
-          {(
-            [
-              {
-                value: 'salon' as const,
-                label: 'Salon professionnel',
-                desc: 'Local commercial avec vitrine',
-                icon: 'storefront-outline',
-              },
-              {
-                value: 'coiffeur_home' as const,
-                label: 'À mon domicile',
-                desc: 'Je reçois chez moi (adresse privée)',
-                icon: 'home-outline',
-              },
-              {
-                value: 'domicile' as const,
-                label: 'Chez le client uniquement',
-                desc: 'Je me déplace uniquement',
-                icon: 'car-outline',
-              },
-              {
-                value: 'both' as const,
-                label: 'Mixte',
-                desc: 'Je reçois et je me déplace',
-                icon: 'swap-horizontal-outline',
-              },
-            ]
-          ).map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[
-                styles.locationTypeCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                serviceLocationType === opt.value && {
-                  borderColor: colors.primary,
-                  backgroundColor: colors.primary + '10',
-                },
-              ]}
-              onPress={() => setServiceLocationType(opt.value)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={opt.icon as any}
-                size={26}
-                color={serviceLocationType === opt.value ? colors.primary : colors.textSecondary}
-              />
-              <View style={styles.locationTypeText}>
-                <Text style={[
-                  styles.locationTypeLabel,
-                  { color: serviceLocationType === opt.value ? colors.primary : colors.text },
-                ]}>
-                  {opt.label}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Lieu de prestation</Text>
+          <View style={{ gap: 10 }}>
+            {(['salon', 'domicile', 'both'] as const).map(type => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1 },
+                  serviceLocationType === type ? { borderColor: colors.primary, backgroundColor: colors.primary + '10' } : { borderColor: colors.border }
+                ]}
+                onPress={() => setServiceLocationType(type)}
+              >
+                <Ionicons 
+                  name={type === 'salon' ? 'storefront-outline' : type === 'domicile' ? 'car-outline' : 'repeat-outline'} 
+                  size={20} 
+                  color={serviceLocationType === type ? colors.primary : colors.textSecondary} 
+                />
+                <Text style={{ marginLeft: 10, flex: 1, color: colors.text, fontWeight: '500' }}>
+                  {type === 'salon' ? 'Au salon' : type === 'domicile' ? 'Chez le client' : 'Les deux'}
                 </Text>
-                <Text style={[styles.locationTypeDesc, { color: colors.textSecondary }]}>
-                  {opt.desc}
-                </Text>
-              </View>
-              {serviceLocationType === opt.value && (
-                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
+                {serviceLocationType === type && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {(serviceLocationType === 'domicile' || serviceLocationType === 'both') && (
-            <View style={[styles.inputGroup, { marginTop: Spacing.md }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Frais de déplacement (€)
-              </Text>
+            <View style={{ marginTop: 15 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 5, color: colors.text }}>Frais de déplacement (€)</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                placeholder="Ex: 15"
-                placeholderTextColor={colors.textMuted}
+                placeholder="Ex: 10"
                 value={homeServiceFee}
                 onChangeText={setHomeServiceFee}
                 keyboardType="numeric"
@@ -893,446 +422,28 @@ export default function SalonManagementScreen() {
           )}
         </View>
 
-        {/* Statut de publication */}
-        {isPublished ? (
-          <View style={[styles.publishedBanner, { backgroundColor: '#F0FDF4', borderColor: '#22C55E30', borderWidth: 1 }]}>
-            <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
-            <View style={styles.publishedBannerContent}>
-              <Text style={[styles.publishedBannerTitle, { color: '#166534' }]}>
-                Salon en ligne
-              </Text>
-              <Text style={[styles.publishedBannerDesc, { color: '#166534', opacity: 0.8 }]}>
-                Votre vitrine est visible par tous les clients AfroPlan.
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.publishedBanner, { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', borderWidth: 1 }]}>
-            <Ionicons name="eye-off-outline" size={24} color="#6B7280" />
-            <View style={styles.publishedBannerContent}>
-              <Text style={[styles.publishedBannerTitle, { color: '#374151' }]}>
-                Salon hors ligne
-              </Text>
-              <Text style={[styles.publishedBannerDesc, { color: '#4B5563', opacity: 0.8 }]}>
-                Publiez votre salon pour commencer à recevoir des réservations.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Boutons de sauvegarde et publication */}
-        <View style={styles.saveSection}>
-          <Button
-            title={isSaving ? t('salon.saving') : t('salon.save')}
-            onPress={handleSave}
-            fullWidth
-            loading={isSaving}
-            disabled={isSaving || isPublishing}
-          />
-
-          <View style={{ height: 12 }} />
-
-          {isPublished ? (
-            <TouchableOpacity
-              style={[styles.unpublishButton, { borderColor: colors.error }]}
-              onPress={handleUnpublish}
-              disabled={isPublishing || isSaving}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="eye-off-outline" size={20} color={colors.error} />
-              <Text style={[styles.unpublishButtonText, { color: colors.error }]}>
-                Dépublier mon salon
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.publishButton, 
-                (isPublishing || servicesCount === 0) && styles.publishButtonDisabled,
-                servicesCount === 0 && { backgroundColor: '#4B5563' }
-              ]}
-              onPress={handlePublish}
-              disabled={isPublishing || isSaving || servicesCount === 0}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name={servicesCount === 0 ? "lock-closed-outline" : "rocket-outline"} 
-                size={20} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.publishButtonText}>
-                {servicesCount === 0 
-                  ? 'Services requis pour publier' 
-                  : isPublishing
-                    ? 'Publication...'
-                    : 'Publier mon salon'}
-              </Text>
-            </TouchableOpacity>
-          )}
+        <View style={{ padding: 20 }}>
+          <Button title={isSaving ? "Enregistrement..." : "Enregistrer les modifications"} onPress={handleSave} loading={isSaving} />
         </View>
-
-        <View style={{ height: Spacing.xxl }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  section: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '700',
-    marginBottom: Spacing.xs,
-  },
-  sectionSubtitle: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.md,
-  },
-  mediaLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  coverPhotoCard: {
-    width: '100%',
-    height: 180,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  galleryRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  galleryCard: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  photoWrapper: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  removeBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoPlaceholderText: {
-    fontSize: FontSizes.sm,
-    marginTop: Spacing.xs,
-  },
-  inputGroup: {
-    marginBottom: Spacing.md,
-  },
-  inputLabel: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    marginBottom: Spacing.xs,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  templateLink: {
-    fontSize: 12,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: FontSizes.md,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  inputHint: {
-    fontSize: FontSizes.sm,
-    marginTop: Spacing.xs,
-  },
-  inputRow: {
-    flexDirection: 'row',
-  },
-  specialtiesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  specialtyCard: {
-    width: '31%',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  specialtyName: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  specialtyCheck: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-  },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-  },
-  dayToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dayCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.sm,
-  },
-  dayLabel: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
-  },
-  hoursInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  hoursInput: {
-    borderWidth: 1,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: FontSizes.sm,
-    width: 60,
-    textAlign: 'center',
-  },
-  hoursSeparator: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  closedText: {
-    fontSize: FontSizes.sm,
-    fontStyle: 'italic',
-  },
-  locationTypeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
-    marginBottom: Spacing.sm,
-  },
-  locationTypeText: {
-    flex: 1,
-    marginLeft: Spacing.sm,
-  },
-  locationTypeLabel: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 20,
-    gap: 10,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  locationTypeDesc: {
-    fontSize: FontSizes.sm,
-    marginTop: 2,
-  },
-  publishedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.sm,
-  },
-  publishedBannerContent: {
-    flex: 1,
-  },
-  publishedBannerTitle: {
-    fontSize: FontSizes.md,
-    fontWeight: '700',
-    color: '#166534',
-  },
-  publishedBannerDesc: {
-    fontSize: FontSizes.sm,
-    color: '#15803D',
-    marginTop: 2,
-  },
-  publishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#191919',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  publishButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  publishButtonText: {
-    color: '#FFFFFF',
-    fontSize: FontSizes.lg,
-    fontWeight: '700',
-  },
-  unpublishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    gap: Spacing.sm,
-  },
-  unpublishButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '700',
-  },
-  saveSection: {
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  /* Warning Banner */
-  warningBanner: {
-    flexDirection: 'row',
-    margin: Spacing.md,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'flex-start',
-  },
-  warningContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  warningTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#DC2626',
-    marginBottom: 4,
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#4B5563',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  warningButton: {
-    backgroundColor: '#DC2626',
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  warningButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  /* Auth Prompt */
-  authPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  authIconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
-  authTitle: {
-    fontSize: FontSizes.xxl,
-    fontWeight: '700',
-    marginBottom: Spacing.sm,
-  },
-  authMessage: {
-    fontSize: FontSizes.md,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: Spacing.xl,
-  },
-  authButton: {
-    backgroundColor: '#191919',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xxl,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-  },
-  authButtonText: {
-    color: '#FFFFFF',
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
-  authLink: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-  },
+  container: { flex: 1 },
+  section: { padding: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+  coverPhotoCard: { width: '100%', height: 180, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', overflow: 'hidden' },
+  photoWrapper: { flex: 1 },
+  photo: { width: '100%', height: '100%' },
+  photoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  removeBadge: { position: 'absolute', top: 10, right: 10, padding: 5, borderRadius: 15 },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16 },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  dayRow: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#CCC', alignItems: 'center' },
+  timeInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 13, width: 55, textAlign: 'center' },
+  authPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  authTitle: { fontSize: 24, fontWeight: '700', marginTop: 10 },
 });

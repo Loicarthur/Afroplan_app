@@ -22,6 +22,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as base64js from 'base64-js';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +31,7 @@ import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/t
 import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { paymentService } from '@/services/payment.service';
+import { supabase } from '@/lib/supabase';
 import NotificationModal from '@/components/NotificationModal';
 
 const { width } = Dimensions.get('window');
@@ -79,7 +82,7 @@ function MenuItem({ icon, title, subtitle, onPress, showChevron = true, danger =
 export default function CoiffeurProfilScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user, profile, signOut, isAuthenticated } = useAuth();
+  const { user, profile, signOut, isAuthenticated, updateProfile } = useAuth();
 
   const [stats, setStats] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -88,6 +91,7 @@ export default function CoiffeurProfilScreen() {
   const [historyModalVisible, setHistoryModalVisible] = React.useState(false);
   const [personalInfoModalVisible, setPersonalInfoModalVisible] = React.useState(false);
   const [securityModalVisible, setSecurityModalVisible] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
 
   const fetchStats = async () => {
     if (!user?.id) return;
@@ -101,6 +105,67 @@ export default function CoiffeurProfilScreen() {
       console.error('Error fetching coiffeur stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateAvatar = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Nous avons besoin de votre permission pour accéder à la galerie.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      setUploading(true);
+      const uri = result.assets[0].uri;
+
+      const base64: string = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        };
+        xhr.onerror = () => reject(new Error('Read error'));
+        xhr.open('GET', uri);
+        xhr.responseType = 'blob';
+        xhr.send();
+      });
+
+      const arrayBuffer = base64js.toByteArray(base64);
+      const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('salon-photos')
+        .upload(fileName, arrayBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('salon-photos')
+        .getPublicUrl(uploadData.path);
+
+      await updateProfile({ avatar_url: publicUrl });
+
+      Alert.alert('Succès', 'Votre photo de profil a été mise à jour !');
+    } catch (error: any) {
+      console.error('Avatar update error:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour votre photo.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -187,9 +252,15 @@ export default function CoiffeurProfilScreen() {
             )}
             <TouchableOpacity
               style={[styles.editAvatarButton, { backgroundColor: colors.card }]}
+              onPress={handleUpdateAvatar}
+              disabled={uploading}
               activeOpacity={0.8}
             >
-              <Ionicons name="camera" size={16} color={colors.primary} />
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="camera" size={16} color={colors.primary} />
+              )}
             </TouchableOpacity>
           </View>
           

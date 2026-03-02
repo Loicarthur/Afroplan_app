@@ -121,6 +121,14 @@ export default function SalonDetailScreen() {
   };
 
   const handleBook = () => {
+    if ((salon as any).is_today_blocked) {
+      Alert.alert(
+        'Salon fermé',
+        'Ce salon est exceptionnellement fermé aujourd\'hui. Vous ne pouvez pas effectuer de réservation pour cette date.'
+      );
+      return;
+    }
+
     if (!isAuthenticated) {
       Alert.alert(
         'Connexion requise',
@@ -214,6 +222,16 @@ export default function SalonDetailScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Banner Urgent: Journée bloquée */}
+        {(salon as any).is_today_blocked && (
+          <View style={[styles.blockedBanner, { backgroundColor: colors.error }]}>
+            <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
+            <Text style={styles.blockedBannerText}>
+              Le salon est exceptionnellement fermé aujourd&apos;hui.
+            </Text>
+          </View>
+        )}
+
         {/* Header Image */}
         <View style={styles.headerImage}>
           {(() => {
@@ -227,10 +245,12 @@ export default function SalonDetailScreen() {
                     ? salon.gallery[0].image_url
                     : null;
 
+            const imageSource = typeof imageUri === 'string' ? { uri: imageUri } : imageUri;
+
             return (
               <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }}>
                 <Image
-                  source={{ uri: imageUri || 'https://via.placeholder.com/400x300' }}
+                  source={imageSource || { uri: 'https://via.placeholder.com/400x300' }}
                   style={styles.coverImage}
                   contentFit="cover"
                   transition={500}
@@ -373,6 +393,72 @@ export default function SalonDetailScreen() {
                   </Text>
                 </View>
               )}
+
+              {/* Opening Hours */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {language === 'fr' ? 'Horaires d\'ouverture' : 'Opening Hours'}
+                </Text>
+                <View style={[styles.hoursContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {(() => {
+                    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                    const dayLabels: Record<string, string> = {
+                      monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi',
+                      thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'
+                    };
+                    const dayLabelsEn: Record<string, string> = {
+                      monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
+                      thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
+                    };
+                    
+                    const hours = typeof salon.opening_hours === 'string' 
+                      ? JSON.parse(salon.opening_hours) 
+                      : salon.opening_hours;
+                    
+                    const now = new Date();
+                    const currentDayIndex = (now.getDay() + 6) % 7; // Convert Sun=0 to Mon=0, Tue=1... Sun=6
+                    
+                    return days.map((day, index) => {
+                      const schedule = hours ? (hours[day] || hours[day.charAt(0).toUpperCase() + day.slice(1)]) : null;
+                      const isToday = index === currentDayIndex;
+                      
+                      let timeText = language === 'fr' ? 'Fermé' : 'Closed';
+                      let isOpen = false;
+
+                      // Si aujourd'hui est bloqué par urgence
+                      if (isToday && (salon as any).is_today_blocked) {
+                        timeText = language === 'fr' ? 'Fermé (Urgence)' : 'Closed (Emergency)';
+                        isOpen = false;
+                      } else if (schedule) {
+                        const isClosed = schedule.closed === true || schedule.isClosed === true || schedule.active === false;
+                        if (!isClosed) {
+                          const open = schedule.open || schedule.start;
+                          const close = schedule.close || schedule.end;
+                          if (open && close) {
+                            timeText = `${open} - ${close}`;
+                            isOpen = true;
+                          }
+                        }
+                      } else if (!hours || Object.keys(hours).length === 0) {
+                        // If no hours set at all, we don't know, so maybe show a placeholder
+                        timeText = '09:00 - 19:00'; // Default
+                        isOpen = true;
+                      }
+
+                      return (
+                        <View key={day} style={[styles.hourRow, isToday && { backgroundColor: colors.primary + '10' }]}>
+                          <Text style={[styles.hourDay, { color: isToday ? colors.primary : colors.text, fontWeight: isToday ? '700' : '400' }]}>
+                            {language === 'fr' ? dayLabels[day] : dayLabelsEn[day]}
+                          </Text>
+                          <Text style={[styles.hourTime, { color: isOpen ? (isToday ? colors.primary : colors.textSecondary) : colors.error }]}>
+                            {timeText}
+                          </Text>
+                        </View>
+                      );
+                    });
+                  })()}
+                </View>
+              </View>
 
               {/* Gallery */}
               {salon.gallery && salon.gallery.length > 0 && (
@@ -518,6 +604,19 @@ export default function SalonDetailScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  blockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 8,
+    zIndex: 100,
+  },
+  blockedBannerText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
     flex: 1,
   },
   loadingContainer: {
@@ -683,6 +782,24 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  hoursContainer: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  hourRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  hourDay: {
+    fontSize: 14,
+  },
+  hourTime: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   thumbnailImage: {
     width: '100%',

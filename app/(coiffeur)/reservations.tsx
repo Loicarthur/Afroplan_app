@@ -36,7 +36,7 @@ export default function CoiffeurReservationsScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'availability'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
 
   // États pour le modal d'annulation
@@ -394,20 +394,6 @@ export default function CoiffeurReservationsScreen() {
             Confirmées
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'availability' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab('availability')}
-        >
-          <Ionicons 
-            name="time-outline" 
-            size={18} 
-            color={activeTab === 'availability' ? colors.primary : colors.textSecondary} 
-            style={{ marginRight: 4 }}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'availability' ? colors.primary : colors.textSecondary }]}>
-            Dispo.
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -417,95 +403,22 @@ export default function CoiffeurReservationsScreen() {
         }
       >
         <View style={styles.content}>
-          {activeTab === 'availability' ? (
-            <View style={styles.availabilityContainer}>
-              <View style={[styles.infoBox, { backgroundColor: colors.primary + '08', borderColor: colors.border }]}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                  Définissez vos horaires habituels pour que les clients sachent quand réserver.
-                </Text>
-              </View>
+          {/* Bouton d'urgence - Toujours visible en haut des réservations */}
+          <TouchableOpacity 
+            style={[styles.pauseButton, { borderColor: isTodayBlocked ? colors.success : colors.error, marginTop: 0, marginBottom: 20 }]}
+            onPress={isTodayBlocked ? handleUnblockDay : handleBlockDay}
+          >
+            <Ionicons 
+              name={isTodayBlocked ? "checkmark-circle-outline" : "pause-circle-outline"} 
+              size={20} 
+              color={isTodayBlocked ? colors.success : colors.error} 
+            />
+            <Text style={[styles.pauseButtonText, { color: isTodayBlocked ? colors.success : colors.error }]}>
+              {isTodayBlocked ? "Débloquer ma journée" : "Bloquer ma journée (Urgence)"}
+            </Text>
+          </TouchableOpacity>
 
-              {/* Liste ordonnée des jours en français */}
-              {[
-                { key: 'monday', label: 'Lundi' },
-                { key: 'tuesday', label: 'Mardi' },
-                { key: 'wednesday', label: 'Mercredi' },
-                { key: 'thursday', label: 'Jeudi' },
-                { key: 'friday', label: 'Vendredi' },
-                { key: 'saturday', label: 'Samedi' },
-                { key: 'sunday', label: 'Dimanche' },
-              ].map(({ key, label }) => {
-                const config = weeklySchedule[key] || { active: false, start: '09:00', end: '18:00' };
-                return (
-                  <View key={key} style={[styles.dayRow, { borderBottomColor: colors.border }]}>
-                    <View style={styles.dayMain}>
-                      <TouchableOpacity 
-                        style={[styles.checkbox, config.active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                        onPress={() => setWeeklySchedule((prev: any) => ({
-                          ...prev,
-                          [key]: { ...config, active: !config.active }
-                        }))}
-                      >
-                        {config.active && <Ionicons name="checkmark" size={14} color="#FFF" />}
-                      </TouchableOpacity>
-                      <Text style={[styles.dayLabel, { color: config.active ? colors.text : colors.textMuted }]}>
-                        {label}
-                      </Text>
-                    </View>
-
-                    {config.active ? (
-                      <View style={styles.hoursRow}>
-                        <TextInput
-                          style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary, color: colors.text }]}
-                          value={config.start}
-                          onChangeText={(val) => setWeeklySchedule((prev: any) => ({
-                            ...prev,
-                            [key]: { ...config, start: val }
-                          }))}
-                          maxLength={5}
-                          placeholder="09:00"
-                        />
-                        <Text style={{ marginHorizontal: 8, color: colors.textMuted }}>-</Text>
-                        <TextInput
-                          style={[styles.hourInput, { backgroundColor: colors.backgroundSecondary, color: colors.text }]}
-                          value={config.end}
-                          onChangeText={(val) => setWeeklySchedule((prev: any) => ({
-                            ...prev,
-                            [key]: { ...config, end: val }
-                          }))}
-                          maxLength={5}
-                          placeholder="18:00"
-                        />
-                      </View>
-                    ) : (
-                      <Text style={[styles.closedText, { color: colors.textMuted }]}>Fermé</Text>
-                    )}
-                  </View>
-                );
-              })}
-
-              <TouchableOpacity 
-                style={[styles.pauseButton, { borderColor: isTodayBlocked ? colors.success : colors.error }]}
-                onPress={isTodayBlocked ? handleUnblockDay : handleBlockDay}
-              >
-                <Ionicons 
-                  name={isTodayBlocked ? "checkmark-circle-outline" : "pause-circle-outline"} 
-                  size={20} 
-                  color={isTodayBlocked ? colors.success : colors.error} 
-                />
-                <Text style={[styles.pauseButtonText, { color: isTodayBlocked ? colors.success : colors.error }]}>
-                  {isTodayBlocked ? "Débloquer ma journée" : "Bloquer ma journée (Urgence)"}
-                </Text>
-              </TouchableOpacity>
-
-              <Button 
-                title="Enregistrer mes horaires" 
-                onPress={saveWeeklySchedule}
-                style={{ marginTop: 24 }}
-              />
-            </View>
-          ) : filteredBookings.length === 0 ? (
+          {filteredBookings.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color={colors.textMuted} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>

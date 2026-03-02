@@ -50,7 +50,6 @@ export default function StyleSalonsScreen() {
 
   // Récupérer les salons réels filtrés par cette catégorie/style
   const { salons: realSalons, isLoading } = useSalons({
-    category: styleInfo?.category.title || undefined,
     serviceName: displayName || styleInfo?.style.name || undefined,
   });
 

@@ -276,6 +276,19 @@ CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
 
+-- MESSAGES (CHAT)
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    sender_type TEXT NOT NULL CHECK (sender_type IN ('client', 'coiffeur')),
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_messages_booking_id ON messages(booking_id);
+
 -- GALLERY_IMAGES
 -- Distinction photo principale / sous-photos :
 --   is_main_photo = true  → Photo principale du salon (affichée en grand dans les listings)

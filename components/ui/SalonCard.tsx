@@ -47,6 +47,9 @@ export function SalonCard({
   };
 
   const isOpen = () => {
+    // 1. Vérification prioritaire : Blocage manuel d'urgence (coiffeur_availability)
+    if ((salon as any).is_today_blocked === true) return false;
+
     if (!salon.opening_hours) return true;
     try {
       // Handle both string and object formats for opening_hours
@@ -54,28 +57,52 @@ export function SalonCard({
         ? JSON.parse(salon.opening_hours) 
         : salon.opening_hours;
       
+      if (!hours || Object.keys(hours).length === 0) return true;
+
       const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const now = new Date();
-      const today = days[now.getDay()];
-      const schedule = hours[today];
+      const dayIndex = now.getDay();
+      const today = days[dayIndex];
       
-      // If no schedule or explicitly closed
-      if (!schedule || schedule.closed === true || schedule.isClosed === true || schedule.active === false) {
-        return false;
+      // Try to find schedule with case-insensitive key
+      let schedule = hours[today] || hours[today.charAt(0).toUpperCase() + today.slice(1)];
+      
+      // If still not found, try to find any key that matches
+      if (!schedule) {
+        const foundKey = Object.keys(hours).find(k => k.toLowerCase() === today);
+        if (foundKey) schedule = hours[foundKey];
       }
+
+      // If no schedule for today, assume open if the rest of the hours are not set, 
+      // but if other days are set, this day might be closed by omission.
+      // For AfroPlan, we prefer showing open if not explicitly closed.
+      if (!schedule) return true;
       
-      // Helper to convert "HH:mm" to minutes since midnight for robust comparison
-      const timeToMinutes = (timeStr: string) => {
+      // Check all possible "closed" flags
+      const isExplicitlyClosed = 
+        schedule.closed === true || 
+        schedule.isClosed === true || 
+        schedule.active === false ||
+        String(schedule.closed) === 'true' ||
+        String(schedule.isClosed) === 'true';
+
+      if (isExplicitlyClosed) return false;
+      
+      const openTime = schedule.open || schedule.start || schedule.opening;
+      const closeTime = schedule.close || schedule.end || schedule.closing;
+      
+      if (!openTime || !closeTime) return true;
+
+      // Helper to convert "HH:mm" to minutes since midnight
+      const timeToMinutes = (timeStr: any) => {
         if (!timeStr) return null;
-        const [hours, minutes] = timeStr.split(/[:h]/).map(Number);
-        if (isNaN(hours) || isNaN(minutes)) return null;
-        return hours * 60 + minutes;
+        if (typeof timeStr !== 'string') return null;
+        const [h, m] = timeStr.split(/[:h]/).map(Number);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
       };
 
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const openTime = schedule.open || schedule.start;
-      const closeTime = schedule.close || schedule.end;
-      
       const openMinutes = timeToMinutes(openTime);
       const closeMinutes = timeToMinutes(closeTime);
 
@@ -220,6 +247,16 @@ export function SalonCard({
   }
 
   // Default variant (Grid/Horizontal Scroll)
+  const serviceImage = (salon as any).service_image;
+  const mainImage = salon.image_url || 'https://via.placeholder.com/300x300?text=Salon';
+  
+  // Logic pour determiner la source correcte (objet {uri} pour les strings, direct pour les require)
+  const getImageSource = (img: any) => {
+    if (!img) return { uri: 'https://via.placeholder.com/300x300?text=Salon' };
+    if (typeof img === 'string') return { uri: img };
+    return img; // C'est deja un require()
+  };
+
   return (
     <TouchableOpacity
       style={[
@@ -232,7 +269,7 @@ export function SalonCard({
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: (salon as any).service_image || salon.image_url || 'https://via.placeholder.com/300x300?text=Salon' }}
+          source={getImageSource(serviceImage || mainImage)}
           style={styles.image}
           contentFit="cover"
           transition={300}

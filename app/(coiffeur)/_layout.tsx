@@ -77,8 +77,6 @@ export default function CoiffeurLayout() {
       
       {/* Screens techniques sans icônes de menu */}
       <Tabs.Screen name="portfolio" options={{ href: null }} />
-      <Tabs.Screen name="finance" options={{ href: null }} />
-      <Tabs.Screen name="clients" options={{ href: null }} />
       <Tabs.Screen name="messages" options={{ href: null }} />
     </Tabs>
   );
