@@ -2,9 +2,9 @@
  * Hook pour la gestion des salons
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { salonService } from '@/services';
-import { Salon, SalonWithDetails, SalonFilters, Category, PaginatedResponse } from '@/types';
+import { Salon, SalonFilters } from '@/types';
 
 export function useSalons(filters?: SalonFilters) {
   const [salons, setSalons] = useState<Salon[]>([]);
@@ -14,12 +14,21 @@ export function useSalons(filters?: SalonFilters) {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
 
+  // Utiliser une ref pour stocker les filtres et éviter les boucles infinies
+  // si l'objet filtres est recréé à chaque rendu du composant parent.
+  const filtersRef = useRef(filters);
+  const filtersString = JSON.stringify(filters);
+
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filtersString]);
+
   const fetchSalons = useCallback(async (pageNum: number = 1, reset: boolean = false) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await salonService.getSalons(pageNum, filters);
+      const response = await salonService.getSalons(pageNum, filtersRef.current);
       setSalons((prev) => (reset ? response.data : [...prev, ...response.data]));
       setHasMore(response.hasMore);
       setTotal(response.total);
@@ -29,11 +38,11 @@ export function useSalons(filters?: SalonFilters) {
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, []); // Dépendance vide car on utilise filtersRef
 
   useEffect(() => {
     fetchSalons(1, true);
-  }, [fetchSalons]);
+  }, [fetchSalons, filtersString]); // On ne redéclenche que si la chaîne JSON des filtres change
 
   const loadMore = () => {
     if (!isLoading && hasMore) {
@@ -56,18 +65,17 @@ export function useSalons(filters?: SalonFilters) {
   };
 }
 
+// ... reste du fichier inchangé
 export function useSalon(id: string) {
-  const [salon, setSalon] = useState<SalonWithDetails | null>(null);
+  const [salon, setSalon] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSalon = async () => {
       if (!id) return;
-
       setIsLoading(true);
       setError(null);
-
       try {
         const data = await salonService.getSalonById(id);
         setSalon(data);
@@ -77,7 +85,6 @@ export function useSalon(id: string) {
         setIsLoading(false);
       }
     };
-
     fetchSalon();
   }, [id]);
 
@@ -93,7 +100,6 @@ export function usePopularSalons(limit: number = 6) {
     const fetchSalons = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         const data = await salonService.getPopularSalons(limit);
         setSalons(data);
@@ -103,7 +109,6 @@ export function usePopularSalons(limit: number = 6) {
         setIsLoading(false);
       }
     };
-
     fetchSalons();
   }, [limit]);
 
@@ -120,10 +125,8 @@ export function useSearchSalons() {
       setResults([]);
       return;
     }
-
     setIsLoading(true);
     setError(null);
-
     try {
       const data = await salonService.searchSalons(query);
       setResults(data);
@@ -143,7 +146,7 @@ export function useSearchSalons() {
 }
 
 export function useCategories() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,7 +154,6 @@ export function useCategories() {
     const fetchCategories = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         const data = await salonService.getCategories();
         setCategories(data);
@@ -161,7 +163,6 @@ export function useCategories() {
         setIsLoading(false);
       }
     };
-
     fetchCategories();
   }, []);
 
@@ -177,10 +178,8 @@ export function useSalonsByCategory(categorySlug: string) {
 
   const fetchSalons = useCallback(async (pageNum: number = 1, reset: boolean = false) => {
     if (!categorySlug) return;
-
     setIsLoading(true);
     setError(null);
-
     try {
       const response = await salonService.getSalonsByCategory(categorySlug, pageNum);
       setSalons((prev) => (reset ? response.data : [...prev, ...response.data]));

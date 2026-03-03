@@ -17,7 +17,6 @@ export default function TabLayout() {
       if (isAuthenticated && user) {
         try {
           const response = await bookingService.getClientBookings(user.id);
-          // On compte les RDV à venir (pending ou confirmed)
           const count = response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
           setActiveBookingsCount(count);
         } catch (e) {
@@ -26,7 +25,6 @@ export default function TabLayout() {
       }
     };
     fetchCount();
-    // Rafraîchir toutes les 30 secondes pour la démo
     const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
@@ -47,18 +45,13 @@ export default function TabLayout() {
           fontSize: 11,
           fontWeight: '500',
         },
-        headerStyle: {
-          backgroundColor: colors.background,
-        },
-        headerTintColor: colors.text,
-        headerShadowVisible: false,
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Accueil',
-          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
@@ -72,7 +65,6 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Recherche',
-          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'search' : 'search-outline'}
@@ -86,7 +78,6 @@ export default function TabLayout() {
         name="reservations"
         options={{
           title: 'Rendez-vous',
-          headerShown: false,
           tabBarBadge: activeBookingsCount > 0 ? activeBookingsCount : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
@@ -98,10 +89,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="favorites"
         options={{
           title: 'Favoris',
-          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'heart' : 'heart-outline'}
@@ -115,7 +118,6 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profil',
-          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
@@ -125,15 +127,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* L'onglet "Styles" est masqué de la barre de navigation :
-          la navigation par style se fait via les cartes de la page Accueil.
-          La route /styles reste accessible en interne si besoin. */}
-      <Tabs.Screen
-        name="styles"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="styles" options={{ href: null }} />
     </Tabs>
   );
 }

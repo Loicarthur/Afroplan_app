@@ -15,7 +15,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Salon } from '@/types';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - Spacing.md * 3) / 2;
 
 type SalonCardProps = {
   salon: Salon;
@@ -64,21 +63,15 @@ export function SalonCard({
       const dayIndex = now.getDay();
       const today = days[dayIndex];
       
-      // Try to find schedule with case-insensitive key
       let schedule = hours[today] || hours[today.charAt(0).toUpperCase() + today.slice(1)];
       
-      // If still not found, try to find any key that matches
       if (!schedule) {
         const foundKey = Object.keys(hours).find(k => k.toLowerCase() === today);
         if (foundKey) schedule = hours[foundKey];
       }
 
-      // If no schedule for today, assume open if the rest of the hours are not set, 
-      // but if other days are set, this day might be closed by omission.
-      // For AfroPlan, we prefer showing open if not explicitly closed.
       if (!schedule) return true;
       
-      // Check all possible "closed" flags
       const isExplicitlyClosed = 
         schedule.closed === true || 
         schedule.isClosed === true || 
@@ -93,7 +86,6 @@ export function SalonCard({
       
       if (!openTime || !closeTime) return true;
 
-      // Helper to convert "HH:mm" to minutes since midnight
       const timeToMinutes = (timeStr: any) => {
         if (!timeStr) return null;
         if (typeof timeStr !== 'string') return null;
@@ -108,7 +100,6 @@ export function SalonCard({
 
       if (openMinutes === null || closeMinutes === null) return true;
 
-      // Handle overnight hours (e.g., 22:00 to 02:00)
       if (closeMinutes < openMinutes) {
         return currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
       }
@@ -119,6 +110,26 @@ export function SalonCard({
       return true;
     }
   };
+
+  const getAvailabilityBadge = () => {
+    // Si bloqué ou fermé, on n'affiche rien
+    if ((salon as any).is_today_blocked === true || !isOpen()) return null;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 13) {
+      return { text: 'Libre ce matin', icon: 'sunny-outline' };
+    } else if (currentHour < 18) {
+      // Si le salon a une réservation entre 12h et 14h, on ne met pas "Libre cet après-midi"
+      if ((salon as any).is_afternoon_busy) return null;
+      
+      return { text: 'Libre cet après-midi', icon: 'partly-sunny-outline' };
+    }
+    return null;
+  };
+
+  const availability = getAvailabilityBadge();
 
   const renderRating = (size: number = 14) => (
     <View style={styles.ratingContainer}>
@@ -153,9 +164,17 @@ export function SalonCard({
         />
         <View style={styles.horizontalContent}>
           <View style={styles.horizontalHeader}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-              {salon.name}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                {salon.name}
+              </Text>
+              {availability && (
+                <View style={styles.lastMinuteBadge}>
+                  <Ionicons name={availability.icon as any} size={10} color={colors.primary} />
+                  <Text style={[styles.lastMinuteText, { color: colors.primary }]}>{availability.text}</Text>
+                </View>
+              )}
+            </View>
             {onFavoritePress && (
               <TouchableOpacity onPress={onFavoritePress} style={styles.miniFavorite}>
                 <Ionicons
@@ -216,6 +235,11 @@ export function SalonCard({
             <View style={[styles.statusBadge, { backgroundColor: isOpen() ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)' }]}>
               <Text style={styles.badgeText}>{isOpen() ? 'Ouvert' : 'Fermé'}</Text>
             </View>
+            {availability && (
+              <View style={[styles.statusBadge, { backgroundColor: '#191919' }]}>
+                <Text style={styles.badgeText}>{availability.text}</Text>
+              </View>
+            )}
           </View>
           
           {onFavoritePress && (
@@ -246,15 +270,13 @@ export function SalonCard({
     );
   }
 
-  // Default variant (Grid/Horizontal Scroll)
   const serviceImage = (salon as any).service_image;
   const mainImage = salon.image_url || 'https://via.placeholder.com/300x300?text=Salon';
   
-  // Logic pour determiner la source correcte (objet {uri} pour les strings, direct pour les require)
   const getImageSource = (img: any) => {
     if (!img) return { uri: 'https://via.placeholder.com/300x300?text=Salon' };
     if (typeof img === 'string') return { uri: img };
-    return img; // C'est deja un require()
+    return img;
   };
 
   return (
@@ -277,8 +299,13 @@ export function SalonCard({
         <View style={[styles.availableBadge, { backgroundColor: isOpen() ? '#22C55E' : '#6B7280' }]}>
           <Text style={styles.availableText}>{isOpen() ? 'Dispo' : 'Fermé'}</Text>
         </View>
+
+        {availability && (
+          <View style={styles.gridLastMinuteBadge}>
+            <Text style={styles.gridLastMinuteText}>{availability.text}</Text>
+          </View>
+        )}
         
-        {/* Badge Travail Certifié */}
         {(salon as any).is_custom_service_image && (
           <View style={styles.certifiedBadge}>
             <Ionicons name="camera" size={10} color="#FFFFFF" />
@@ -331,249 +358,51 @@ export function SalonCard({
 }
 
 const styles = StyleSheet.create({
-  // Shared styles
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rating: {
-    fontWeight: '700',
-  },
-  reviewCount: {
-    fontWeight: '400',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  location: {
-    fontSize: 12,
-  },
-
-  // Default card (Style Coiffeur Proximité)
-  card: {
-    width: 180,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  imageContainer: {
-    position: 'relative',
-    height: 120,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  availableBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  availableText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  certifiedBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  certifiedText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  cardFavoriteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 28,
-    height: 30,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    padding: 12,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  specialty: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  price: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  meta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-  ratingBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  locationBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  locationText: {
-    fontSize: 11,
-    maxWidth: 70,
-  },
-
-  // Horizontal card
-  horizontalCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: Spacing.md,
-    height: 100,
-  },
-  horizontalImage: {
-    width: 100,
-    height: '100%',
-  },
-  horizontalContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  horizontalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  miniFavorite: {
-    padding: 4,
-  },
-  horizontalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-
-  // Featured card
-  featuredCard: {
-    width: width * 0.8,
-    height: 220,
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginRight: Spacing.md,
-  },
-  featuredImage: {
-    width: '100%',
-    height: '100%',
-  },
-  featuredGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '60%',
-  },
-  featuredOverlay: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  featuredBadges: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  favoriteCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
-  },
-  featuredContent: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-  },
-  featuredName: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  featuredMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  featuredLocation: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  ratingContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rating: { fontWeight: '700' },
+  reviewCount: { fontWeight: '400' },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  location: { fontSize: 12 },
+  lastMinuteBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  lastMinuteText: { fontSize: 10, fontWeight: '700' },
+  gridLastMinuteBadge: { position: 'absolute', top: 8, right: 45, backgroundColor: '#191919', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 },
+  gridLastMinuteText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  card: { width: 180, borderRadius: 16, overflow: 'hidden', marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
+  imageContainer: { position: 'relative', height: 120 },
+  image: { width: '100%', height: '100%' },
+  availableBadge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  availableText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  certifiedBadge: { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  certifiedText: { color: '#FFFFFF', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  cardFavoriteButton: { position: 'absolute', top: 8, right: 8, width: 28, height: 30, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.2)', alignItems: 'center', justifyContent: 'center' },
+  content: { padding: 12 },
+  name: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  specialty: { fontSize: 12, marginBottom: 4 },
+  price: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  meta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' },
+  ratingBox: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  ratingText: { fontSize: 12, fontWeight: '600' },
+  locationBox: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1, justifyContent: 'flex-end' },
+  locationText: { fontSize: 11, maxWidth: 70 },
+  horizontalCard: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', marginBottom: Spacing.md, height: 100 },
+  horizontalImage: { width: 100, height: '100%' },
+  horizontalContent: { flex: 1, padding: 12, justifyContent: 'space-between' },
+  horizontalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  miniFavorite: { padding: 4 },
+  horizontalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statusIndicator: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  statusText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  featuredCard: { width: Dimensions.get('window').width * 0.8, height: 220, borderRadius: 24, overflow: 'hidden', marginRight: Spacing.md },
+  featuredImage: { width: '100%', height: '100%' },
+  featuredGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%' },
+  featuredOverlay: { position: 'absolute', top: 16, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  featuredBadges: { flexDirection: 'row', gap: 8 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  favoriteCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  featuredContent: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  featuredName: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  featuredMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  featuredLocation: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
 });

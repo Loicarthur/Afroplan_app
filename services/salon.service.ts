@@ -82,9 +82,30 @@ export const salonService = {
     if (error) return { data: [], total: 0, page, totalPages: 0, hasMore: false };
 
     const ownerIds = (data || []).map(s => s.owner_id);
+    const salonIds = (data || []).map(s => s.id);
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const { data: blocked } = await supabase.from('coiffeur_availability').select('coiffeur_id').in('coiffeur_id', ownerIds).eq('specific_date', todayStr).eq('is_available', false).lte('start_time', '00:00:00').gte('end_time', '23:59:00');
+
+    // 1. Vérifier les blocages manuels (indisponibilités)
+    const { data: blocked } = await supabase.from('coiffeur_availability')
+      .select('coiffeur_id')
+      .in('coiffeur_id', ownerIds)
+      .eq('specific_date', todayStr)
+      .eq('is_available', false)
+      .lte('start_time', '00:00:00')
+      .gte('end_time', '23:59:00');
+    
     const blockedSet = new Set(blocked?.map(b => b.coiffeur_id) || []);
+
+    // 2. Vérifier les réservations entre 12h et 14h pour le badge "Libre"
+    const { data: afternoonBookings } = await supabase.from('bookings')
+      .select('salon_id, start_time')
+      .in('salon_id', salonIds)
+      .eq('booking_date', todayStr)
+      .in('status', ['confirmed', 'pending'])
+      .gte('start_time', '12:00')
+      .lte('start_time', '14:00');
+
+    const busyAfternoonSet = new Set(afternoonBookings?.map(b => b.salon_id) || []);
 
     const processedData = (data || []).map(salon => {
       const activeServices = (salon.services || []).filter((s: any) => s.is_active);
@@ -117,7 +138,8 @@ export const salonService = {
         min_price: minPrice,
         service_image: specificImage,
         is_custom_service_image: isCustomImage,
-        is_today_blocked: blockedSet.has(salon.owner_id)
+        is_today_blocked: blockedSet.has(salon.owner_id),
+        is_afternoon_busy: busyAfternoonSet.has(salon.id) // Nouveau flag
       };
     });
 

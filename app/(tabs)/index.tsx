@@ -1,6 +1,5 @@
 /**
- * Page d'accueil AfroPlan - Client
- * Enrichie avec flow de recherche et plus de contenu
+ * Page d'accueil AfroPlan - Client (Version Vitrine Premium)
  * Charte graphique: Noir #191919, Blanc #f9f8f8
  */
 
@@ -15,8 +14,6 @@ import {
   Dimensions,
   StatusBar,
   Linking,
-  Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -28,13 +25,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Colors } from '@/constants/theme';
+import { Colors, Shadows } from '@/constants/theme';
 import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 import LanguageSelector from '@/components/LanguageSelector';
 import NotificationModal from '@/components/NotificationModal';
-import RatingModal from '@/components/RatingModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSalons } from '@/hooks/use-salons';
 import { useFavorites } from '@/hooks/use-favorites';
 import { favoriteService } from '@/services/favorite.service';
@@ -42,45 +37,22 @@ import { SalonCard } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 
 const { width } = Dimensions.get('window');
-const isSmallScreen = width < 380;
 
 const ALL_STYLES = HAIRSTYLE_CATEGORIES.map((cat) => ({
   id: cat.id,
   name: cat.title,
-  emoji: cat.emoji,
-  color: cat.color,
   image: cat.styles[0]?.image,
-  firstStyleId: cat.styles[0]?.id,
 }));
 
 const TIPS_AND_INSPIRATION = [
-  {
-    id: '1',
-    title: 'Comment entretenir ses tresses ?',
-    category: 'Conseils',
-    image: require('@/assets/images/entretien_cheveux.jpg'),
-    readTime: '3 min',
-  },
-  {
-    id: '2',
-    title: 'Les tendances coiffures 2024',
-    category: 'Tendances',
-    image: require('@/assets/images/Photo_tendance.jpg'),
-    readTime: '5 min',
-  },
-  {
-    id: '3',
-    title: 'Routine capillaire cheveux crépus',
-    category: 'Tutoriel',
-    image: require('@/assets/images/routine_capilaire.jpg'),
-    readTime: '4 min',
-  },
+  { id: '1', title: 'Comment entretenir ses tresses ?', category: 'Conseils', image: require('@/assets/images/entretien_cheveux.jpg'), readTime: '3 min' },
+  { id: '2', title: 'Les tendances coiffures 2024', category: 'Tendances', image: require('@/assets/images/Photo_tendance.jpg'), readTime: '5 min' },
+  { id: '3', title: 'Routine capillaire cheveux crépus', category: 'Tutoriel', image: require('@/assets/images/routine_capilaire.jpg'), readTime: '4 min' },
 ];
 
 function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeAll?: () => void; seeAllLabel?: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-
   return (
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
@@ -104,26 +76,16 @@ export default function HomeScreen() {
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [pendingReviewBooking, setPendingReviewBooking] = useState<any>(null);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
 
-  const { salons, isLoading: loadingSalons, refresh: refreshSalons } = useSalons();
+  const { salons, refresh: refreshSalons } = useSalons();
   const { favorites, refresh: refreshFavorites } = useFavorites(user?.id || '');
   const favoriteIds = React.useMemo(() => favorites.map(f => f.id), [favorites]);
 
   const handleToggleFavorite = async (salonId: string) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+    if (!isAuthenticated) { setShowAuthModal(true); return; }
     if (!user) return;
-    try {
-      await favoriteService.toggleFavorite(user.id, salonId);
-      refreshFavorites();
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
+    try { await favoriteService.toggleFavorite(user.id, salonId); refreshFavorites(); } catch (e) {}
   };
 
   const fetchActiveBookingsCount = React.useCallback(async () => {
@@ -131,83 +93,30 @@ export default function HomeScreen() {
       try {
         const { bookingService } = await import('@/services/booking.service');
         const response = await bookingService.getClientBookings(user.id);
-        const count = response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
-        setActiveBookingsCount(count);
-      } catch (e) {
-        setActiveBookingsCount(0);
-      }
-    }
-  }, [isAuthenticated, user?.id]);
-
-  const checkForPendingReviews = React.useCallback(async () => {
-    if (!isAuthenticated || !user?.id) return;
-    try {
-      const { bookingService } = await import('@/services/booking.service');
-      const { reviewService } = await import('@/services/review.service');
-      
-      const response = await bookingService.getClientBookings(user.id);
-      const completed = response.data.filter(b => b.status === 'completed');
-      
-      if (completed.length > 0) {
-        const now = new Date().getTime();
-        for (const booking of completed) {
-          const bookingDate = new Date(booking.booking_date);
-          const [hours, minutes] = (booking.start_time || '00:00').split(':').map(Number);
-          bookingDate.setHours(hours, minutes + (booking.duration_minutes || 60), 0, 0);
-          
-          if (now - bookingDate.getTime() > 5 * 60 * 1000) {
-            const reviewed = await reviewService.hasClientReviewed(user.id, booking.salon_id);
-            if (!reviewed) {
-              setPendingReviewBooking(booking);
-              setRatingModalVisible(true);
-              break; 
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Error checking for reviews:', e);
+        setActiveBookingsCount(response.data.filter(b => b.status === 'pending' || b.status === 'confirmed').length);
+      } catch (e) {}
     }
   }, [isAuthenticated, user?.id]);
 
   useFocusEffect(
     React.useCallback(() => {
-      let isMounted = true;
-      const loadData = async () => {
-        if (!isMounted) return;
-        await fetchActiveBookingsCount();
-        await refreshSalons();
-        if (isAuthenticated) await checkForPendingReviews();
-      };
-      loadData();
-      return () => { isMounted = false; };
-    }, [isAuthenticated, user?.id])
+      fetchActiveBookingsCount();
+      refreshSalons();
+    }, [fetchActiveBookingsCount, refreshSalons])
   );
-
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await refreshSalons();
-    setRefreshing(false);
-  }, [refreshSalons]);
 
   const handleSearch = (filters: any) => {
     router.push({
       pathname: '/(tabs)/explore',
       params: { 
         category: filters.hairstyle,
-        serviceName: filters.subStyle,
-        budget: filters.maxBudget,
-        distance: filters.maxDistance,
-        location: filters.location,
-        hairType: (filters.hairType || []).join(','),
+        city: filters.city,
       }
     });
   };
 
   const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
-  const featuredSalons = [...salons].filter(s => s.is_verified).sort((a, b) => b.rating - a.rating).slice(0, 5);
-  const popularSalons = [...salons].sort((a, b) => (b.reviews_count || 0) - (a.reviews_count || 0)).slice(0, 6);
-  const nearbySalons = [...salons].reverse().slice(0, 6);
+  const featuredSalons = [...salons].filter(s => s.is_verified).slice(0, 5);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -216,22 +125,18 @@ export default function HomeScreen() {
       <SearchFlowModal visible={searchModalVisible} onClose={() => setSearchModalVisible(false)} onSearch={handleSearch} />
       <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
 
-      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => refreshSalons()} tintColor={colors.primary} />}>
         {/* Header */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.logoWrapper}>
               <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.logoImage} contentFit="contain" />
             </View>
-
             <View style={styles.authButtons}>
               {!isAuthenticated ? (
                 <>
                   <LanguageSelector compact />
-                  <TouchableOpacity style={styles.switchRoleButton} onPress={async () => { await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur'); router.replace('/(coiffeur)'); }}>
-                    <Ionicons name="swap-horizontal" size={16} color="#191919" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.loginButton} onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}>
+                  <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(auth)/login')}>
                     <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
                   </TouchableOpacity>
                 </>
@@ -242,12 +147,9 @@ export default function HomeScreen() {
                       {t('home.hello')}, {profile && profile.full_name ? profile.full_name.split(' ')[0] : t('profile.user')}
                     </Text>
                   </View>
-                  <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]} onPress={() => router.push('/(tabs)/reservations')}>
-                    <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-                    {activeBookingsCount > 0 && <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{activeBookingsCount}</Text></View>}
-                  </TouchableOpacity>
                   <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]} onPress={() => setNotificationModalVisible(true)}>
                     <Ionicons name="notifications-outline" size={24} color={colors.text} />
+                    {activeBookingsCount > 0 && <View style={styles.badge} />}
                   </TouchableOpacity>
                 </>
               )}
@@ -255,7 +157,7 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
-        {/* Search */}
+        {/* Search Button Premium */}
         <Animated.View entering={FadeInUp.delay(200).duration(500)} style={styles.searchSection}>
           <TouchableOpacity style={styles.mainSearchButton} onPress={() => setSearchModalVisible(true)}>
             <View style={styles.searchButtonContent}>
@@ -274,14 +176,12 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <SectionHeader title={t('home.featured')} onSeeAll={() => router.push('/(tabs)/explore')} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {featuredSalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="featured" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
-              ))}
+              {featuredSalons.map(s => <SalonCard key={s.id} salon={s} variant="featured" isFavorite={favoriteIds.includes(s.id)} onFavoritePress={() => handleToggleFavorite(s.id)} />)}
             </ScrollView>
           </View>
         )}
 
-        {/* Categories */}
+        {/* Categories Grid */}
         <View style={styles.section}>
           <SectionHeader title={t('home.hairstyleCategories')} onSeeAll={() => setShowAllStyles(!showAllStyles)} seeAllLabel={showAllStyles ? t('home.seeLess') : t('common.seeAll')} />
           <View style={styles.stylesGrid}>
@@ -294,34 +194,26 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Popular Salons */}
-        {popularSalons.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="Les plus populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {popularSalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="default" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {/* Popular */}
+        <View style={styles.section}>
+          <SectionHeader title="Les plus populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+            {salons.sort((a, b) => (b.reviews_count || 0) - (a.reviews_count || 0)).slice(0, 6).map(s => <SalonCard key={s.id} salon={s} variant="default" isFavorite={favoriteIds.includes(s.id)} onFavoritePress={() => handleToggleFavorite(s.id)} />)}
+          </ScrollView>
+        </View>
 
         {/* Nearby */}
-        {nearbySalons.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {nearbySalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} variant="default" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+            {[...salons].reverse().slice(0, 6).map(s => <SalonCard key={s.id} salon={s} variant="default" isFavorite={favoriteIds.includes(s.id)} onFavoritePress={() => handleToggleFavorite(s.id)} />)}
+          </ScrollView>
+        </View>
 
-        {/* Tips & Inspiration */}
+        {/* Tips */}
         <View style={styles.section}>
           <SectionHeader title="Conseils & Inspiration" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             {TIPS_AND_INSPIRATION.map((item) => (
               <TouchableOpacity key={item.id} style={styles.tipCard}>
                 <Image source={item.image} style={styles.tipImage} contentFit="cover" />
@@ -330,7 +222,7 @@ export default function HomeScreen() {
                   <Text style={styles.tipTitle} numberOfLines={2}>{item.title}</Text>
                   <View style={styles.tipFooter}>
                     <Ionicons name="time-outline" size={14} color="#808080" />
-                    <Text style={styles.tipTime}>{item.readTime} de lecture</Text>
+                    <Text style={styles.tipTime}>{item.readTime}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -338,44 +230,20 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Become Pro CTA */}
-        <View style={styles.section}>
-          <View style={styles.ctaCard}>
-            <View style={styles.ctaContent}>
-              <Ionicons name="cut" size={32} color="#FFFFFF" />
-              <Text style={styles.ctaTitle}>{t('home.areYouCoiffeur')}</Text>
-              <Text style={styles.ctaSubtitle}>{t('home.joinAfroPlanPro')}</Text>
-              <TouchableOpacity style={styles.ctaButton} onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
-                <Text style={styles.ctaButtonText}>{t('home.discoverPro')}</Text>
-                <Ionicons name="arrow-forward" size={18} color="#191919" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Social Media & Footer */}
+        {/* Footer & Social */}
         <View style={styles.footerSection}>
           <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
           <View style={styles.socialRow}>
-            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://instagram.com/afroplan')}>
-              <Ionicons name="logo-instagram" size={22} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://facebook.com/afroplan')}>
-              <Ionicons name="logo-facebook" size={22} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://tiktok.com/@afroplan')}>
-              <Ionicons name="logo-tiktok" size={22} color="#FFF" />
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://instagram.com')}><Ionicons name="logo-instagram" size={22} color="#FFF" /></TouchableOpacity>
+            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://facebook.com')}><Ionicons name="logo-facebook" size={22} color="#FFF" /></TouchableOpacity>
+            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://tiktok.com')}><Ionicons name="logo-tiktok" size={22} color="#FFF" /></TouchableOpacity>
           </View>
           <Text style={styles.copyright}>© 2024 AfroPlan. Tous droits réservés.</Text>
         </View>
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <AuthGuardModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} message="Connectez-vous pour profiter de toutes les fonctionnalités" />
-      {pendingReviewBooking && (
-        <RatingModal visible={ratingModalVisible} onClose={() => setRatingModalVisible(false)} bookingId={pendingReviewBooking.id} salonId={pendingReviewBooking.salon_id} salonName={pendingReviewBooking.salon?.name || 'le salon'} onSuccess={() => { setPendingReviewBooking(null); refreshSalons(); }} />
-      )}
+      <AuthGuardModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </SafeAreaView>
   );
 }
@@ -386,22 +254,20 @@ const styles = StyleSheet.create({
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logoWrapper: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E5E5E5' },
   logoImage: { width: '100%', height: '100%' },
-  authButtons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  switchRoleButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
+  authButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   loginButton: { backgroundColor: '#191919', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   loginButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  notificationButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  notificationBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: '#EF4444', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  notificationBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  notificationButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
   userInfoCompact: { marginRight: 8 },
   welcomeText: { fontSize: 14 },
   searchSection: { paddingHorizontal: 16, paddingBottom: 8 },
-  mainSearchButton: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 2, borderColor: '#191919', elevation: 4 },
+  mainSearchButton: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 2, borderColor: '#191919', ...Shadows.md },
   searchButtonContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   searchIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#191919', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   searchTextContainer: { flex: 1 },
-  searchButtonTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
-  searchButtonSubtitle: { fontSize: 13, color: '#808080', marginTop: 2 },
+  searchButtonTitle: { fontSize: 15, fontWeight: '700', color: '#191919' },
+  searchButtonSubtitle: { fontSize: 12, color: '#808080', marginTop: 2 },
   section: { paddingTop: 20, paddingHorizontal: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   sectionTitle: { fontSize: 20, fontWeight: '700' },
@@ -410,28 +276,19 @@ const styles = StyleSheet.create({
   stylesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   styleCard: { width: (width - 56) / 3, height: 110, borderRadius: 12, overflow: 'hidden' },
   styleImage: { width: '100%', height: '100%' },
-  styleOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, justifyContent: 'flex-end' },
-  styleName: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', lineHeight: 17, textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  ctaCard: { backgroundColor: '#191919', borderRadius: 20, padding: 24, marginTop: 8 },
-  ctaContent: { alignItems: 'center' },
-  ctaTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginTop: 12 },
-  ctaSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 8, marginBottom: 20 },
-  ctaButton: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
-  ctaButtonText: { fontSize: 15, fontWeight: '600', color: '#191919' },
-  footer: { marginTop: 24, paddingVertical: 20, alignItems: 'center' },
-  copyright: { fontSize: 11, color: '#808080' },
-  // Styles pour les conseils
-  tipCard: { width: 280, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', marginRight: 12, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  styleOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.2)' },
+  styleName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  tipCard: { width: 280, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', marginRight: 12, ...Shadows.sm },
   tipImage: { width: '100%', height: 150 },
   tipContent: { padding: 16 },
   tipBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 },
   tipBadgeText: { fontSize: 10, fontWeight: '700', color: '#191919', textTransform: 'uppercase' },
-  tipTitle: { fontSize: 15, fontWeight: '700', color: '#191919', marginBottom: 12, lineHeight: 20 },
+  tipTitle: { fontSize: 15, fontWeight: '700', color: '#191919', marginBottom: 12 },
   tipFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tipTime: { fontSize: 12, color: '#808080', fontWeight: '500' },
-  // Footer & Social
-  footerSection: { padding: 30, alignItems: 'center', backgroundColor: 'transparent' },
+  tipTime: { fontSize: 12, color: '#808080' },
+  footerSection: { padding: 30, alignItems: 'center' },
   footerTitle: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
   socialRow: { flexDirection: 'row', gap: 15, marginBottom: 24 },
-  socialIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
+  socialIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#191919', alignItems: 'center', justifyContent: 'center' },
+  copyright: { fontSize: 11, color: '#808080' },
 });
