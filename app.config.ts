@@ -31,6 +31,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
       package: "com.afroplan.app",
       versionCode: 1,
+      config: {
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+        },
+      },
       permissions: [
         "android.permission.INTERNET",
         "android.permission.CAMERA",

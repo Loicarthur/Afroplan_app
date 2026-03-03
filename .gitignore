@@ -18,9 +18,10 @@ web-build/
 # Environment variables - local overrides only
 .env
 .env.local
-.env.development.local
+.env.development
 .env.test.local
-.env.production.local
+.env.production
+.env.preview
 # Note: .env.development, .env.preview, .env.production are tracked
 # because EAS Build needs them to configure the app per environment
 
