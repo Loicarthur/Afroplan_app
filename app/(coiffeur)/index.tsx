@@ -58,6 +58,7 @@ export default function CoiffeurDashboard() {
   const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [salonServices, setSalonServices] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   
   // Formulaire RDV Manuel
   const [manualClientName, setManualClientName] = useState('');
