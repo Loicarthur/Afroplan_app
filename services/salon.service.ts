@@ -64,7 +64,8 @@ export const salonService = {
     if (filters?.minRating) query = query.gte('rating', filters.minRating);
     if (filters?.isVerified !== undefined) query = query.eq('is_verified', filters.isVerified);
     if (filters?.searchQuery) {
-      query = query.or(`name.ilike."%${filters.searchQuery}%",description.ilike."%${filters.searchQuery}%"`);
+      // Recherche globale : Nom OR Description OR Ville
+      query = query.or(`name.ilike."%${filters.searchQuery}%",description.ilike."%${filters.searchQuery}%",city.ilike."%${filters.searchQuery}%"`);
     }
     
     if (filters?.serviceName) {
