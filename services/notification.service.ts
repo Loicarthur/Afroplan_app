@@ -61,7 +61,8 @@ export const notificationService = {
         // Configuration du handler au besoin (si pas déjà fait)
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
-            shouldShowAlert: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
             shouldPlaySound: true,
             shouldSetBadge: true,
             shouldVibrate: true,

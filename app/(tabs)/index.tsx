@@ -16,6 +16,7 @@ import {
   StatusBar,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -34,7 +35,6 @@ import LanguageSelector from '@/components/LanguageSelector';
 import NotificationModal from '@/components/NotificationModal';
 import RatingModal from '@/components/RatingModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { useSalons } from '@/hooks/use-salons';
 import { useFavorites } from '@/hooks/use-favorites';
 import { favoriteService } from '@/services/favorite.service';
@@ -44,95 +44,15 @@ import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 380;
 
-/* -------------------- Données mock -------------------- */
-
-// Catégories de styles de coiffure (depuis la source unique)
 const ALL_STYLES = HAIRSTYLE_CATEGORIES.map((cat) => ({
   id: cat.id,
   name: cat.title,
   emoji: cat.emoji,
   color: cat.color,
-  // use first sub-style image as preview
   image: cat.styles[0]?.image,
   firstStyleId: cat.styles[0]?.id,
 }));
 
-
-// Coiffeurs à proximité
-const NEARBY_COIFFEURS = [
-  {
-    id: '1',
-    name: 'Marie Koné',
-    specialty: 'Tresses africaines',
-    rating: 4.9,
-    reviews: 127,
-    distance: '0.8 km',
-    image: require('@/assets/images/Tissage.jpg'),
-    available: true,
-    price: 'À partir de 45€',
-  },
-  {
-    id: '2',
-    name: 'Fatou Diallo',
-    specialty: 'Twists & Locks',
-    rating: 4.8,
-    reviews: 89,
-    distance: '1.2 km',
-    image: require('@/assets/images/Vanille.jpg'),
-    available: true,
-    price: 'À partir de 35€',
-  },
-  {
-    id: '3',
-    name: 'Aminata Bamba',
-    specialty: 'Natural Hair',
-    rating: 4.7,
-    reviews: 64,
-    distance: '2.1 km',
-    image: require('@/assets/images/Wash_and_Go.jpg'),
-    available: false,
-    price: 'À partir de 30€',
-  },
-];
-
-// Salons populaires
-const POPULAR_SALONS = [
-  {
-    id: '1',
-    name: 'Bella Coiffure',
-    services: ['Tresses', 'Twists', 'Coloration'],
-    priceRange: '30€ - 150€',
-    rating: 4.9,
-    reviews: 234,
-    image: require('@/assets/images/Box_Braids.jpg'),
-    location: 'Paris 18e',
-    openNow: true,
-  },
-  {
-    id: '2',
-    name: 'Afro Style Studio',
-    services: ['Locks', 'Coupe homme', 'Entretien'],
-    priceRange: '20€ - 100€',
-    rating: 4.8,
-    reviews: 156,
-    image: require('@/assets/images/Fausse_Locks.jpg'),
-    location: 'Paris 11e',
-    openNow: true,
-  },
-  {
-    id: '3',
-    name: 'Natural Beauty',
-    services: ['Soins', 'Hydratation', 'Coupe'],
-    priceRange: '25€ - 80€',
-    rating: 4.7,
-    reviews: 98,
-    image: require('@/assets/images/Soin.jpg'),
-    location: 'Paris 10e',
-    openNow: false,
-  },
-];
-
-// Conseils et inspirations
 const TIPS_AND_INSPIRATION = [
   {
     id: '1',
@@ -157,8 +77,6 @@ const TIPS_AND_INSPIRATION = [
   },
 ];
 
-/* -------------------- Composants -------------------- */
-
 function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeAll?: () => void; seeAllLabel?: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -175,14 +93,12 @@ function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeA
   );
 }
 
-/* -------------------- Screen -------------------- */
-
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isAuthenticated, profile, user } = useAuth();
-  const { requireAuth, showAuthModal, setShowAuthModal } = useAuthGuard();
-  const { t, language } = useLanguage();
+  const { showAuthModal, setShowAuthModal } = useAuthGuard();
+  const { t } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
@@ -211,7 +127,7 @@ export default function HomeScreen() {
   };
 
   const fetchActiveBookingsCount = React.useCallback(async () => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user?.id) {
       try {
         const { bookingService } = await import('@/services/booking.service');
         const response = await bookingService.getClientBookings(user.id);
@@ -221,32 +137,25 @@ export default function HomeScreen() {
         setActiveBookingsCount(0);
       }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]);
 
-  // Vérifier s'il y a un RDV à noter (terminé depuis > 30 min)
   const checkForPendingReviews = React.useCallback(async () => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user?.id) return;
     try {
       const { bookingService } = await import('@/services/booking.service');
       const { reviewService } = await import('@/services/review.service');
       
       const response = await bookingService.getClientBookings(user.id);
-      // On filtre les terminés
       const completed = response.data.filter(b => b.status === 'completed');
       
       if (completed.length > 0) {
         const now = new Date().getTime();
-        
         for (const booking of completed) {
-          // Calcul de la fin de prestation
           const bookingDate = new Date(booking.booking_date);
-          const [hours, minutes] = booking.start_time.split(':').map(Number);
+          const [hours, minutes] = (booking.start_time || '00:00').split(':').map(Number);
           bookingDate.setHours(hours, minutes + (booking.duration_minutes || 60), 0, 0);
           
-          const timeSinceEnd = now - bookingDate.getTime();
-          const fiveMinutes = 5 * 60 * 1000;
-
-          if (timeSinceEnd > fiveMinutes) {
+          if (now - bookingDate.getTime() > 5 * 60 * 1000) {
             const reviewed = await reviewService.hasClientReviewed(user.id, booking.salon_id);
             if (!reviewed) {
               setPendingReviewBooking(booking);
@@ -259,40 +168,29 @@ export default function HomeScreen() {
     } catch (e) {
       console.warn('Error checking for reviews:', e);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]);
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchActiveBookingsCount();
-      refreshSalons();
-      if (isAuthenticated) {
-        checkForPendingReviews();
-      }
-    }, [fetchActiveBookingsCount, refreshSalons, isAuthenticated, checkForPendingReviews])
+      let isMounted = true;
+      const loadData = async () => {
+        if (!isMounted) return;
+        await fetchActiveBookingsCount();
+        await refreshSalons();
+        if (isAuthenticated) await checkForPendingReviews();
+      };
+      loadData();
+      return () => { isMounted = false; };
+    }, [isAuthenticated, user?.id])
   );
-
-  const handleSwitchToCoiffeur = async () => {
-    await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur');
-    router.replace('/(coiffeur)');
-  };
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    try {
-      await refreshSalons();
-    } catch (e) {
-      console.warn('Refresh error:', e);
-    } finally {
-      setRefreshing(false);
-    }
+    await refreshSalons();
+    setRefreshing(false);
   }, [refreshSalons]);
 
-  const openLink = (url: string) => {
-    Linking.openURL(url).catch(() => {});
-  };
-
   const handleSearch = (filters: any) => {
-    // Appliquer les filtres de recherche
     router.push({
       pathname: '/(tabs)/explore',
       params: { 
@@ -301,753 +199,239 @@ export default function HomeScreen() {
         budget: filters.maxBudget,
         distance: filters.maxDistance,
         location: filters.location,
-        hairType: filters.hairType.join(','),
-        showAll: filters.showAll ? 'true' : 'false'
+        hairType: (filters.hairType || []).join(','),
       }
     });
   };
 
   const displayedStyles = showAllStyles ? ALL_STYLES : ALL_STYLES.slice(0, 6);
-  
-  // Featured salons: highest rated verified salons
   const featuredSalons = [...salons].filter(s => s.is_verified).sort((a, b) => b.rating - a.rating).slice(0, 5);
-  // Popular salons: most reviews
   const popularSalons = [...salons].sort((a, b) => (b.reviews_count || 0) - (a.reviews_count || 0)).slice(0, 6);
-  // Nearby (just newest for now)
   const nearbySalons = [...salons].reverse().slice(0, 6);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Search Flow Modal */}
-      <SearchFlowModal
-        visible={searchModalVisible}
-        onClose={() => setSearchModalVisible(false)}
-        onSearch={handleSearch}
-      />
+      <SearchFlowModal visible={searchModalVisible} onClose={() => setSearchModalVisible(false)} onSearch={handleSearch} />
+      <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
 
-      <NotificationModal
-        visible={notificationModalVisible}
-        onClose={() => setNotificationModalVisible(false)}
-      />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {/* ---------------- Header ---------------- */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={styles.header}
-        >
+      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.header}>
           <View style={styles.headerContent}>
-            {/* Logo arrondi à gauche */}
             <View style={styles.logoWrapper}>
-              <Image
-                source={require('@/assets/images/logo_afroplan.jpeg')}
-                style={styles.logoImage}
-                contentFit="contain"
-              />
+              <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.logoImage} contentFit="contain" />
             </View>
 
-            {/* Boutons à droite */}
-            {!isAuthenticated ? (
-              <View style={styles.authButtons}>
-                <LanguageSelector compact />
-                <TouchableOpacity
-                  style={styles.switchRoleButton}
-                  onPress={handleSwitchToCoiffeur}
-                >
-                  <Ionicons name="swap-horizontal" size={16} color="#191919" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.registerButton}
-                  onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'client' } })}
-                >
-                  <Text style={styles.registerButtonText}>{t('auth.register')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.loginButton}
-                  onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}
-                >
-                  <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.authButtons}>
-                <TouchableOpacity
-                  style={[styles.notificationButton, { backgroundColor: colors.card }]}
-                  onPress={() => router.push('/(tabs)/reservations')}
-                >
-                  <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-                  {activeBookingsCount > 0 && (
-                    <View style={styles.notificationBadge}>
-                      <Text style={styles.notificationBadgeText}>{activeBookingsCount}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.notificationButton, { backgroundColor: colors.card }]}
-                  onPress={() => setNotificationModalVisible(true)}
-                >
-                  <Ionicons name="notifications-outline" size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={styles.authButtons}>
+              {!isAuthenticated ? (
+                <>
+                  <LanguageSelector compact />
+                  <TouchableOpacity style={styles.switchRoleButton} onPress={async () => { await AsyncStorage.setItem('@afroplan_selected_role', 'coiffeur'); router.replace('/(coiffeur)'); }}>
+                    <Ionicons name="swap-horizontal" size={16} color="#191919" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.loginButton} onPress={() => router.push({ pathname: '/(auth)/login', params: { role: 'client' } })}>
+                    <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View style={styles.userInfoCompact}>
+                    <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
+                      {t('home.hello')}, {profile && profile.full_name ? profile.full_name.split(' ')[0] : t('profile.user')}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]} onPress={() => router.push('/(tabs)/reservations')}>
+                    <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
+                    {activeBookingsCount > 0 && <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{activeBookingsCount}</Text></View>}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.card }]} onPress={() => setNotificationModalVisible(true)}>
+                    <Ionicons name="notifications-outline" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
-
-          {/* Welcome message */}
-          {isAuthenticated && profile && (
-            <View style={styles.welcomeMessage}>
-              <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-                {t('home.hello')} {profile.full_name?.split(' ')[0] || t('profile.user')} 👋
-              </Text>
-              <Text style={[styles.welcomeSubtext, { color: colors.text }]}>
-                {t('home.readyForHairstyle')}
-              </Text>
-            </View>
-          )}
         </Animated.View>
 
-        {/* ---------------- Main Search Button ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(200).duration(500)}
-          style={styles.searchSection}
-        >
-          <TouchableOpacity
-            style={styles.mainSearchButton}
-            onPress={() => setSearchModalVisible(true)}
-          >
+        {/* Search */}
+        <Animated.View entering={FadeInUp.delay(200).duration(500)} style={styles.searchSection}>
+          <TouchableOpacity style={styles.mainSearchButton} onPress={() => setSearchModalVisible(true)}>
             <View style={styles.searchButtonContent}>
-              <View style={styles.searchIconContainer}>
-                <Ionicons name="search" size={24} color="#FFFFFF" />
-              </View>
+              <View style={styles.searchIconContainer}><Ionicons name="search" size={22} color="#FFFFFF" /></View>
               <View style={styles.searchTextContainer}>
-                <Text style={styles.searchButtonTitle}>{t('home.searchSalon')}</Text>
+                <Text style={styles.searchButtonTitle}>Disponible pour une nouvelle coiffure ?</Text>
                 <Text style={styles.searchButtonSubtitle}>{t('home.searchSubtitle')}</Text>
               </View>
             </View>
-            <Ionicons name="arrow-forward-circle" size={32} color="#191919" />
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </Animated.View>
 
-
-        {/* ---------------- Featured Salons ---------------- */}
+        {/* Featured */}
         {featuredSalons.length > 0 && (
-          <Animated.View
-            entering={FadeInUp.delay(300).duration(500)}
-            style={styles.section}
-          >
-            <SectionHeader 
-              title={t('home.featured')} 
-              onSeeAll={() => router.push('/(tabs)/explore')} 
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
+          <View style={styles.section}>
+            <SectionHeader title={t('home.featured')} onSeeAll={() => router.push('/(tabs)/explore')} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
               {featuredSalons.map((salon) => (
-                <SalonCard 
-                  key={salon.id} 
-                  salon={salon} 
-                  variant="featured"
-                  isFavorite={favoriteIds.includes(salon.id)}
-                  onFavoritePress={() => handleToggleFavorite(salon.id)}
-                />
+                <SalonCard key={salon.id} salon={salon} variant="featured" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
               ))}
             </ScrollView>
-          </Animated.View>
+          </View>
         )}
 
-        {/* ---------------- Quick Categories ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(350).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader
-            title={t('home.hairstyleCategories')}
-            onSeeAll={() => setShowAllStyles(!showAllStyles)}
-            seeAllLabel={showAllStyles ? t('home.seeLess') : t('common.seeAll')}
-          />
+        {/* Categories */}
+        <View style={styles.section}>
+          <SectionHeader title={t('home.hairstyleCategories')} onSeeAll={() => setShowAllStyles(!showAllStyles)} seeAllLabel={showAllStyles ? t('home.seeLess') : t('common.seeAll')} />
           <View style={styles.stylesGrid}>
             {displayedStyles.map((style) => (
-              <TouchableOpacity
-                key={style.id}
-                style={styles.styleCard}
-                onPress={() => {
-                  router.push(`/category-styles/${style.id}`);
-                }}
-              >
+              <TouchableOpacity key={style.id} style={styles.styleCard} onPress={() => router.push(`/category-styles/${style.id}`)}>
                 <Image source={style.image} style={styles.styleImage} contentFit="cover" />
-                <View style={styles.styleOverlay}>
-                  <Text style={styles.styleName} numberOfLines={2}>{style.name}</Text>
-                </View>
+                <View style={styles.styleOverlay}><Text style={styles.styleName} numberOfLines={2}>{style.name}</Text></View>
               </TouchableOpacity>
             ))}
           </View>
-        </Animated.View>
+        </View>
 
-        {/* ---------------- Coiffeurs à proximité ---------------- */}
-        {nearbySalons.length > 0 && (
-          <Animated.View
-            entering={FadeInUp.delay(400).duration(500)}
-            style={styles.section}
-          >
-            <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              {nearbySalons.map((salon) => (
-                <SalonCard 
-                  key={salon.id} 
-                  salon={salon} 
-                  variant="default" 
-                  isFavorite={favoriteIds.includes(salon.id)}
-                  onFavoritePress={() => handleToggleFavorite(salon.id)}
-                />
+        {/* Popular Salons */}
+        {popularSalons.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="Les plus populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {popularSalons.map((salon) => (
+                <SalonCard key={salon.id} salon={salon} variant="default" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
               ))}
             </ScrollView>
-          </Animated.View>
+          </View>
         )}
 
-        {/* ---------------- Salons populaires ---------------- */}
-        {popularSalons.length > 0 && (
-          <Animated.View
-            entering={FadeInUp.delay(450).duration(500)}
-            style={styles.section}
-          >
-            <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
-            <View style={styles.popularGrid}>
-              {popularSalons.map((salon) => (
-                <SalonCard 
-                  key={salon.id} 
-                  salon={salon} 
-                  variant="horizontal" 
-                  isFavorite={favoriteIds.includes(salon.id)}
-                  onFavoritePress={() => handleToggleFavorite(salon.id)}
-                />
+        {/* Nearby */}
+        {nearbySalons.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title={t('home.nearbyCoiffeurs')} onSeeAll={() => router.push('/(tabs)/explore')} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {nearbySalons.map((salon) => (
+                <SalonCard key={salon.id} salon={salon} variant="default" isFavorite={favoriteIds.includes(salon.id)} onFavoritePress={() => handleToggleFavorite(salon.id)} />
               ))}
-            </View>
-          </Animated.View>
+            </ScrollView>
+          </View>
         )}
 
-        {/* ---------------- Tips & Inspiration ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(500).duration(500)}
-          style={styles.section}
-        >
-          <SectionHeader title={t('home.tipsAndInspiration')} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {TIPS_AND_INSPIRATION.map((tip) => (
-              <TouchableOpacity key={tip.id} style={styles.tipCard}>
-                <Image source={tip.image} style={styles.tipImage} contentFit="cover" />
-                <View style={styles.tipOverlay}>
-                  <View style={styles.tipCategoryBadge}>
-                    <Text style={styles.tipCategoryText}>{tip.category}</Text>
-                  </View>
-                  <View style={styles.tipContent}>
-                    <Text style={styles.tipTitle}>{tip.title}</Text>
-                    <View style={styles.tipMeta}>
-                      <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.tipReadTime}>{tip.readTime}</Text>
-                    </View>
+        {/* Tips & Inspiration */}
+        <View style={styles.section}>
+          <SectionHeader title="Conseils & Inspiration" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+            {TIPS_AND_INSPIRATION.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.tipCard}>
+                <Image source={item.image} style={styles.tipImage} contentFit="cover" />
+                <View style={styles.tipContent}>
+                  <View style={styles.tipBadge}><Text style={styles.tipBadgeText}>{item.category}</Text></View>
+                  <Text style={styles.tipTitle} numberOfLines={2}>{item.title}</Text>
+                  <View style={styles.tipFooter}>
+                    <Ionicons name="time-outline" size={14} color="#808080" />
+                    <Text style={styles.tipTime}>{item.readTime} de lecture</Text>
                   </View>
                 </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </Animated.View>
+        </View>
 
-        {/* ---------------- Become a Pro CTA ---------------- */}
-        <Animated.View
-          entering={FadeInUp.delay(550).duration(500)}
-          style={styles.section}
-        >
+        {/* Become Pro CTA */}
+        <View style={styles.section}>
           <View style={styles.ctaCard}>
             <View style={styles.ctaContent}>
               <Ionicons name="cut" size={32} color="#FFFFFF" />
               <Text style={styles.ctaTitle}>{t('home.areYouCoiffeur')}</Text>
-              <Text style={styles.ctaSubtitle}>
-                {t('home.joinAfroPlanPro')}
-              </Text>
-              <TouchableOpacity
-                style={styles.ctaButton}
-                onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}
-              >
+              <Text style={styles.ctaSubtitle}>{t('home.joinAfroPlanPro')}</Text>
+              <TouchableOpacity style={styles.ctaButton} onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'coiffeur' } })}>
                 <Text style={styles.ctaButtonText}>{t('home.discoverPro')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#191919" />
               </TouchableOpacity>
             </View>
           </View>
-        </Animated.View>
-
-        {/* ---------------- Footer avec réseaux sociaux ---------------- */}
-        <View style={styles.footer}>
-          <View style={styles.footerTop}>
-            <View style={styles.footerLinks}>
-              <TouchableOpacity onPress={() => openLink('mailto:support@afroplan.com')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>Support</Text>
-              </TouchableOpacity>
-              <Text style={styles.footerDot}>•</Text>
-              <TouchableOpacity onPress={() => router.push('/terms')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>CGU</Text>
-              </TouchableOpacity>
-              <Text style={styles.footerDot}>•</Text>
-              <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
-                <Text style={[styles.footerLink, { color: '#191919' }]}>Confidentialité</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.socialSection}>
-            <Text style={styles.socialTitle}>Rejoignez-nous</Text>
-            <View style={styles.socialLinks}>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => openLink('https://www.instagram.com/afro._plan?igsh=ODRhaWt6aWpsdHY=')}
-              >
-                <Ionicons name="logo-instagram" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => openLink('https://www.linkedin.com/company/afro-plan/')}
-              >
-                <Ionicons name="logo-linkedin" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Text style={styles.copyright}>
-            © 2024 AfroPlan. Tous droits réservés.
-          </Text>
         </View>
 
+        {/* Social Media & Footer */}
+        <View style={styles.footerSection}>
+          <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://instagram.com/afroplan')}>
+              <Ionicons name="logo-instagram" size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://facebook.com/afroplan')}>
+              <Ionicons name="logo-facebook" size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialIcon, { backgroundColor: '#191919' }]} onPress={() => Linking.openURL('https://tiktok.com/@afroplan')}>
+              <Ionicons name="logo-tiktok" size={22} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.copyright}>© 2024 AfroPlan. Tous droits réservés.</Text>
+        </View>
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Auth Guard Modal */}
-      <AuthGuardModal
-        visible={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        message="Connectez-vous pour voir les détails du salon et réserver"
-      />
-
-      <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
-      
+      <AuthGuardModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} message="Connectez-vous pour profiter de toutes les fonctionnalités" />
       {pendingReviewBooking && (
-        <RatingModal
-          visible={ratingModalVisible}
-          onClose={() => setRatingModalVisible(false)}
-          bookingId={pendingReviewBooking.id}
-          salonId={pendingReviewBooking.salon_id}
-          salonName={pendingReviewBooking.salon?.name || 'le salon'}
-          onSuccess={() => {
-            setPendingReviewBooking(null);
-            refreshSalons();
-          }}
-        />
+        <RatingModal visible={ratingModalVisible} onClose={() => setRatingModalVisible(false)} bookingId={pendingReviewBooking.id} salonId={pendingReviewBooking.salon_id} salonName={pendingReviewBooking.salon?.name || 'le salon'} onSuccess={() => { setPendingReviewBooking(null); refreshSalons(); }} />
       )}
     </SafeAreaView>
   );
 }
 
-/* -------------------- Styles -------------------- */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  // Header
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logoWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E5E5',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#191919',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  authButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  switchRoleButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#F0F0F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  registerButton: {
-    backgroundColor: '#f9f8f8',
-    borderWidth: 1.5,
-    borderColor: '#191919',
-    borderRadius: 20,
-    paddingHorizontal: isSmallScreen ? 12 : 16,
-    paddingVertical: 8,
-  },
-  registerButtonText: {
-    color: '#191919',
-    fontWeight: '600',
-    fontSize: isSmallScreen ? 12 : 14,
-  },
-  loginButton: {
-    backgroundColor: '#191919',
-    borderRadius: 20,
-    paddingHorizontal: isSmallScreen ? 12 : 16,
-    paddingVertical: 8,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: isSmallScreen ? 12 : 14,
-  },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#EF4444',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  welcomeMessage: {
-    marginTop: 16,
-  },
-  welcomeText: {
-    fontSize: 14,
-  },
-  welcomeSubtext: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-
-  // Main Search
-  searchSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  mainSearchButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: '#191919',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#191919',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  searchButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  searchIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#191919',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  searchTextContainer: {
-    flex: 1,
-  },
-  searchButtonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#191919',
-  },
-  searchButtonSubtitle: {
-    fontSize: 13,
-    color: '#808080',
-    marginTop: 2,
-  },
-
-  // Sections
-  section: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Horizontal scroll
-  horizontalScroll: {
-    paddingRight: 16,
-    gap: 12,
-  },
-  // Styles grid
-  stylesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  styleCard: {
-    width: (width - 56) / 3,
-    height: 110,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  styleImage: {
-    width: '100%',
-    height: '100%',
-  },
-  styleOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 10,
-    justifyContent: 'flex-end',
-  },
-  styleEmoji: {
-    fontSize: 18,
-    marginBottom: 2,
-  },
-  styleName: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 17,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  showLessButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  showLessText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  popularGrid: {
-    gap: 12,
-    paddingBottom: 8,
-  },
-  horizontalScroll: {
-    paddingRight: 16,
-    gap: 12,
-  },
-  // Tips
-  tipCard: {
-    width: 240,
-    height: 160,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  tipImage: {
-    width: '100%',
-    height: '100%',
-  },
-  tipOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  tipCategoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  tipCategoryText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  tipContent: {},
-  tipTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  tipMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  tipReadTime: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-
-  // CTA
-  ctaCard: {
-    backgroundColor: '#191919',
-    borderRadius: 20,
-    padding: 24,
-    marginTop: 8,
-  },
-  ctaContent: {
-    alignItems: 'center',
-  },
-  ctaTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 12,
-  },
-  ctaSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  ctaButton: {
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  ctaButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#191919',
-  },
-
-  // Footer
-  footer: {
-    marginTop: 24,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9f8f8',
-  },
-  footerTop: {
-    marginBottom: 16,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  footerLink: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  footerDot: {
-    fontSize: 6,
-    color: '#808080',
-  },
-  socialSection: {
-    backgroundColor: '#191919',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  socialTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 12,
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  socialButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  copyright: {
-    fontSize: 11,
-    textAlign: 'center',
-    color: '#808080',
-    marginBottom: 8,
-  },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logoWrapper: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E5E5E5' },
+  logoImage: { width: '100%', height: '100%' },
+  authButtons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  switchRoleButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
+  loginButton: { backgroundColor: '#191919', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  loginButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
+  notificationButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  notificationBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: '#EF4444', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  notificationBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  userInfoCompact: { marginRight: 8 },
+  welcomeText: { fontSize: 14 },
+  searchSection: { paddingHorizontal: 16, paddingBottom: 8 },
+  mainSearchButton: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 2, borderColor: '#191919', elevation: 4 },
+  searchButtonContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  searchIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#191919', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  searchTextContainer: { flex: 1 },
+  searchButtonTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
+  searchButtonSubtitle: { fontSize: 13, color: '#808080', marginTop: 2 },
+  section: { paddingTop: 20, paddingHorizontal: 16 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '700' },
+  seeAll: { fontSize: 14, fontWeight: '600' },
+  horizontalScroll: { paddingRight: 16, gap: 12 },
+  stylesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  styleCard: { width: (width - 56) / 3, height: 110, borderRadius: 12, overflow: 'hidden' },
+  styleImage: { width: '100%', height: '100%' },
+  styleOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, justifyContent: 'flex-end' },
+  styleName: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', lineHeight: 17, textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  ctaCard: { backgroundColor: '#191919', borderRadius: 20, padding: 24, marginTop: 8 },
+  ctaContent: { alignItems: 'center' },
+  ctaTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginTop: 12 },
+  ctaSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 8, marginBottom: 20 },
+  ctaButton: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  ctaButtonText: { fontSize: 15, fontWeight: '600', color: '#191919' },
+  footer: { marginTop: 24, paddingVertical: 20, alignItems: 'center' },
+  copyright: { fontSize: 11, color: '#808080' },
+  // Styles pour les conseils
+  tipCard: { width: 280, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', marginRight: 12, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  tipImage: { width: '100%', height: 150 },
+  tipContent: { padding: 16 },
+  tipBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 },
+  tipBadgeText: { fontSize: 10, fontWeight: '700', color: '#191919', textTransform: 'uppercase' },
+  tipTitle: { fontSize: 15, fontWeight: '700', color: '#191919', marginBottom: 12, lineHeight: 20 },
+  tipFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tipTime: { fontSize: 12, color: '#808080', fontWeight: '500' },
+  // Footer & Social
+  footerSection: { padding: 30, alignItems: 'center', backgroundColor: 'transparent' },
+  footerTitle: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
+  socialRow: { flexDirection: 'row', gap: 15, marginBottom: 24 },
+  socialIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
 });

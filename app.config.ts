@@ -52,6 +52,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       "expo-router",
+      "expo-audio",
+      "expo-video",
       "expo-secure-store",
       "expo-image-picker",
       [
