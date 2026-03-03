@@ -34,3 +34,5 @@ temp/
 Thumbs.db
 .idea/
 .vscode/
+.gemini/
+ai_docs/
