@@ -301,6 +301,7 @@ export default function HomeScreen() {
         budget: filters.maxBudget,
         distance: filters.maxDistance,
         location: filters.location,
+        hairType: filters.hairType.join(','),
         showAll: filters.showAll ? 'true' : 'false'
       }
     });

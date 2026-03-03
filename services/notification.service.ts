@@ -1,14 +1,22 @@
 /**
- * Service pour la gestion des notifications in-app
+ * Service pour la gestion des notifications in-app et push locales
  */
 
 import { supabase } from '@/lib/supabase';
 import { Platform } from 'react-native';
+import * as Device from 'expo-constants';
 
-// Note: On ne peut pas appeler setNotificationHandler sans importer le module.
-// On le fera dynamiquement lors de l'initialisation si nécessaire.
+// On importe expo-notifications dynamiquement pour éviter les crashs si le module natif manque
+const getNotificationsModule = async () => {
+  try {
+    return await import('expo-notifications');
+  } catch (e) {
+    console.warn('Expo Notifications module not found');
+    return null;
+  }
+};
 
-export type NotificationType = 'booking_confirmed' | 'booking_cancelled' | 'booking_reminder' | 'system';
+export type NotificationType = 'booking_confirmed' | 'booking_cancelled' | 'booking_reminder' | 'system' | 'rating_prompt';
 
 export interface Notification {
   id: string;
@@ -23,7 +31,7 @@ export interface Notification {
 
 export const notificationService = {
   /**
-   * Créer une nouvelle notification et déclencher une alerte locale
+   * Créer une nouvelle notification (Base de données + Notification Locale)
    */
   async createNotification(notification: {
     user_id: string;
@@ -32,7 +40,7 @@ export const notificationService = {
     type: NotificationType;
     booking_id?: string;
   }) {
-    // 1. Sauvegarder en base de données
+    // 1. Sauvegarder en base de données (Toujours faire ça)
     const { data, error } = await supabase
       .from('notifications')
       .insert({
@@ -43,25 +51,81 @@ export const notificationService = {
       .single();
 
     if (error) {
-      console.error('Error creating notification:', error);
+      console.error('Error creating notification in DB:', error);
     }
 
-    // Les notifications système (vibrations/push) sont désactivées temporairement
-    // mais le message est bien enregistré en base de données.
+    // 2. Déclencher une notification locale avec son et vibration
+    try {
+      const Notifications = await getNotificationsModule();
+      if (Notifications) {
+        // Configuration du handler au besoin (si pas déjà fait)
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldVibrate: true,
+          }),
+        });
+
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: notification.title,
+            body: notification.message,
+            data: { booking_id: notification.booking_id, type: notification.type },
+            sound: true,
+            vibrate: [0, 250, 250, 250],
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null,
+        });
+      }
+    } catch (e) {
+      console.error('Error scheduling local notification:', e);
+    }
 
     return data;
   },
 
   /**
-   * Demander les permissions pour les notifications push
+   * Demander les permissions pour les notifications
    */
   async registerForPushNotificationsAsync() {
-    // Désactivé temporairement
+    let token;
+    const Notifications = await getNotificationsModule();
+    if (!Notifications) return;
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        sound: 'default',
+      });
+    }
+
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        return;
+      }
+      
+      try {
+        token = (await Notifications.getExpoPushTokenAsync()).data;
+      } catch (e) {
+        console.error('Erreur récupération token push:', e);
+      }
+    }
+
+    return token;
   },
 
-  /**
-   * Récupérer les notifications d'un utilisateur
-   */
   async getNotifications(userId: string): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
@@ -69,53 +133,18 @@ export const notificationService = {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
-
-    if (error) {
-      console.error('Error fetching notifications:', error);
-      return [];
-    }
     return data || [];
   },
 
-  /**
-   * Marquer une notification comme lue
-   */
   async markAsRead(id: string) {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error marking notification as read:', error);
-    }
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
   },
 
-  /**
-   * Marquer toutes les notifications comme lues
-   */
   async markAllAsRead(userId: string) {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId);
   },
 
-  /**
-   * Supprimer une notification
-   */
   async deleteNotification(id: string) {
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting notification:', error);
-    }
+    await supabase.from('notifications').delete().eq('id', id);
   }
 };

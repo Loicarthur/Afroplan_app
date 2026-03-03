@@ -16,12 +16,13 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +49,45 @@ const mapDbToLocalMessage = (dbMsg: DbMessage, activeRole: string, salonName: st
     isMe: dbMsg.sender_type === activeRole,
   };
 };
+
+function BookingContextBanner({ booking }: { booking: BookingWithDetails }) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  
+  const date = new Date(booking.booking_date).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
+  const imageUrl = booking.service?.image_url || booking.salon?.image_url || 'https://via.placeholder.com/150';
+
+  return (
+    <Animated.View 
+      entering={FadeInDown.duration(400)}
+      style={[styles.bannerContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
+    >
+      <Image source={{ uri: imageUrl }} style={styles.bannerImage} />
+      <View style={styles.bannerInfo}>
+        <Text style={[styles.bannerServiceTitle, { color: colors.text }]} numberOfLines={1}>
+          {booking.service?.name || 'Prestation'}
+        </Text>
+        <View style={styles.bannerRow}>
+          <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+          <Text style={[styles.bannerText, { color: colors.textSecondary }]}>
+            {date} à {booking.start_time}
+          </Text>
+        </View>
+        <View style={styles.bannerRow}>
+          <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
+          <Text style={[styles.bannerText, { color: colors.textMuted }]}>
+            {booking.total_price}€ • {booking.status === 'confirmed' ? 'Confirmé' : 'En attente'}
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
 
 function MessageBubble({ message }: { message: Message }) {
   const colorScheme = useColorScheme();
@@ -124,6 +164,9 @@ export default function ChatScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerTitle: activeRole === 'coiffeur' ? booking.client?.full_name : booking.salon?.name }} />
+      
+      <BookingContextBanner booking={booking} />
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -135,7 +178,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
         <View style={[styles.inputArea, { paddingBottom: insets.bottom + 8, backgroundColor: colors.background }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickMsgs}>
-            {(activeRole === 'coiffeur' ? ["À votre service !", "Prêt pour vous !"] : ["Je suis en route !", "Merci !"]).map(t => (
+            {(activeRole === 'coiffeur' ? ["À votre service !", "Prêt pour vous !", "Je vous attends."] : ["Je suis en route !", "Merci !", "Je serai un peu en retard."]).map(t => (
               <TouchableOpacity key={t} style={[styles.chip, { backgroundColor: colors.card }]} onPress={() => setInputText(t)}>
                 <Text style={{ color: colors.text, fontSize: 12 }}>{t}</Text>
               </TouchableOpacity>
@@ -158,6 +201,44 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  // Banner styles
+  bannerContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    ...Shadows.sm,
+  },
+  bannerImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  bannerInfo: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  bannerServiceTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  bannerText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Chat styles
   messageBubbleContainer: { marginVertical: 6, maxWidth: '85%' },
   messageBubbleRight: { alignSelf: 'flex-end' },
   messageBubbleLeft: { alignSelf: 'flex-start' },

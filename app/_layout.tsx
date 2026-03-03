@@ -55,11 +55,26 @@ function RootContent() {
   useBookingReminders();
 
   React.useEffect(() => {
-    let subscription: any;
+    let responseListener: any;
 
     const setupNotifications = async () => {
-      // Les notifications Push sont temporairement désactivées pour résoudre un conflit système.
-      // Les notifications In-App (la cloche) restent 100% fonctionnelles.
+      try {
+        // Demander les permissions au démarrage via le service sécurisé
+        await notificationService.registerForPushNotificationsAsync();
+
+        // Importer dynamiquement pour éviter le crash au chargement si le module natif manque
+        const Notifications = await import('expo-notifications');
+        
+        // Gérer le clic sur la notification
+        responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+          const data = response.notification.request.content.data;
+          if (data?.booking_id) {
+            console.log('Notification cliquée pour le booking:', data.booking_id);
+          }
+        });
+      } catch (e) {
+        console.warn('Notifications non disponibles (Build natif requis)');
+      }
     };
 
     setupNotifications();
@@ -68,7 +83,11 @@ function RootContent() {
     SplashScreen.hideAsync();
 
     return () => {
-      if (subscription && subscription.remove) subscription.remove();
+      if (responseListener) {
+        import('expo-notifications').then(Notifications => {
+          Notifications.removeNotificationSubscription(responseListener);
+        }).catch(() => {});
+      }
     };
   }, []);
 
