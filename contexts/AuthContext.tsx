@@ -8,6 +8,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { authService } from '@/services';
 import { Profile } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type UserRole = 'client' | 'coiffeur' | 'admin';
 
@@ -22,7 +23,7 @@ type AuthContextType = {
   isClient: boolean;
   role: UserRole | null;
   signUp: (email: string, password: string, fullName: string, phone?: string, role?: 'client' | 'coiffeur') => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, targetRole?: 'client' | 'coiffeur') => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -123,10 +124,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   // Connexion
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string, targetRole?: 'client' | 'coiffeur') => {
     setIsLoading(true);
     try {
       const { user: authUser } = await authService.signIn({ email, password });
+      
+      if (targetRole) {
+        await AsyncStorage.setItem('@afroplan_selected_role', targetRole);
+      }
+
       if (authUser) {
         await loadProfile(authUser.id);
       }

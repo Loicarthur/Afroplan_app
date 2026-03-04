@@ -47,114 +47,163 @@ interface RecentPayment {
 export default function SalonDashboard() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile } = useAuth();
+  const { user } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [stats, setStats] = useState<PaymentStats | null>(null);
   const [balance, setBalance] = useState({ availableBalance: 0, currency: 'eur' });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>('free');
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
-  const [, setIsStripeConnected] = useState(false);
-
-  // Données de démonstration
-  const mockStats: PaymentStats = {
-    totalRevenue: 245000, // 2450€
-    totalCommission: 36750, // 367.50€
-    netRevenue: 208250, // 2082.50€
-    transactionCount: 42,
-    averageTransaction: 5833, // 58.33€
-  };
-
-  const mockRecentPayments: RecentPayment[] = [
-    {
-      id: '1',
-      amount: 12000,
-      commission: 1800,
-      salonAmount: 10200,
-      status: 'completed',
-      createdAt: '2026-02-01T14:30:00',
-      clientName: 'Marie D.',
-      serviceName: 'Box Braids',
-    },
-    {
-      id: '2',
-      amount: 8500,
-      commission: 1275,
-      salonAmount: 7225,
-      status: 'completed',
-      createdAt: '2026-02-01T10:00:00',
-      clientName: 'Aminata K.',
-      serviceName: 'Twists',
-    },
-    {
-      id: '3',
-      amount: 6000,
-      commission: 900,
-      salonAmount: 5100,
-      status: 'pending',
-      createdAt: '2026-01-31T16:45:00',
-      clientName: 'Sophie L.',
-      serviceName: 'Coupe naturelle',
-    },
-  ];
+  const [salonId, setSalonId] = useState<string | null>(null);
 
   const loadDashboardData = async () => {
-    // Pour le moment, utiliser les données de démo
-    setStats(mockStats);
-    setBalance({ availableBalance: 52350, currency: 'eur' });
-    setRecentPayments(mockRecentPayments);
-    setCurrentPlan('free');
-    setIsStripeConnected(true);
+    if (!user?.id) return;
+    
+    try {
+      const salon = await salonService.getSalonByOwnerId(user.id);
+      if (salon) {
+        setSalonId(salon.id);
+        
+        // Récupérer le solde et les paiements en parallèle
+        const [paymentsResponse, availableBalance] = await Promise.all([
+          paymentService.getSalonPayments(salon.id, 1, 10),
+          paymentService.getSalonBalance(salon.id)
+        ]);
+
+        setBalance({ availableBalance, currency: 'eur' });
+
+        // Mapper les paiements récents
+        const mapped: RecentPayment[] = paymentsResponse.data.map((p: any) => ({
+          id: p.id,
+          amount: p.amount,
+          commission: p.commission,
+          salonAmount: p.salon_amount,
+          status: p.status,
+          createdAt: p.created_at,
+          clientName: p.booking?.client?.full_name || 'Client',
+          serviceName: p.booking?.service?.name || 'Prestation',
+        }));
+        setRecentPayments(mapped);
+
+        // Calculer les stats basées sur la période (simulation simplifiée ici)
+        const now = new Date();
+        let periodStart = new Date();
+        if (period === 'week') periodStart.setDate(now.getDate() - 7);
+        else if (period === 'month') periodStart.setMonth(now.getMonth() - 1);
+        else periodStart.setFullYear(now.getFullYear() - 1);
+
+        const periodPayments = mapped.filter(p => new Date(p.createdAt) >= periodStart && p.status === 'completed');
+        
+        const totalRevenue = periodPayments.reduce((sum, p) => sum + p.amount, 0);
+        const totalCommission = periodPayments.reduce((sum, p) => sum + p.commission, 0);
+        const netRevenue = periodPayments.reduce((sum, p) => sum + p.salonAmount, 0);
+        
+        setStats({
+          totalRevenue,
+          totalCommission,
+          netRevenue,
+          transactionCount: periodPayments.length,
+          averageTransaction: periodPayments.length > 0 ? totalRevenue / periodPayments.length : 0,
+        });
+
+        // Simuler le plan (en réalité on le récupèrerait de stripe_accounts)
+        setCurrentPlan('free');
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
     loadDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [user?.id, period]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadDashboardData();
-    setRefreshing(false);
   };
 
   const formatAmount = (cents: number) => {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
   };
 
-  const handleUpgradePlan = () => {
-    router.push('/(salon)/subscription');
-  };
+  const handleWithdraw = async () => {
+    if (!salonId || balance.availableBalance <= 0) return;
 
-  const handleViewPayments = () => {
-    router.push('/(salon)/payments' as any);
-  };
-
-  const handleWithdraw = () => {
     Alert.alert(
-      'Retrait',
+      'Confirmer le retrait',
       `Voulez-vous transférer ${formatAmount(balance.availableBalance)} vers votre compte bancaire ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Confirmer',
-          onPress: () => Alert.alert('Succès', 'Le virement sera effectué sous 2-3 jours ouvrés.'),
+          onPress: async () => {
+            try {
+              await paymentService.withdrawFunds(salonId);
+              Alert.alert('Succès', 'Le virement a été initié avec succès !');
+              loadDashboardData();
+            } catch (error: any) {
+              Alert.alert('Erreur', error.message);
+            }
+          },
         },
       ]
     );
   };
 
+  // Groupement par jour pour les paiements récents
+  const groupedPayments = useMemo(() => {
+    const groups: Record<string, RecentPayment[]> = {};
+    recentPayments.forEach(p => {
+      const date = p.createdAt.split('T')[0];
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(p);
+    });
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 5); // Limiter aux 5 derniers jours
+  }, [recentPayments]);
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const handleViewPayments = () => {
+    router.push('/(salon)/payments' as any);
+  };
+
+  const handleUpgradePlan = () => {
+    router.push('/(salon)/subscription' as any);
+  };
+
   const currentPlanInfo = SUBSCRIPTION_PLANS[currentPlan];
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
+      {/* ... (rest of the render) ... */}
       {/* Header */}
       <LinearGradient
         colors={['#8B5CF6', '#7C3AED']}
@@ -163,9 +212,9 @@ export default function SalonDashboard() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Bonjour,</Text>
-            <Text style={styles.salonName}>{profile?.full_name || 'Mon Salon'}</Text>
+            <Text style={styles.salonName}>{user?.email?.split('@')[0] || 'Mon Salon'}</Text>
           </View>
-          <TouchableOpacity style={styles.settingsButton}>
+          <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/(salon)/dashboard' as any)}>
             <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -198,8 +247,8 @@ export default function SalonDashboard() {
           <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
             Solde disponible
           </Text>
-          <TouchableOpacity onPress={handleWithdraw}>
-            <Text style={[styles.withdrawLink, { color: colors.primary }]}>
+          <TouchableOpacity onPress={handleWithdraw} disabled={balance.availableBalance <= 0}>
+            <Text style={[styles.withdrawLink, { color: balance.availableBalance > 0 ? colors.primary : colors.textMuted }]}>
               Retirer →
             </Text>
           </TouchableOpacity>
@@ -208,7 +257,7 @@ export default function SalonDashboard() {
           {formatAmount(balance.availableBalance)}
         </Text>
         <Text style={[styles.balanceNote, { color: colors.textMuted }]}>
-          Prochain virement automatique : Vendredi
+          Transferts vers votre compte bancaire enregistré
         </Text>
       </View>
 
@@ -283,7 +332,7 @@ export default function SalonDashboard() {
         <Ionicons name="information-circle" size={20} color="#D97706" />
         <View style={styles.commissionInfo}>
           <Text style={[styles.commissionTitle, { color: '#92400E' }]}>
-            Commission ce mois
+            Commission sur la période
           </Text>
           <Text style={[styles.commissionAmount, { color: '#D97706' }]}>
             {stats ? formatAmount(stats.totalCommission) : '--'}
@@ -296,11 +345,11 @@ export default function SalonDashboard() {
         </TouchableOpacity>
       </View>
 
-      {/* Paiements récents */}
+      {/* Paiements récents groupés par jour */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Paiements récents
+            Historique des transactions
           </Text>
           <TouchableOpacity onPress={handleViewPayments}>
             <Text style={[styles.viewAllLink, { color: colors.primary }]}>
@@ -309,53 +358,64 @@ export default function SalonDashboard() {
           </TouchableOpacity>
         </View>
 
-        {recentPayments.map((payment) => (
-          <View
-            key={payment.id}
-            style={[styles.paymentItem, { backgroundColor: colors.card }, Shadows.sm]}
-          >
-            <View style={styles.paymentLeft}>
-              <Text style={[styles.paymentService, { color: colors.text }]}>
-                {payment.serviceName}
-              </Text>
-              <Text style={[styles.paymentClient, { color: colors.textSecondary }]}>
-                {payment.clientName}
-              </Text>
-              <Text style={[styles.paymentDate, { color: colors.textMuted }]}>
-                {new Date(payment.createdAt).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            </View>
-            <View style={styles.paymentRight}>
-              <Text style={[styles.paymentAmount, { color: colors.text }]}>
-                +{formatAmount(payment.salonAmount)}
-              </Text>
-              <View
-                style={[
-                  styles.paymentStatus,
-                  {
-                    backgroundColor:
-                      payment.status === 'completed' ? '#DCFCE7' : '#FEF3C7',
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: payment.status === 'completed' ? '#166534' : '#92400E',
-                    fontSize: 10,
-                    fontWeight: '600',
-                  }}
-                >
-                  {payment.status === 'completed' ? 'Reçu' : 'En attente'}
-                </Text>
-              </View>
-            </View>
+        {recentPayments.length === 0 ? (
+          <View style={[styles.emptyState, { backgroundColor: colors.card }, Shadows.sm]}>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>Aucun paiement récent</Text>
           </View>
-        ))}
+        ) : (
+          groupedPayments.map(([date, payments]) => (
+            <View key={date} style={styles.dayGroup}>
+              <Text style={[styles.dayHeaderLabel, { color: colors.textSecondary }]}>
+                {new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </Text>
+              {payments.map((payment) => (
+                <View
+                  key={payment.id}
+                  style={[styles.paymentItem, { backgroundColor: colors.card }, Shadows.sm]}
+                >
+                  <View style={styles.paymentLeft}>
+                    <Text style={[styles.paymentService, { color: colors.text }]}>
+                      {payment.serviceName}
+                    </Text>
+                    <Text style={[styles.paymentClient, { color: colors.textSecondary }]}>
+                      {payment.clientName}
+                    </Text>
+                    <Text style={[styles.paymentDate, { color: colors.textMuted }]}>
+                      {new Date(payment.createdAt).toLocaleTimeString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.paymentRight}>
+                    <Text style={[styles.paymentAmount, { color: payment.status === 'completed' ? '#22C55E' : colors.text }]}>
+                      +{formatAmount(payment.salonAmount)}
+                    </Text>
+                    <View
+                      style={[
+                        styles.paymentStatus,
+                        {
+                          backgroundColor:
+                            payment.status === 'completed' ? '#DCFCE7' : '#FEF3C7',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: payment.status === 'completed' ? '#166534' : '#92400E',
+                          fontSize: 10,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {payment.status === 'completed' ? 'Reçu' : 'En attente'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))
+        )}
       </View>
 
       {/* Actions rapides */}
@@ -632,6 +692,26 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     marginTop: 4,
+  },
+  dayGroup: {
+    marginBottom: 20,
+  },
+  dayHeaderLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 10,
+    textTransform: 'capitalize',
+    paddingLeft: 4,
+  },
+  emptyState: {
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   actionsGrid: {
     flexDirection: 'row',

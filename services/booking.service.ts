@@ -217,11 +217,32 @@ export const bookingService = {
 
   /**
    * Annuler une reservation par le coiffeur avec un motif
+   * Règle : Un rendez-vous dont la date est passée ne peut plus être annulé.
    */
   async cancelBookingByCoiffeur(id: string, reason: string): Promise<Booking> {
     checkSupabaseConfig();
     
-    // 1. Mettre à jour le statut du rendez-vous
+    // 1. Vérifier la date
+    const { data: booking, error: fetchError } = await supabase
+      .from('bookings')
+      .select('status, booking_date, start_time, client_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !booking) {
+      throw new Error('Rendez-vous introuvable.');
+    }
+
+    const now = new Date();
+    const [h, m] = (booking.start_time || '00:00').split(':').map(Number);
+    const bookingDateTime = new Date(booking.booking_date);
+    bookingDateTime.setHours(h, m, 0, 0);
+
+    if (bookingDateTime < now) {
+      throw new Error('Impossible d\'annuler : ce rendez-vous est déjà passé.');
+    }
+
+    // 2. Mettre à jour le statut du rendez-vous
     const { data, error } = await supabase
       .from('bookings')
       .update({ 
@@ -258,22 +279,58 @@ export const bookingService = {
   },
 
   /**
-   * Annuler une reservation (Suppression physique)
+   * Annuler une reservation par le client
+   * Règle : Un rendez-vous confirmé (avec paiement/acompte) ne peut pas être annulé directement par le client.
+   * Règle 2 : Un rendez-vous dont la date est passée ne peut plus être annulé.
    */
-  async cancelBooking(id: string): Promise<void> {
+  async cancelBooking(id: string): Promise<Booking> {
+    checkSupabaseConfig();
+    
+    // 1. Vérifier le statut et la date
+    const { data: booking, error: fetchError } = await supabase
+      .from('bookings')
+      .select('status, payment_method, booking_date, start_time')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !booking) {
+      throw new Error('Rendez-vous introuvable.');
+    }
+
+    // Vérification de la date passée
+    const now = new Date();
+    const [h, m] = (booking.start_time || '00:00').split(':').map(Number);
+    const bookingDateTime = new Date(booking.booking_date);
+    bookingDateTime.setHours(h, m, 0, 0);
+
+    if (bookingDateTime < now) {
+      throw new Error('Ce rendez-vous est déjà passé et ne peut plus être annulé.');
+    }
+
+    if (booking.status === 'confirmed' || booking.status === 'completed') {
+      throw new Error('Ce rendez-vous est déjà confirmé ou terminé et ne peut plus être annulé directement.');
+    }
+
+    // 2. Mettre à jour le statut en 'cancelled' au lieu de supprimer
     const { data, error } = await supabase
       .from('bookings')
-      .delete()
+      .update({ 
+        status: 'cancelled', 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
-      .select(); // Important pour vérifier si la suppression a eu lieu
+      .select()
+      .single();
 
     if (error) {
       throw new Error(error.message);
     }
 
-    if (!data || data.length === 0) {
-      throw new Error('Suppression impossible : Vous n\'avez pas les droits ou le rendez-vous n\'existe plus.');
+    if (!data) {
+      throw new Error('Annulation impossible : Le rendez-vous n\'existe plus.');
     }
+
+    return data;
   },
 
   /**

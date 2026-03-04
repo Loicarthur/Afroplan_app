@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,9 +97,10 @@ export default function RegisterScreen() {
 
       // 2. Connexion automatique après inscription
       try {
-        await signIn(email, password);
-        // Redirection directe sans modal
-        redirectToApp();
+        // On passe selectedRole pour que signIn le sauvegarde en local
+        await signIn(email, password, selectedRole);
+        
+        // Redirection gérée par app/index.tsx
       } catch {
         // Si la connexion auto échoue (ex: confirmation email requise),
         // rediriger vers login
@@ -123,29 +124,13 @@ export default function RegisterScreen() {
     }
   };
 
-  const redirectToApp = async () => {
-    if (hasRedirected.current) return;
-    hasRedirected.current = true;
-
-    // On respecte le mode choisi lors de l'inscription
-    const roleToUse = selectedRole;
-    
-    // Sauvegarder ce choix localement
-    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
-
-    if (roleToUse === 'coiffeur') {
-      router.replace('/(coiffeur)');
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
-
   const isClient = selectedRole === 'client';
   const roleColor = '#191919';
   const roleGradient: [string, string] = ['#191919', '#4A4A4A'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

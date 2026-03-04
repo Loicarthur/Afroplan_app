@@ -84,6 +84,53 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
 
+    if (action === 'create_payout') {
+      const { data: stripeAcc } = await supabaseAdmin
+        .from('stripe_accounts')
+        .select('stripe_account_id')
+        .eq('salon_id', salonId)
+        .single();
+
+      if (!stripeAcc?.stripe_account_id) throw new Error('Compte Stripe non trouvé pour ce salon');
+
+      // 1. Récupérer le solde disponible sur le compte Stripe Connecté
+      const balance = await stripe.balance.retrieve({
+        stripeAccount: stripeAcc.stripe_account_id,
+      });
+
+      const availableEur = balance.available.find(b => b.currency === 'eur');
+      
+      if (!availableEur || availableEur.amount <= 0) {
+        throw new Error('Aucun fonds disponible pour le virement sur votre compte Stripe.');
+      }
+
+      // 2. Créer le payout (virement vers le compte bancaire par défaut)
+      const payout = await stripe.payouts.create(
+        {
+          amount: availableEur.amount,
+          currency: 'eur',
+          description: `Virement AfroPlan Salon ${salon.name}`,
+        },
+        { stripeAccount: stripeAcc.stripe_account_id }
+      );
+
+      // 3. Marquer localement les paiements comme étant payés (virement effectué)
+      await supabaseAdmin
+        .from('payments')
+        .update({ 
+          is_paid_out: true, 
+          paid_out_at: new Date().toISOString() 
+        })
+        .eq('salon_id', salonId)
+        .eq('status', 'completed')
+        .eq('is_paid_out', false);
+
+      return new Response(
+        JSON.stringify({ success: true, payoutId: payout.id, amount: availableEur.amount }), 
+        { headers: corsHeaders }
+      );
+    }
+
     throw new Error('Action inconnue');
 
   } catch (error) {

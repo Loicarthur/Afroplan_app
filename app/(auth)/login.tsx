@@ -79,9 +79,11 @@ export default function LoginScreen() {
     if (!validate()) return;
 
     try {
-      await signIn(email, password);
-      // Redirection directe vers la page d'accueil sans modal
-      redirectToApp();
+      // On passe le selectedRole à signIn pour qu'il soit sauvegardé proprement
+      await signIn(email, password, selectedRole);
+      
+      // La redirection sera gérée par le root (app/index.tsx)
+      // car l'état d'auth et le profil vont changer globalement.
     } catch (error) {
       Alert.alert(
         'Erreur de connexion',
@@ -89,30 +91,6 @@ export default function LoginScreen() {
       );
     }
   };
-
-  const redirectToApp = useCallback(async () => {
-    if (hasRedirected.current) return;
-    hasRedirected.current = true;
-
-    // On respecte le mode choisi par l'utilisateur à l'écran (Espace Client ou Coiffeur)
-    const roleToUse = selectedRole;
-    
-    // Sauvegarder ce choix localement pour que l'app s'en souvienne
-    await AsyncStorage.setItem(SELECTED_ROLE_KEY, roleToUse);
-
-    if (roleToUse === 'coiffeur') {
-      router.replace('/(coiffeur)');
-    } else {
-      router.replace('/(tabs)');
-    }
-  }, [selectedRole]);
-
-  // Rediriger quand le profil se charge après connexion
-  useEffect(() => {
-    if (profile?.role && hasRedirected.current === false) {
-      redirectToApp();
-    }
-  }, [profile, redirectToApp]);
 
   const isClient = selectedRole === 'client';
   const roleColor = '#191919';

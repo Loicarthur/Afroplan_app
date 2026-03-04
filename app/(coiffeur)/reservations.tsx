@@ -248,12 +248,24 @@ export default function CoiffeurReservationsScreen() {
                       <Text style={styles.actionButtonText}>{t('coiffeur.confirm')}</Text>
                     </TouchableOpacity>
                   )}
-                  {(booking.status === 'pending' || booking.status === 'confirmed') && (
-                    <TouchableOpacity style={[styles.actionButton, { borderColor: colors.error, borderWidth: 1 }]} onPress={() => openCancelModal(booking.id)}>
-                      <Ionicons name="close" size={18} color={colors.error} />
-                      <Text style={[styles.actionButtonText, { color: colors.error }]}>{t('coiffeur.cancel')}</Text>
-                    </TouchableOpacity>
-                  )}
+                  {(booking.status === 'pending' || booking.status === 'confirmed') && (() => {
+                    const [h, m] = booking.start_time.split(':').map(Number);
+                    const bDateTime = new Date(booking.booking_date);
+                    bDateTime.setHours(h, m, 0, 0);
+                    const isPast = bDateTime < new Date();
+
+                    if (isPast) return null;
+
+                    return (
+                      <TouchableOpacity 
+                        style={[styles.actionButton, { borderColor: colors.error, borderWidth: 1 }]} 
+                        onPress={() => openCancelModal(booking.id)}
+                      >
+                        <Ionicons name="close" size={18} color={colors.error} />
+                        <Text style={[styles.actionButtonText, { color: colors.error }]}>{t('coiffeur.cancel')}</Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
                   <TouchableOpacity 
                     style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]} 
                     onPress={() => router.push({ pathname: '/chat/[bookingId]', params: { bookingId: booking.id } })}

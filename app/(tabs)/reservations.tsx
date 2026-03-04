@@ -325,17 +325,26 @@ export default function ClientReservationsScreen() {
             )}
           </View>
 
-          {item.status === 'pending' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleCancelBooking(item as any)}
-            >
-              <Ionicons name="close-circle-outline" size={16} color={colors.error} />
-              <Text style={[styles.actionButtonText, { color: colors.error }]}>
-                {language === 'fr' ? 'Annuler' : 'Cancel'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {item.status === 'pending' && (() => {
+            const [h, m] = item.start_time.split(':').map(Number);
+            const bDateTime = new Date(item.booking_date);
+            bDateTime.setHours(h, m, 0, 0);
+            const isPast = bDateTime < now;
+
+            if (isPast) return null;
+
+            return (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleCancelBooking(item as any)}
+              >
+                <Ionicons name="close-circle-outline" size={16} color={colors.error} />
+                <Text style={[styles.actionButtonText, { color: colors.error }]}>
+                  {language === 'fr' ? 'Annuler' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
         </View>
       )}
     </View>

@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, { FadeInUp, FadeInDown, FadeInRight } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -175,10 +176,111 @@ export default function CoiffeurDashboard() {
   // Rendu selon l'état réel des données
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
-        <Text style={[styles.userName, { marginTop: 20, textAlign: 'center' }]}>{t('coiffeur.restrictedAccess')}</Text>
-        <Button title={t('auth.login')} onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20, width: '100%' }} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar barStyle="dark-content" />
+        <ScrollView showsVerticalScrollIndicator={false}>
+          
+          {/* Header minimaliste comme côté client */}
+          <View style={styles.headerClientStyle}>
+            <View style={styles.logoWrapperClientStyle}>
+              <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.logoImageClientStyle} contentFit="contain" />
+            </View>
+            <TouchableOpacity style={styles.loginButtonClientStyle} onPress={() => router.push('/(auth)/login')}>
+              <Text style={styles.loginButtonTextClientStyle}>Se connecter</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Hero Banner Pro */}
+          <View style={styles.heroSectionClientStyle}>
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=1000&auto=format&fit=crop' }} 
+              style={styles.heroImageClientStyle}
+              contentFit="cover"
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.heroOverlayClientStyle}>
+              <View style={styles.proBadgeClientStyle}>
+                <Text style={styles.proBadgeTextClientStyle}>POUR LES PROFESSIONNELS</Text>
+              </View>
+              <Text style={styles.heroTitleClientStyle}>Vivez de votre{"\n"}passion coiffure.</Text>
+            </View>
+          </View>
+
+          {/* Main Action Button (Style Barre de recherche client) */}
+          <View style={styles.searchSectionClientStyle}>
+            <TouchableOpacity style={styles.mainActionContainerClientStyle} onPress={() => router.push('/(auth)/register')}>
+              <View style={styles.actionIconContainerClientStyle}>
+                <Ionicons name="rocket" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.actionTextContainerClientStyle}>
+                <Text style={styles.actionTitleClientStyle}>Prêt à digitaliser votre salon ?</Text>
+                <Text style={styles.actionSubtitleClientStyle}>Ouvrez votre compte Pro gratuitement en 2 min</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#808080" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Benefits Section (Cards style client) */}
+          <View style={styles.sectionClientStyle}>
+            <Text style={styles.sectionTitleClientStyle}>Pourquoi AfroPlan Pro ?</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollClientStyle}>
+              <View style={[styles.benefitCardClientStyle, Shadows.sm]}>
+                <View style={[styles.benefitIconWrapperClientStyle, { backgroundColor: '#8B5CF620' }]}>
+                  <Ionicons name="trending-up" size={24} color="#8B5CF6" />
+                </View>
+                <Text style={styles.benefitTitleClientStyle}>Visibilité boostée</Text>
+                <Text style={styles.benefitDescClientStyle}>Soyez vu par des milliers de clients locaux chaque jour.</Text>
+              </View>
+
+              <View style={[styles.benefitCardClientStyle, Shadows.sm]}>
+                <View style={[styles.benefitIconWrapperClientStyle, { backgroundColor: '#22C55E20' }]}>
+                  <Ionicons name="shield-checkmark" size={24} color="#22C55E" />
+                </View>
+                <Text style={styles.benefitTitleClientStyle}>Acomptes garantis</Text>
+                <Text style={styles.benefitDescClientStyle}>Finis les rendez-vous non honorés. Encaissez des acomptes.</Text>
+              </View>
+
+              <View style={[styles.benefitCardClientStyle, Shadows.sm]}>
+                <View style={[styles.benefitIconWrapperClientStyle, { backgroundColor: '#3B82F620' }]}>
+                  <Ionicons name="calendar" size={24} color="#3B82F6" />
+                </View>
+                <Text style={styles.benefitTitleClientStyle}>Gestion 24h/24</Text>
+                <Text style={styles.benefitDescClientStyle}>Vos clients réservent même pendant que vous dormez.</Text>
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Inspiration Section */}
+          <View style={styles.sectionClientStyle}>
+            <Text style={styles.sectionTitleClientStyle}>Ils ont sauté le pas</Text>
+            <View style={styles.testimonialContainerClientStyle}>
+              <Image 
+                source={{ uri: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=200&auto=format&fit=crop' }} 
+                style={styles.testimonialImageClientStyle}
+              />
+              <View style={styles.testimonialContentClientStyle}>
+                <Text style={styles.testimonialQuoteClientStyle}>"AfroPlan a littéralement transformé mon salon. Plus de coups de fil pendant mes prestations, tout se gère tout seul !"</Text>
+                <Text style={styles.testimonialAuthorClientStyle}>Sarah, <Text style={{fontWeight: '400'}}>Salon AfroChic</Text></Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Footer Style Client */}
+          <View style={styles.footerSectionClientStyle}>
+            <Text style={styles.footerTitleClientStyle}>Rejoignez la communauté</Text>
+            <View style={styles.socialRowClientStyle}>
+              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-instagram" size={22} color="#FFF" /></TouchableOpacity>
+              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-facebook" size={22} color="#FFF" /></TouchableOpacity>
+              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-tiktok" size={22} color="#FFF" /></TouchableOpacity>
+            </View>
+            <Text style={styles.copyrightClientStyle}>© 2024 AfroPlan Pro. Pour les passionnés d'afro.</Text>
+          </View>
+
+          <View style={{ height: 60 }} />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -652,5 +754,529 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     fontSize: 14,
+  },
+  /* Landing Page Pro Styles */
+  heroPro: {
+    padding: 30,
+    paddingTop: 60,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+  },
+  heroTitlePro: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+    lineHeight: 40,
+    marginBottom: 16,
+  },
+  heroSubtitlePro: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  heroButtonPro: {
+    backgroundColor: '#FFFFFF',
+    height: 56,
+    borderRadius: 16,
+  },
+  loginLinkPro: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loginLinkTextPro: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+  },
+  statsContainerPro: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 30,
+    marginTop: -20,
+  },
+  statBoxPro: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumberPro: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statLabelPro: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  statDividerPro: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginTop: 10,
+  },
+  benefitsSectionPro: {
+    padding: 20,
+  },
+  sectionTitlePro: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 20,
+    paddingLeft: 10,
+  },
+  benefitCardPro: {
+    flexDirection: 'row',
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  benefitIconPro: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitContentPro: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  benefitTitlePro: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  benefitDescPro: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  /* Premium Landing Styles */
+  heroContainerPremium: {
+    height: 450,
+    width: '100%',
+    justifyContent: 'flex-end',
+    padding: 30,
+    paddingBottom: 50,
+  },
+  proBadgeHero: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  proBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroContentPremium: {
+    zIndex: 1,
+  },
+  heroTitlePremium: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '900',
+    lineHeight: 44,
+    marginBottom: 16,
+  },
+  heroSubtitlePremium: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    lineHeight: 24,
+    maxWidth: '90%',
+  },
+  floatingContainer: {
+    marginTop: -30,
+    paddingHorizontal: 20,
+    zIndex: 2,
+  },
+  incomeCard: {
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    gap: 16,
+  },
+  incomeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#22C55E15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incomeLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  incomeValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#191919',
+  },
+  mainContentPremium: {
+    padding: 20,
+    backgroundColor: '#000',
+  },
+  sectionTitlePremium: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 40,
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  featureGridPro: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  featureItemPro: {
+    width: (width - 56) / 2,
+    backgroundColor: '#111',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  featureIconPro: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  featureTitlePro: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  featureDescPro: {
+    color: '#888',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  testimonialCard: {
+    backgroundColor: '#111',
+    borderRadius: 24,
+    padding: 24,
+    marginTop: 40,
+    flexDirection: 'row',
+    gap: 16,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  testimonialAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  testimonialContent: {
+    flex: 1,
+  },
+  testimonialQuote: {
+    color: '#FFF',
+    fontSize: 14,
+    fontStyle: 'italic',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  testimonialAuthor: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 2,
+  },
+  ctaContainerPremium: {
+    marginTop: 50,
+    gap: 16,
+  },
+  mainCtaPro: {
+    backgroundColor: '#FFF',
+    height: 64,
+    borderRadius: 20,
+  },
+  secondaryCtaPro: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  secondaryCtaTextPro: {
+    color: '#888',
+    fontSize: 14,
+  },
+  /* Minimalist Landing Styles */
+  minimalContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 30,
+    paddingBottom: 60,
+  },
+  brandTag: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  minimalTitle: {
+    color: '#FFF',
+    fontSize: 38,
+    fontWeight: '900',
+    lineHeight: 46,
+    marginBottom: 20,
+  },
+  minimalSubtitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 40,
+    maxWidth: '90%',
+  },
+  ctaWrapper: {
+    gap: 20,
+  },
+  singleCta: {
+    backgroundColor: '#FFF',
+    height: 64,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  singleCtaText: {
+    color: '#000',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  loginLinkMinimal: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  loginLinkTextMinimal: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+  },
+  /* Client-Style Design for Coiffeur Landing */
+  headerClientStyle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  logoWrapperClientStyle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+  },
+  logoImageClientStyle: {
+    width: '100%',
+    height: '100%',
+  },
+  loginButtonClientStyle: {
+    backgroundColor: '#191919',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  loginButtonTextClientStyle: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  heroSectionClientStyle: {
+    height: 240,
+    marginHorizontal: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  heroImageClientStyle: {
+    width: '100%',
+    height: '100%',
+  },
+  heroOverlayClientStyle: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    justifyContent: 'flex-end',
+  },
+  proBadgeClientStyle: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  proBadgeTextClientStyle: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroTitleClientStyle: {
+    color: '#FFF',
+    fontSize: 28,
+    fontWeight: '800',
+    lineHeight: 34,
+  },
+  searchSectionClientStyle: {
+    paddingHorizontal: 16,
+    marginTop: 24,
+  },
+  mainActionContainerClientStyle: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: '#191919',
+    ...Shadows.md,
+  },
+  actionIconContainerClientStyle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#191919',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionTextContainerClientStyle: {
+    flex: 1,
+  },
+  actionTitleClientStyle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#191919',
+  },
+  actionSubtitleClientStyle: {
+    fontSize: 12,
+    color: '#808080',
+    marginTop: 2,
+  },
+  sectionClientStyle: {
+    marginTop: 32,
+    paddingHorizontal: 16,
+  },
+  sectionTitleClientStyle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#191919',
+    marginBottom: 16,
+  },
+  horizontalScrollClientStyle: {
+    paddingRight: 16,
+    gap: 12,
+  },
+  benefitCardClientStyle: {
+    width: 220,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    marginRight: 4,
+  },
+  benefitIconWrapperClientStyle: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  benefitTitleClientStyle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#191919',
+    marginBottom: 8,
+  },
+  benefitDescClientStyle: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
+  },
+  testimonialContainerClientStyle: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    ...Shadows.sm,
+  },
+  testimonialImageClientStyle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  testimonialContentClientStyle: {
+    flex: 1,
+  },
+  testimonialQuoteClientStyle: {
+    fontSize: 13,
+    color: '#191919',
+    fontStyle: 'italic',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  testimonialAuthorClientStyle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#191919',
+  },
+  footerSectionClientStyle: {
+    marginTop: 40,
+    padding: 32,
+    alignItems: 'center',
+    backgroundColor: '#F9F8F8',
+  },
+  footerTitleClientStyle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#191919',
+    marginBottom: 16,
+  },
+  socialRowClientStyle: {
+    flexDirection: 'row',
+    gap: 15,
+    marginBottom: 24,
+  },
+  socialIconClientStyle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#191919',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyrightClientStyle: {
+    fontSize: 11,
+    color: '#808080',
+    textAlign: 'center',
   },
 });

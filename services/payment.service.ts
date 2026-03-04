@@ -150,6 +150,21 @@ export const paymentService = {
   },
 
   /**
+   * Effectuer un virement vers le compte bancaire du salon
+   */
+  async withdrawFunds(salonId: string) {
+    const { data, error } = await supabase.functions.invoke('manage-stripe-account', {
+      body: { action: 'create_payout', salonId },
+    });
+
+    if (error) {
+      console.error('Erreur virement:', error);
+      throw new Error(error.message);
+    }
+    return data;
+  },
+
+  /**
    * Récupère le statut d'un paiement
    */
   async getPaymentStatus(bookingId: string) {

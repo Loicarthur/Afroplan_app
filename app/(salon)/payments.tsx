@@ -45,13 +45,23 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [salonId, setSalonId] = useState<string | null>(null);
 
   const fetchTransactions = async () => {
     if (!user?.id) return;
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
-        const response = await paymentService.getSalonPayments(salon.id);
+        setSalonId(salon.id);
+        const [response, balance] = await Promise.all([
+          paymentService.getSalonPayments(salon.id),
+          paymentService.getSalonBalance(salon.id)
+        ]);
+
+        setAvailableBalance(balance / 100);
+
         const mapped: Transaction[] = response.data.map((p: any) => ({
           id: p.id,
           clientName: p.booking?.client?.full_name || 'Client',
@@ -60,7 +70,7 @@ export default function PaymentsScreen() {
           commission: (p.commission || 0) / 100,
           net: (p.salon_amount || 0) / 100,
           date: p.created_at.split('T')[0],
-          status: p.status === 'completed' ? 'completed' : p.status === 'failed' ? 'refunded' : 'pending',
+          status: p.status === 'completed' ? 'completed' : p.status === 'refunded' ? 'refunded' : 'pending',
         }));
         setTransactions(mapped);
         
@@ -82,6 +92,43 @@ export default function PaymentsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleWithdraw = async () => {
+    if (!salonId || availableBalance <= 0) return;
+
+    const alertTitle = language === 'fr' ? 'Confirmer le virement' : 'Confirm Payout';
+    const alertMsg = language === 'fr' 
+      ? `Souhaitez-vous virer ${availableBalance.toFixed(2)}€ sur votre compte bancaire ?`
+      : `Do you want to payout ${availableBalance.toFixed(2)}€ to your bank account?`;
+
+    require('react-native').Alert.alert(
+      alertTitle,
+      alertMsg,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { 
+          text: language === 'fr' ? 'Confirmer' : 'Confirm', 
+          onPress: async () => {
+            setIsWithdrawing(true);
+            try {
+              await paymentService.withdrawFunds(salonId);
+              require('react-native').Alert.alert(
+                t('common.success'), 
+                language === 'fr' 
+                  ? 'Virement initié avec succès ! Les fonds arriveront sous 2 à 5 jours ouvrés.' 
+                  : 'Payout initiated successfully! Funds will arrive in 2 to 5 business days.'
+              );
+              fetchTransactions();
+            } catch (error: any) {
+              require('react-native').Alert.alert(t('common.error'), error.message);
+            } finally {
+              setIsWithdrawing(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   useEffect(() => {
@@ -154,6 +201,44 @@ export default function PaymentsScreen() {
             </View>
           </View>
 
+          {/* Wallet / Payout Section */}
+          <View style={[styles.walletCard, { backgroundColor: colors.card, borderColor: colors.border }, Shadows.sm]}>
+            <View style={styles.walletInfo}>
+              <View style={[styles.walletIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="wallet-outline" size={24} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={[styles.walletLabel, { color: colors.textSecondary }]}>{language === 'fr' ? 'Solde disponible' : 'Available balance'}</Text>
+                <Text style={[styles.walletAmount, { color: colors.text }]}>{availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €</Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity 
+              style={[
+                styles.withdrawButton, 
+                { backgroundColor: colors.primary },
+                (availableBalance <= 0 || isWithdrawing) && { backgroundColor: colors.textMuted, opacity: 0.6 }
+              ]}
+              onPress={handleWithdraw}
+              disabled={availableBalance <= 0 || isWithdrawing}
+            >
+              {isWithdrawing ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="arrow-up-circle-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.withdrawButtonText}>{language === 'fr' ? 'Retirer vers la banque' : 'Withdraw to bank'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            
+            <Text style={[styles.payoutNotice, { color: colors.textMuted }]}>
+              {language === 'fr' 
+                ? 'Les fonds sont transférés sur votre compte bancaire par défaut.' 
+                : 'Funds are transferred to your default bank account.'}
+            </Text>
+          </View>
+
           {/* Grouped Transactions */}
           {groupedTransactions.length === 0 ? (
             <View style={styles.emptyState}>
@@ -222,4 +307,12 @@ const styles = StyleSheet.create({
   txDetails: { marginTop: 8, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(0,0,0,0.05)' },
   txDetailText: { fontSize: 11 },
   emptyState: { alignItems: 'center', marginTop: 60 },
+  walletCard: { padding: 20, borderRadius: 24, marginBottom: 32, borderWidth: 1 },
+  walletInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  walletIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  walletLabel: { fontSize: 13, fontWeight: '500', marginBottom: 2 },
+  walletAmount: { fontSize: 24, fontWeight: '700' },
+  withdrawButton: { height: 54, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  withdrawButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  payoutNotice: { fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
 });

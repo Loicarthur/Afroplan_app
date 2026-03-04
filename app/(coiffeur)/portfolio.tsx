@@ -21,7 +21,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
 import * as base64js from 'base64-js';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -33,6 +32,17 @@ import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/t
 import { Button } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 import { salonService } from '@/services/salon.service';
+
+// Import sécurisé pour expo-video
+let useVideoPlayer: any;
+let VideoView: any;
+try {
+  const ExpoVideo = require('expo-video');
+  useVideoPlayer = ExpoVideo.useVideoPlayer;
+  VideoView = ExpoVideo.VideoView;
+} catch (e) {
+  console.warn('Native module ExpoVideo not found. Video features will be disabled.');
+}
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - Spacing.md * 3) / 2;
@@ -46,19 +56,35 @@ interface Realization {
 }
 
 function PortfolioVideoItem({ url }: { url: string }) {
-  const player = useVideoPlayer(url, player => {
-    player.loop = false;
-  });
+  if (!useVideoPlayer || !VideoView) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="videocam-outline" size={40} color="#FFF" />
+      </View>
+    );
+  }
 
-  return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      allowsFullscreen={false}
-      allowsPictureInPicture={false}
-    />
-  );
+  try {
+    const player = useVideoPlayer(url, (player: any) => {
+      player.loop = false;
+    });
+
+    return (
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        allowsFullscreen={false}
+        allowsPictureInPicture={false}
+      />
+    );
+  } catch (error) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="videocam-outline" size={40} color="#FFF" />
+      </View>
+    );
+  }
 }
 
 export default function CoiffeurPortfolioScreen() {
