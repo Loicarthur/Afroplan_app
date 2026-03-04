@@ -202,7 +202,7 @@ export default function CoiffeurDashboard() {
           {/* Hero Banner Pro */}
           <View style={styles.heroSectionClientStyle}>
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=1000&auto=format&fit=crop' }} 
+              source={require('@/assets/images/Photo_accueil_coiffeur.jpg')} 
               style={styles.heroImageClientStyle}
               contentFit="cover"
             />
@@ -277,36 +277,48 @@ export default function CoiffeurDashboard() {
             </View>
           </View>
 
-          {/* Footer Premium Pro Restauré */}
-          <View style={[styles.footerSectionClientStyle, { backgroundColor: '#F9F8F8', borderTopWidth: 1, borderTopColor: '#EEEEEE' }]}>
-            <View style={styles.footerBrand}>
-              <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.footerLogo} contentFit="contain" />
-              <Text style={styles.footerTagline}>La plateforme de référence pour les experts de la coiffure afro.</Text>
-            </View>
-
-            <View style={styles.footerLinksRow}>
-              <TouchableOpacity onPress={() => router.push('/terms' as any)}><Text style={styles.footerLink}>CGU</Text></TouchableOpacity>
-              <View style={styles.footerLinkDivider} />
-              <TouchableOpacity onPress={() => router.push('/privacy-policy' as any)}><Text style={styles.footerLink}>Confidentialité</Text></TouchableOpacity>
-              <View style={styles.footerLinkDivider} />
-              <TouchableOpacity onPress={() => Linking.openURL('mailto:pro@afroplan.com')}><Text style={styles.footerLink}>Support Pro</Text></TouchableOpacity>
-            </View>
-
-            <View style={styles.socialRowClientStyle}>
+          {/* Nouveau Footer Pro - Clean & Dynamic */}
+          <View style={styles.footerModern}>
+            <View style={styles.footerDivider} />
+            
+            <Text style={[styles.footerHeadline, { color: colors.text }]}>Restons connectés</Text>
+            
+            <View style={styles.socialGridModern}>
               <TouchableOpacity 
-                style={[styles.socialIconClientStyle, Shadows.sm]} 
+                style={[styles.socialButtonModern, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => Linking.openURL('https://www.instagram.com/afro._plan?igsh=ODRhaWt6aWpsdHY=')}
               >
-                <Ionicons name="logo-instagram" size={20} color="#FFF" />
+                <Ionicons name="logo-instagram" size={24} color={colors.text} />
+                <Text style={[styles.socialLabelModern, { color: colors.text }]}>Instagram</Text>
               </TouchableOpacity>
+
               <TouchableOpacity 
-                style={[styles.socialIconClientStyle, Shadows.sm]}
+                style={[styles.socialButtonModern, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => Linking.openURL('https://www.linkedin.com/company/afro-plan/posts/?feedView=all')}
               >
-                <Ionicons name="logo-linkedin" size={20} color="#FFF" />
+                <Ionicons name="logo-linkedin" size={24} color={colors.text} />
+                <Text style={[styles.socialLabelModern, { color: colors.text }]}>LinkedIn</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.copyrightClientStyle}>© 2024 AfroPlan Pro. Pour les passionnés d'afro.</Text>
+
+            <View style={styles.footerBottomLinks}>
+              <TouchableOpacity onPress={() => router.push('/terms' as any)}><Text style={styles.footerSmallLink}>Conditions</Text></TouchableOpacity>
+              <View style={styles.footerDot} />
+              <TouchableOpacity onPress={() => router.push('/privacy-policy' as any)}><Text style={styles.footerSmallLink}>Confidentialité</Text></TouchableOpacity>
+              <View style={styles.footerDot} />
+              <TouchableOpacity onPress={() => Linking.openURL('mailto:pro@afroplan.com')}><Text style={styles.footerSmallLink}>Aide</Text></TouchableOpacity>
+            </View>
+
+            <View style={styles.footerBrandFinal}>
+              <Image 
+                source={require('@/assets/images/logo_afroplan.jpeg')} 
+                style={styles.footerLogoTiny} 
+                contentFit="contain" 
+              />
+              <Text style={styles.footerBrandTextFinal}>AFROPLAN PRO</Text>
+            </View>
+            
+            <Text style={[styles.footerFinalCopyright, { textAlign: 'center' }]}>© 2024 TOUS DROITS RÉSERVÉS</Text>
           </View>
 
           <View style={{ height: 60 }} />
@@ -329,9 +341,9 @@ export default function CoiffeurDashboard() {
     pendingBookings: pendingBookingsCount,
     totalRevenue: Math.max(revenueStats.total / 100, allTimeStats?.totalRevenue || 0),
     monthlyRevenue: Math.max(revenueStats.monthly / 100, (allTimeStats?.monthlyRevenue || 0)),
-    monthlyNet: Math.max((revenueStats.monthlyNet || 0) / 100, (Math.max(revenueStats.monthly / 100, (allTimeStats?.monthlyRevenue || 0)) * 0.8)),
+    monthlyNet: Math.max(revenueStats.monthly / 100, (allTimeStats?.monthlyRevenue || 0)), // 100% Net
     dailyRevenue: revenueStats.daily / 100,
-    dailyNet: revenueStats.dailyNet / 100,
+    dailyNet: revenueStats.daily / 100, // 100% Net
     averageRating: allTimeStats?.averageRating || 0,
   };
 
@@ -413,19 +425,19 @@ export default function CoiffeurDashboard() {
           </View>
         </Animated.View>
 
-        {/* Financial Transparency - Réduit pour laisser de la place */}
+        {/* Financial Transparency - Focus Protection Acompte */}
         <Animated.View entering={FadeInDown.delay(300)} style={[styles.transparencyCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 10 }]}>
           <View style={styles.transparencyHeader}>
-            <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+            <Ionicons name="shield-checkmark-outline" size={20} color="#22C55E" />
             <Text style={[styles.transparencyTitle, { color: colors.text }]}>
-              Net ce mois : {((revenueStats.monthlyNet || 0) / 100).toFixed(0)}€
+              Revenus 100% protégés
             </Text>
             <TouchableOpacity onPress={() => setHistoryModalVisible(true)}>
               <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Détails →</Text>
             </TouchableOpacity>
           </View>
-          <Text style={{ color: colors.textMuted, fontSize: 11, marginLeft: 28, marginTop: -12 }}>
-            Net aujourd'hui : {((revenueStats.dailyNet || 0) / 100).toFixed(2)}€
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginLeft: 28, marginTop: -8, lineHeight: 16 }}>
+            Vous encaissez {language === 'fr' ? 'la totalité' : '100%'} de vos prestations. En cas d'absence, l'acompte de 20% vous reste acquis.
           </Text>
         </Animated.View>
 
@@ -1562,5 +1574,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
+  },
+  /* Modern Footer Styles */
+  footerModern: {
+    marginTop: 40,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  footerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginBottom: 32,
+  },
+  footerHeadline: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 20,
+  },
+  socialGridModern: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
+  socialButtonModern: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 10,
+  },
+  socialLabelModern: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  footerBottomLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 15,
+    marginBottom: 32,
+  },
+  footerSmallLink: {
+    fontSize: 13,
+    color: '#808080',
+    fontWeight: '500',
+  },
+  footerDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#CCC',
+  },
+  footerBrandFinal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  footerLogoTiny: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+  },
+  footerBrandTextFinal: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: '#191919',
+  },
+  footerFinalCopyright: {
+    fontSize: 10,
+    color: '#AAA',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

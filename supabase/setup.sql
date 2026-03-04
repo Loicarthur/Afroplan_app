@@ -580,6 +580,13 @@ CREATE POLICY "Authenticated Upload" ON storage.objects
     FOR INSERT WITH CHECK (
         bucket_id = 'salon-photos' 
         AND auth.role() = 'authenticated'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+CREATE POLICY "Owner Update" ON storage.objects
+    FOR UPDATE USING (
+        bucket_id = 'salon-photos' 
+        AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
 CREATE POLICY "Owner Delete" ON storage.objects

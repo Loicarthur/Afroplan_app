@@ -2,16 +2,17 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import React from 'react';
 import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto';
-import { Stack } from 'expo-router';
+import { router, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBookingReminders } from '@/hooks/use-booking-reminders';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Colors } from '@/constants/theme';
@@ -20,6 +21,7 @@ import { notificationService } from '@/services/notification.service';
 SplashScreen.preventAutoHideAsync();
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+const SELECTED_ROLE_KEY = '@afroplan_selected_role';
 
 const AfroPlanLightTheme = {
   ...DefaultTheme,
@@ -50,9 +52,41 @@ const AfroPlanDarkTheme = {
 function RootContent() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? AfroPlanDarkTheme : AfroPlanLightTheme;
+  const { isAuthenticated, isLoading, profile } = useAuth();
+  const segments = useSegments();
   
   // Activer les rappels de RDV
   useBookingReminders();
+
+  // Navigation Globale (Auth Guard & Redirection)
+  React.useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inOnboarding = segments[0] === 'onboarding' || segments[0] === 'role-selection';
+    const isRoot = segments.length === 0 || (segments.length === 1 && segments[0] === 'index');
+
+    if (!isAuthenticated) {
+      // Si on n'est pas connecté et qu'on est au démarrage (isRoot)
+      // on force le passage par l'onboarding, même si un rôle était déjà choisi
+      if (isRoot) {
+        router.replace('/onboarding');
+      }
+    } else if (profile) {
+      // Si on est connecté et que le profil est chargé
+      // On ne redirige AUTOMATIQUEMENT que si on est sur une page "transitoire" (Login, Onboarding, Splash)
+      if (inAuthGroup || inOnboarding || isRoot) {
+        AsyncStorage.getItem(SELECTED_ROLE_KEY).then(selectedRole => {
+          const roleToUse = selectedRole || profile.role;
+          if (roleToUse === 'coiffeur') {
+            router.replace('/(coiffeur)');
+          } else {
+            router.replace('/(tabs)');
+          }
+        });
+      }
+    }
+  }, [isAuthenticated, isLoading, profile, segments]);
 
   React.useEffect(() => {
     let responseListener: any;

@@ -3,7 +3,7 @@
  * Après inscription, connexion automatique + modale de succès
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -37,7 +37,7 @@ type UserRole = 'client' | 'coiffeur';
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signUp, signIn, isLoading, profile } = useAuth();
+  const { signUp, signIn } = useAuth();
   const params = useLocalSearchParams<{ role?: string }>();
 
   const [fullName, setFullName] = useState('');
@@ -47,7 +47,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const hasRedirected = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -91,32 +91,33 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     if (!validate()) return;
 
+    setIsSubmitting(true);
     try {
       // 1. Inscription
       await signUp(email, password, fullName, phone || undefined, selectedRole);
 
-      // 2. Connexion automatique après inscription
+      // 2. Tentative de connexion automatique immédiate (Zéro friction)
       try {
-        // On passe selectedRole pour que signIn le sauvegarde en local
         await signIn(email, password, selectedRole);
+        // Succès : on laisse isSubmitting à true, redirection gérée globalement
+      } catch (signInError) {
+        setIsSubmitting(false);
+        // Si l'auto-login échoue, on renvoie vers la page de login avec l'email pré-rempli
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { 
+            role: selectedRole,
+            email: email 
+          }
+        });
         
-        // Redirection gérée par app/index.tsx
-      } catch {
-        // Si la connexion auto échoue (ex: confirmation email requise),
-        // rediriger vers login
         Alert.alert(
-          'Inscription réussie',
-          'Veuillez vérifier votre email puis vous connecter.',
-          [{
-            text: 'OK',
-            onPress: () => router.replace({
-              pathname: '/(auth)/login',
-              params: { role: selectedRole }
-            })
-          }]
+          'Compte créé',
+          'Votre compte a été créé avec succès. Veuillez vous connecter avec vos identifiants.'
         );
       }
     } catch (error) {
+      setIsSubmitting(false);
       Alert.alert(
         'Erreur d\'inscription',
         error instanceof Error ? error.message : 'Une erreur est survenue'
@@ -243,7 +244,7 @@ export default function RegisterScreen() {
             <Button
               title="S'inscrire"
               onPress={handleRegister}
-              loading={isLoading}
+              loading={isSubmitting}
               fullWidth
               style={{...styles.registerButton, backgroundColor: roleColor}}
             />

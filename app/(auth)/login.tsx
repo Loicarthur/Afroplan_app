@@ -3,7 +3,7 @@
  * Design responsive amélioré
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -37,24 +37,30 @@ type UserRole = 'client' | 'coiffeur';
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signIn, isLoading, profile } = useAuth();
-  const params = useLocalSearchParams<{ role?: string }>();
+  const { signIn } = useAuth();
+  const params = useLocalSearchParams<{ role?: string; email?: string }>();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
-  const hasRedirected = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const loadRole = async () => {
+    const loadData = async () => {
+      // 1. Charger le rôle
       const role = params.role || await AsyncStorage.getItem(SELECTED_ROLE_KEY);
       if (role === 'client' || role === 'coiffeur') {
         setSelectedRole(role);
       }
+      
+      // 2. Pré-remplir l'email si passé en paramètre (après inscription)
+      if (params.email) {
+        setEmail(params.email);
+      }
     };
-    loadRole();
-  }, [params.role]);
+    loadData();
+  }, [params.role, params.email]);
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -78,13 +84,12 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (!validate()) return;
 
+    setIsSubmitting(true);
     try {
-      // On passe le selectedRole à signIn pour qu'il soit sauvegardé proprement
       await signIn(email, password, selectedRole);
-      
-      // La redirection sera gérée par le root (app/index.tsx)
-      // car l'état d'auth et le profil vont changer globalement.
+      // Succès : on laisse isSubmitting à true pour que le spinner tourne jusqu'à la redirection
     } catch (error) {
+      setIsSubmitting(false);
       Alert.alert(
         'Erreur de connexion',
         error instanceof Error ? error.message : 'Une erreur est survenue'
@@ -188,7 +193,7 @@ export default function LoginScreen() {
             <Button
               title="Se connecter"
               onPress={handleLogin}
-              loading={isLoading}
+              loading={isSubmitting}
               fullWidth
               style={{...styles.loginButton, backgroundColor: roleColor}}
             />

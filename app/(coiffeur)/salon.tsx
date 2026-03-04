@@ -185,7 +185,39 @@ export default function SalonManagementScreen() {
     }
   };
 
-  // ... (handleMediaSelection, removeMedia, updateDayHours remain same)
+  const handleMediaSelection = (uri: string, type: 'cover' | 'gallery', index?: number) => {
+    if (type === 'cover') {
+      setCoverPhoto(uri);
+    } else {
+      const newGallery = [...galleryPhotos];
+      if (index !== undefined && index < newGallery.length) {
+        newGallery[index] = uri;
+      } else {
+        newGallery.push(uri);
+      }
+      setGalleryPhotos(newGallery.slice(0, 2)); // Max 2 photos en galerie pour le moment
+    }
+  };
+
+  const removeMedia = (type: 'cover' | 'gallery', index?: number) => {
+    if (type === 'cover') {
+      setCoverPhoto(null);
+    } else if (index !== undefined) {
+      const newGallery = [...galleryPhotos];
+      newGallery.splice(index, 1);
+      setGalleryPhotos(newGallery);
+    }
+  };
+
+  const updateDayHours = (dayKey: string, field: keyof DayHours, value: any) => {
+    setOpeningHours(prev => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        [field]: value
+      }
+    }));
+  };
 
   const handleSave = async () => {
     if (!salonName.trim() || !address.trim() || !city.trim() || !postalCode.trim() || !phone.trim()) {
@@ -197,27 +229,56 @@ export default function SalonManagementScreen() {
     setIsSaving(true);
 
     try {
-      // ... (upload logic remains same)
       const uploadFile = async (uri: string, prefix: string) => {
         if (uri.startsWith('http')) return uri;
-        const base64: string = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.onload = function () {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-            reader.readAsDataURL(xhr.response);
-          };
-          xhr.onerror = () => reject(new Error('Read error'));
-          xhr.open('GET', uri);
-          xhr.responseType = 'blob';
-          xhr.send();
-        });
+        
+        try {
+          // 1. Obtenir les données binaires via XMLHttpRequest (plus fiable sur mobile)
+          const arrayBuffer: ArrayBuffer = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                if (reader.result instanceof ArrayBuffer) {
+                  resolve(reader.result);
+                } else {
+                  reject(new Error('Failed to read as ArrayBuffer'));
+                }
+              };
+              reader.onerror = reject;
+              reader.readAsArrayBuffer(xhr.response);
+            };
+            xhr.onerror = () => reject(new Error('Network request failed during local file read'));
+            xhr.responseType = 'blob';
+            xhr.open('GET', uri, true);
+            xhr.send(null);
+          });
 
-        const arrayBuffer = base64js.toByteArray(base64);
-        const fileName = `${user.id}/${prefix}_${Date.now()}.jpg`;
-        const { data, error } = await supabase.storage.from('salon-photos').upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
-        if (error) throw error;
-        return supabase.storage.from('salon-photos').getPublicUrl(data.path).data.publicUrl;
+          const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${user.id}/${prefix}_${Date.now()}.${fileExt}`;
+
+          // 2. Envoyer l'ArrayBuffer directement à Supabase
+          const { data, error } = await supabase.storage
+            .from('salon-photos')
+            .upload(fileName, arrayBuffer, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              upsert: true
+            });
+
+          if (error) {
+            console.error('Supabase Storage Error:', error);
+            throw error;
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('salon-photos')
+            .getPublicUrl(data.path);
+
+          return publicUrl;
+        } catch (uploadErr: any) {
+          console.error('Upload Process Detail:', uploadErr);
+          throw new Error(`Upload échoué: ${uploadErr.message || 'Erreur réseau'}`);
+        }
       };
 
       let finalCoverUrl = coverPhoto ? await uploadFile(coverPhoto, 'cover') : null;

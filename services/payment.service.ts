@@ -166,10 +166,10 @@ export const paymentService = {
         totalNet: 0,
       };
 
-      // Calcul du Brut (CA) et du Net estimé (80%) via Bookings
+      // Calcul du Brut (CA) et du Net (100% pour le coiffeur désormais)
       bookings?.forEach(b => {
         const amount = Number(b.total_price || 0) * 100; // Conversion en centimes
-        const net = Math.round(amount * 0.8); // 80% pour le coiffeur
+        const net = amount; // Nouveau modèle : 100% pour le coiffeur
         const date = b.created_at;
 
         stats.total += amount;
@@ -188,7 +188,6 @@ export const paymentService = {
           stats.monthlyNet += net;
         }
       });
-
       console.log('DEBUG Revenue Stats (Computed 80%):', stats);
       return stats;
 

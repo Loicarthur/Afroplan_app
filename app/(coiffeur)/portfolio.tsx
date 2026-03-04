@@ -3,7 +3,7 @@
  * Permet au coiffeur de poster ses "Coiffures du jour"
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ try {
   console.warn('Native module ExpoVideo not found. Video features will be disabled.');
 }
 
-const { width } = Dimensions.get('window');
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - Spacing.md * 3) / 2;
 
 interface Realization {
@@ -55,7 +55,7 @@ interface Realization {
   created_at: string;
 }
 
-function PortfolioVideoItem({ url }: { url: string }) {
+function PortfolioVideoItem({ url, autoPlay = false, useControls = false }: { url: string, autoPlay?: boolean, useControls?: boolean }) {
   if (!useVideoPlayer || !VideoView) {
     return (
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
@@ -66,7 +66,8 @@ function PortfolioVideoItem({ url }: { url: string }) {
 
   try {
     const player = useVideoPlayer(url, (player: any) => {
-      player.loop = false;
+      player.loop = true;
+      if (autoPlay) player.play();
     });
 
     return (
@@ -74,14 +75,14 @@ function PortfolioVideoItem({ url }: { url: string }) {
         player={player}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
-        allowsFullscreen={false}
-        allowsPictureInPicture={false}
+        nativeControls={useControls}
+        allowsFullscreen={true}
       />
     );
   } catch (error) {
     return (
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-        <Ionicons name="videocam-outline" size={40} color="#FFF" />
+        <Ionicons name="alert-circle-outline" size={40} color="#FFF" />
       </View>
     );
   }
@@ -90,7 +91,7 @@ function PortfolioVideoItem({ url }: { url: string }) {
 export default function CoiffeurPortfolioScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const { t } = useLanguage();
 
   const [realizations, setRealizations] = useState<Realization[]>([]);
@@ -101,16 +102,15 @@ export default function CoiffeurPortfolioScreen() {
   
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
-  const [newImage, setNewImage] = useState<string | null>(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<Realization | null>(null);
+  
+  const [newMedia, setNewMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
   const [newCaption, setNewCaption] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(HAIRSTYLE_CATEGORIES[0]?.id || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    loadRealizations();
-  }, []);
-
-  const loadRealizations = async () => {
+  const loadRealizations = useCallback(async () => {
     if (!user) return;
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
@@ -143,7 +143,17 @@ export default function CoiffeurPortfolioScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user, activeFilter]);
+
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (isAuthenticated) {
+        loadRealizations();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [isAuthenticated, isAuthLoading, loadRealizations]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -183,7 +193,9 @@ export default function CoiffeurPortfolioScreen() {
                 ...options,
                 mediaTypes: ['images'],
               });
-              if (!result.canceled) setNewImage(result.assets[0].uri);
+              if (!result.canceled && result.assets[0]) {
+                setNewMedia({ uri: result.assets[0].uri, type: 'image' });
+              }
             },
           },
           {
@@ -198,14 +210,21 @@ export default function CoiffeurPortfolioScreen() {
                 ...options,
                 mediaTypes: ['videos'],
               });
-              if (!result.canceled) setNewImage(result.assets[0].uri);
+              if (!result.canceled && result.assets[0]) {
+                setNewMedia({ uri: result.assets[0].uri, type: 'video' });
+              }
             },
           },
           {
             text: t('coiffeur.gallery'),
             onPress: async () => {
               const result = await ImagePicker.launchImageLibraryAsync(options);
-              if (!result.canceled) setNewImage(result.assets[0].uri);
+              if (!result.canceled && result.assets[0]) {
+                setNewMedia({ 
+                  uri: result.assets[0].uri, 
+                  type: result.assets[0].type === 'video' ? 'video' : 'image' 
+                });
+              }
             },
           },
           { text: t('common.cancel'), style: 'cancel' },
@@ -217,7 +236,7 @@ export default function CoiffeurPortfolioScreen() {
   };
 
   const handleSave = async () => {
-    if (!newImage || !user) {
+    if (!newMedia || !user) {
       Alert.alert(t('common.error'), 'Veuillez sélectionner un média.');
       return;
     }
@@ -226,16 +245,18 @@ export default function CoiffeurPortfolioScreen() {
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
-        let finalImageUrl = newImage;
+        let finalMediaUrl = newMedia.uri;
         
-        if (!newImage.startsWith('http')) {
+        if (!newMedia.uri.startsWith('http')) {
           const { supabase } = await import('@/lib/supabase');
-          const extension = newImage.split('.').pop()?.toLowerCase() || 'jpg';
+          const extension = newMedia.uri.split('.').pop()?.toLowerCase() || (newMedia.type === 'video' ? 'mp4' : 'jpg');
           const fileName = `${user.id}/portfolio_${Date.now()}.${extension}`;
-          const isVideo = ['mp4', 'mov', 'avi', 'wmv'].includes(extension);
-          const contentType = isVideo ? `video/${extension === 'mov' ? 'quicktime' : extension}` : `image/${extension === 'png' ? 'png' : 'jpeg'}`;
           
-          finalImageUrl = await new Promise<string>((resolve, reject) => {
+          const contentType = newMedia.type === 'video' 
+            ? `video/${extension === 'mov' ? 'quicktime' : 'mp4'}` 
+            : `image/${extension === 'png' ? 'png' : 'jpeg'}`;
+          
+          finalMediaUrl = await new Promise<string>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.onload = function () {
               const reader = new FileReader();
@@ -255,15 +276,15 @@ export default function CoiffeurPortfolioScreen() {
             };
             xhr.onerror = () => reject(new Error('Erreur lecture fichier.'));
             xhr.responseType = 'blob';
-            xhr.open('GET', newImage, true);
+            xhr.open('GET', newMedia.uri, true);
             xhr.send(null);
           });
         }
 
-        await salonService.addGalleryImage(salon.id, finalImageUrl, `${selectedCategory}: ${newCaption}`);
+        await salonService.addGalleryImage(salon.id, finalMediaUrl, `${selectedCategory}: ${newCaption}`);
         Alert.alert(t('common.success'), 'Votre réalisation a été ajoutée au portfolio !');
         setModalVisible(false);
-        setNewImage(null);
+        setNewMedia(null);
         setNewCaption('');
         loadRealizations();
       }
@@ -292,6 +313,36 @@ export default function CoiffeurPortfolioScreen() {
       },
     ]);
   };
+
+  const isVideo = (url: string) => url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/);
+
+  if (isAuthLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.emptyState}>
+          <Ionicons name="images-outline" size={48} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Portfolio</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+            Connectez-vous pour gérer vos réalisations
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={styles.loginButtonText}>{t('auth.login')}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -369,9 +420,13 @@ export default function CoiffeurPortfolioScreen() {
               >
                 <TouchableOpacity 
                   onLongPress={() => handleDelete(item.id)}
+                  onPress={() => {
+                    setSelectedMedia(item);
+                    setViewerVisible(true);
+                  }}
                   activeOpacity={0.9}
                 >
-                  {item.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
+                  {isVideo(item.image_url) ? (
                     <View style={styles.image}>
                       <PortfolioVideoItem url={item.image_url} />
                       <View style={styles.videoIndicator}>
@@ -398,6 +453,7 @@ export default function CoiffeurPortfolioScreen() {
         )}
       </ScrollView>
 
+      {/* MODAL AJOUT RÉALISATION */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -411,7 +467,7 @@ export default function CoiffeurPortfolioScreen() {
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle Réalisation</Text>
             <TouchableOpacity onPress={handleSave} disabled={isSaving}>
-              <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '700' }}>Publier</Text>
+              {isSaving ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '700' }}>Publier</Text>}
             </TouchableOpacity>
           </View>
 
@@ -420,13 +476,13 @@ export default function CoiffeurPortfolioScreen() {
               style={[styles.imagePicker, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]} 
               onPress={pickMedia}
             >
-              {newImage ? (
-                newImage.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
+              {newMedia ? (
+                newMedia.type === 'video' ? (
                   <View style={styles.previewImage}>
-                    <PortfolioVideoItem url={newImage} />
+                    <PortfolioVideoItem url={newMedia.uri} />
                   </View>
                 ) : (
-                  <Image source={{ uri: newImage }} style={styles.previewImage} />
+                  <Image source={{ uri: newMedia.uri }} style={styles.previewImage} />
                 )
               ) : (
                 <View style={styles.pickerPlaceholder}>
@@ -471,6 +527,32 @@ export default function CoiffeurPortfolioScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* VISIONNEUSE PLEIN ÉCRAN */}
+      <Modal visible={viewerVisible} transparent animationType="fade">
+        <View style={styles.viewerContainer}>
+          <TouchableOpacity style={styles.viewerClose} onPress={() => setViewerVisible(false)}>
+            <Ionicons name="close" size={30} color="#FFF" />
+          </TouchableOpacity>
+          
+          <View style={styles.viewerMedia}>
+            {selectedMedia && (
+              isVideo(selectedMedia.image_url) ? (
+                <PortfolioVideoItem url={selectedMedia.image_url} autoPlay={true} useControls={true} />
+              ) : (
+                <Image source={{ uri: selectedMedia.image_url }} style={styles.fullImage} contentFit="contain" />
+              )
+            )}
+          </View>
+
+          {selectedMedia && (
+            <View style={styles.viewerFooter}>
+              <Text style={styles.viewerCategory}>{selectedMedia.style_category}</Text>
+              <Text style={styles.viewerCaption}>{selectedMedia.caption || 'Aucune description'}</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -498,8 +580,10 @@ const styles = StyleSheet.create({
   itemCaption: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyIconCircle: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  emptyText: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: 20 },
   emptySubtext: { fontSize: 14, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
+  loginButton: { backgroundColor: '#191919', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, marginTop: 20 },
+  loginButtonText: { color: '#FFF', fontWeight: '700' },
   modalContainer: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1 },
   modalTitle: { fontSize: 18, fontWeight: '700' },
@@ -513,4 +597,12 @@ const styles = StyleSheet.create({
   categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, marginRight: 8 },
   categoryText: { fontSize: 14, fontWeight: '600' },
   input: { borderRadius: BorderRadius.md, borderWidth: 1, padding: 12, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
+  // Viewer styles
+  viewerContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  viewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
+  viewerMedia: { width: '100%', height: SCREEN_HEIGHT * 0.7 },
+  fullImage: { width: '100%', height: '100%' },
+  viewerFooter: { position: 'absolute', bottom: 50, left: 0, right: 0, padding: 20 },
+  viewerCategory: { color: '#FFF', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 },
+  viewerCaption: { color: '#FFF', fontSize: 16, fontWeight: '600' },
 });

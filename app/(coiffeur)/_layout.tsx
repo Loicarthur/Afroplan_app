@@ -56,6 +56,15 @@ export default function CoiffeurLayout() {
         }}
       />
       <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: 'Portfolio',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="images-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="reservations"
         options={{
           title: 'Mes Reservations',
@@ -74,9 +83,6 @@ export default function CoiffeurLayout() {
           ),
         }}
       />
-      
-      {/* Screens techniques sans icônes de menu */}
-      <Tabs.Screen name="portfolio" options={{ href: null }} />
       <Tabs.Screen name="messages" options={{ href: null }} />
     </Tabs>
   );
