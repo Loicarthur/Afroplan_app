@@ -30,6 +30,7 @@ import { AuthGuardModal } from '@/components/ui';
 import SearchFlowModal from '@/components/SearchFlowModal';
 import LanguageSelector from '@/components/LanguageSelector';
 import NotificationModal from '@/components/NotificationModal';
+import FeedbackModal from '@/components/FeedbackModal';
 import { useSalons } from '@/hooks/use-salons';
 import { useFavorites } from '@/hooks/use-favorites';
 import { favoriteService } from '@/services/favorite.service';
@@ -76,6 +77,7 @@ export default function HomeScreen() {
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
 
   const { salons, refresh: refreshSalons } = useSalons();
@@ -230,20 +232,51 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Footer & Social */}
-        <View style={styles.footerSection}>
-          <Text style={[styles.footerTitle, { color: colors.text }]}>Suivez-nous</Text>
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://instagram.com')}><Ionicons name="logo-instagram" size={22} color="#FFF" /></TouchableOpacity>
-            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://facebook.com')}><Ionicons name="logo-facebook" size={22} color="#FFF" /></TouchableOpacity>
-            <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://tiktok.com')}><Ionicons name="logo-tiktok" size={22} color="#FFF" /></TouchableOpacity>
+        {/* Footer Dynamique & Premium */}
+        <View style={[styles.footerSection, { backgroundColor: '#F9F8F8', borderTopWidth: 1, borderTopColor: '#EEEEEE' }]}>
+          <View style={styles.footerBrand}>
+            <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.footerLogo} contentFit="contain" />
+            <Text style={styles.footerTagline}>L'excellence de la coiffure afro à portée de main.</Text>
           </View>
-          <Text style={styles.copyright}>© 2024 AfroPlan. Tous droits réservés.</Text>
+
+          <View style={styles.footerLinksRow}>
+            <TouchableOpacity onPress={() => router.push('/terms' as any)}><Text style={styles.footerLink}>CGU</Text></TouchableOpacity>
+            <View style={styles.footerLinkDivider} />
+            <TouchableOpacity onPress={() => router.push('/privacy-policy' as any)}><Text style={styles.footerLink}>Confidentialité</Text></TouchableOpacity>
+            <View style={styles.footerLinkDivider} />
+            <TouchableOpacity onPress={() => Linking.openURL('mailto:support@afroplan.com')}><Text style={styles.footerLink}>Aide</Text></TouchableOpacity>
+          </View>
+
+          <View style={styles.socialRow}>
+            <TouchableOpacity 
+              style={[styles.socialIcon, Shadows.sm]} 
+              onPress={() => Linking.openURL('https://www.instagram.com/afro._plan?igsh=ODRhaWt6aWpsdHY=')}
+            >
+              <Ionicons name="logo-instagram" size={20} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.socialIcon, Shadows.sm]} 
+              onPress={() => Linking.openURL('https://www.linkedin.com/company/afro-plan/posts/?feedView=all')}
+            >
+              <Ionicons name="logo-linkedin" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.copyright}>© 2024 AfroPlan. Crafted with passion.</Text>
         </View>
         <View style={{ height: 100 }} />
       </ScrollView>
 
       <AuthGuardModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      <FeedbackModal visible={feedbackModalVisible} onClose={() => setFeedbackModalVisible(false)} />
+
+      {/* Floating Feedback Button */}
+      <TouchableOpacity 
+        style={[styles.floatingFeedback, Shadows.lg]} 
+        onPress={() => setFeedbackModalVisible(true)}
+      >
+        <Ionicons name="chatbubble-ellipses" size={24} color="#FFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -291,4 +324,137 @@ const styles = StyleSheet.create({
   socialRow: { flexDirection: 'row', gap: 15, marginBottom: 24 },
   socialIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#191919', alignItems: 'center', justifyContent: 'center' },
   copyright: { fontSize: 11, color: '#808080' },
+  /* Premium Footer Styles */
+  footerBrand: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  footerLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+  },
+  footerTagline: {
+    fontSize: 13,
+    color: '#666666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingHorizontal: 40,
+  },
+  footerLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  footerLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  footerLinkDivider: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CCCCCC',
+  },
+  /* Ultra-Design Footer Styles */
+  footerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 32,
+  },
+  footerBrandCol: {
+    flex: 1.5,
+    paddingRight: 20,
+  },
+  footerLogoPremium: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  footerBrandName: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  footerBrandDesc: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  footerLinksCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  footerColTitle: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 16,
+    opacity: 0.4,
+  },
+  footerLinkNew: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  footerDividerNew: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 24,
+  },
+  footerBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  copyrightNew: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  socialGridNew: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialIconNew: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  floatingFeedback: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#191919',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
 });

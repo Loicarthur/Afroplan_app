@@ -588,6 +588,35 @@ CREATE POLICY "Owner Delete" ON storage.objects
         AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
+-- APP FEEDBACKS (Pour la phase Bêta)
+CREATE TABLE IF NOT EXISTS app_feedbacks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    type TEXT NOT NULL CHECK (type IN ('bug', 'suggestion', 'other')),
+    content TEXT NOT NULL,
+    device_info TEXT,
+    app_version TEXT,
+    status TEXT DEFAULT 'new',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS pour app_feedbacks
+ALTER TABLE app_feedbacks ENABLE ROW LEVEL SECURITY;
+
+-- Tout le monde peut envoyer un feedback (si authentifié)
+CREATE POLICY "Anyone can insert feedback" ON app_feedbacks
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+-- Seuls les admins peuvent voir les feedbacks (ou l'owner de l'app)
+CREATE POLICY "Admins can view feedback" ON app_feedbacks
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
 -- ============================================
--- TERMINÉ !
+-- FIN DU SCRIPT
 -- ============================================
+

@@ -19,6 +19,7 @@ import {
   TextInput,
   Platform,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -36,8 +37,10 @@ import { Button } from '@/components/ui';
 import { salonService } from '@/services/salon.service';
 import { bookingService } from '@/services/booking.service';
 import { coiffeurService } from '@/services/coiffeur.service';
+import { paymentService } from '@/services/payment.service';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
 import NotificationModal from '@/components/NotificationModal';
+import FeedbackModal from '@/components/FeedbackModal';
 
 const { width } = Dimensions.get('window');
 
@@ -52,12 +55,23 @@ export default function CoiffeurDashboard() {
   const [salon, setSalon] = useState<any>(null);
   const [todayBookings, setTodayBookings] = useState<any[]>([]);
   const [allTimeStats, setAllTimeStats] = useState<any>(null);
+  const [revenueStats, setRevenueStats] = useState<any>({
+    daily: 0,
+    weekly: 0,
+    monthly: 0,
+    total: 0,
+    dailyNet: 0,
+    weeklyNet: 0,
+    monthlyNet: 0,
+    totalNet: 0,
+  });
   
   // Modals & States
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [salonServices, setSalonServices] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   
@@ -104,13 +118,17 @@ export default function CoiffeurDashboard() {
         Promise.all([
           salonService.getSalonById(salonData.id).catch(() => null),
           bookingService.getSalonBookings(salonData.id, undefined, todayStr).catch(() => ({ data: [] })),
-          salonService.getSalonStats(salonData.id).catch(() => null)
-        ]).then(([fullSalonRes, bookingsRes, statsRes]) => {
+          salonService.getSalonStats(salonData.id).catch(() => null),
+          paymentService.getDetailedRevenueStats(salonData.id).catch(() => null),
+          paymentService.getSalonPayments(salonData.id, 1, 10).catch(() => ({ data: [] }))
+        ]).then(([fullSalonRes, bookingsRes, statsRes, revenueRes, paymentsRes]) => {
           if (fullSalonRes) setSalon(fullSalonRes);
           if (bookingsRes) {
             setTodayBookings(bookingsRes.data || []);
           }
           if (statsRes) setAllTimeStats(statsRes);
+          if (revenueRes) setRevenueStats(revenueRes);
+          if (paymentsRes) setTransactions(paymentsRes.data || []);
         });
 
       } else {
@@ -259,13 +277,34 @@ export default function CoiffeurDashboard() {
             </View>
           </View>
 
-          {/* Footer Style Client */}
-          <View style={styles.footerSectionClientStyle}>
-            <Text style={styles.footerTitleClientStyle}>Rejoignez la communauté</Text>
+          {/* Footer Premium Pro Restauré */}
+          <View style={[styles.footerSectionClientStyle, { backgroundColor: '#F9F8F8', borderTopWidth: 1, borderTopColor: '#EEEEEE' }]}>
+            <View style={styles.footerBrand}>
+              <Image source={require('@/assets/images/logo_afroplan.jpeg')} style={styles.footerLogo} contentFit="contain" />
+              <Text style={styles.footerTagline}>La plateforme de référence pour les experts de la coiffure afro.</Text>
+            </View>
+
+            <View style={styles.footerLinksRow}>
+              <TouchableOpacity onPress={() => router.push('/terms' as any)}><Text style={styles.footerLink}>CGU</Text></TouchableOpacity>
+              <View style={styles.footerLinkDivider} />
+              <TouchableOpacity onPress={() => router.push('/privacy-policy' as any)}><Text style={styles.footerLink}>Confidentialité</Text></TouchableOpacity>
+              <View style={styles.footerLinkDivider} />
+              <TouchableOpacity onPress={() => Linking.openURL('mailto:pro@afroplan.com')}><Text style={styles.footerLink}>Support Pro</Text></TouchableOpacity>
+            </View>
+
             <View style={styles.socialRowClientStyle}>
-              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-instagram" size={22} color="#FFF" /></TouchableOpacity>
-              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-facebook" size={22} color="#FFF" /></TouchableOpacity>
-              <TouchableOpacity style={styles.socialIconClientStyle}><Ionicons name="logo-tiktok" size={22} color="#FFF" /></TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.socialIconClientStyle, Shadows.sm]} 
+                onPress={() => Linking.openURL('https://www.instagram.com/afro._plan?igsh=ODRhaWt6aWpsdHY=')}
+              >
+                <Ionicons name="logo-instagram" size={20} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.socialIconClientStyle, Shadows.sm]}
+                onPress={() => Linking.openURL('https://www.linkedin.com/company/afro-plan/posts/?feedView=all')}
+              >
+                <Ionicons name="logo-linkedin" size={20} color="#FFF" />
+              </TouchableOpacity>
             </View>
             <Text style={styles.copyrightClientStyle}>© 2024 AfroPlan Pro. Pour les passionnés d'afro.</Text>
           </View>
@@ -284,6 +323,17 @@ export default function CoiffeurDashboard() {
       </View>
     );
   }
+
+  const dashboardStats = {
+    todayBookings: activeTodayCount,
+    pendingBookings: pendingBookingsCount,
+    totalRevenue: Math.max(revenueStats.total / 100, allTimeStats?.totalRevenue || 0),
+    monthlyRevenue: Math.max(revenueStats.monthly / 100, (allTimeStats?.monthlyRevenue || 0)),
+    monthlyNet: Math.max((revenueStats.monthlyNet || 0) / 100, (Math.max(revenueStats.monthly / 100, (allTimeStats?.monthlyRevenue || 0)) * 0.8)),
+    dailyRevenue: revenueStats.daily / 100,
+    dailyNet: revenueStats.dailyNet / 100,
+    averageRating: allTimeStats?.averageRating || 0,
+  };
 
   // Écran de création si vraiment aucun salon n'est trouvé après chargement
   if (!salon) {
@@ -334,8 +384,11 @@ export default function CoiffeurDashboard() {
         <Animated.View entering={FadeInDown.delay(200)} style={[styles.businessCard, { backgroundColor: '#191919' }]}>
           <View style={styles.businessHeader}>
             <View>
-              <Text style={styles.businessLabel}>{t('coiffeur.weeklyRevenue')}</Text>
-              <Text style={styles.businessValue}>{dashboardStats.weeklyRevenue.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2 })} €</Text>
+              <Text style={styles.businessLabel}>{language === 'fr' ? 'Revenu du mois' : 'Monthly Revenue'}</Text>
+              <Text style={styles.businessValue}>{dashboardStats.monthlyRevenue.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2 })} €</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 4 }}>
+                {language === 'fr' ? 'Aujourd\'hui' : 'Today'} : +{dashboardStats.dailyRevenue.toFixed(2)} €
+              </Text>
             </View>
             <View style={styles.growthBadge}>
               <Ionicons name="trending-up" size={14} color="#22C55E" />
@@ -344,7 +397,7 @@ export default function CoiffeurDashboard() {
           </View>
           <View style={styles.footerStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{dashboardStats.weeklyBookingsCount}</Text>
+              <Text style={styles.statValue}>{allTimeStats?.weeklyBookingsCount || 0}</Text>
               <Text style={styles.statLabel}>{t('coiffeur.weeklyAppt')}</Text>
             </View>
             <View style={styles.statDivider} />
@@ -360,24 +413,81 @@ export default function CoiffeurDashboard() {
           </View>
         </Animated.View>
 
-        {/* Financial Transparency */}
-        <Animated.View entering={FadeInDown.delay(300)} style={[styles.transparencyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Financial Transparency - Réduit pour laisser de la place */}
+        <Animated.View entering={FadeInDown.delay(300)} style={[styles.transparencyCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 10 }]}>
           <View style={styles.transparencyHeader}>
             <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-            <Text style={[styles.transparencyTitle, { color: colors.text }]}>{t('coiffeur.estimatedNet')}</Text>
+            <Text style={[styles.transparencyTitle, { color: colors.text }]}>
+              Net ce mois : {((revenueStats.monthlyNet || 0) / 100).toFixed(0)}€
+            </Text>
+            <TouchableOpacity onPress={() => setHistoryModalVisible(true)}>
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Détails →</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.flowContainer}>
-            <View style={styles.flowStep}><Text style={styles.flowAmount}>{dashboardStats.totalRevenue.toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.total')}</Text></View>
-            <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
-            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.error }]}>-20%</Text><Text style={styles.flowLabel}>{t('coiffeur.fees')}</Text></View>
-            <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
-            <View style={styles.flowStep}><Text style={[styles.flowAmount, { color: colors.success }]}>{(dashboardStats.totalRevenue * 0.8).toFixed(0)}€</Text><Text style={styles.flowLabel}>{t('coiffeur.net')}</Text></View>
-          </View>
+          <Text style={{ color: colors.textMuted, fontSize: 11, marginLeft: 28, marginTop: -12 }}>
+            Net aujourd'hui : {((revenueStats.dailyNet || 0) / 100).toFixed(2)}€
+          </Text>
         </Animated.View>
 
-        {/* Quick Pro Actions */}
+        {/* NOUVEAU : CENTRE DE COMMANDE UNIFIÉ */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('coiffeur.proActions')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Gestion de mon activité</Text>
+          <View style={styles.managementGrid}>
+            <TouchableOpacity 
+              style={[styles.mgmtItem, { backgroundColor: colors.card }]} 
+              onPress={() => router.push('/(coiffeur)/services' as any)}
+            >
+              <View style={[styles.mgmtIcon, { backgroundColor: '#8B5CF615' }]}>
+                <Ionicons name="cut-outline" size={24} color="#8B5CF6" />
+              </View>
+              <Text style={[styles.mgmtText, { color: colors.text }]}>Services & Tarifs</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.mgmtItem, { backgroundColor: colors.card }]} 
+              onPress={() => router.push('/(coiffeur)/portfolio' as any)}
+            >
+              <View style={[styles.mgmtIcon, { backgroundColor: '#EC489915' }]}>
+                <Ionicons name="images-outline" size={24} color="#EC4899" />
+              </View>
+              <Text style={[styles.mgmtText, { color: colors.text }]}>Portfolio</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.mgmtItem, { backgroundColor: colors.card }]} 
+              onPress={() => setWalletModalVisible(true)}
+            >
+              <View style={[styles.mgmtIcon, { backgroundColor: '#22C55E15' }]}>
+                <Ionicons name="cash-outline" size={24} color="#22C55E" />
+              </View>
+              <Text style={[styles.mgmtText, { color: colors.text }]}>Portefeuille</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.mgmtItem, { backgroundColor: colors.card }]} 
+              onPress={() => router.push('/(salon)/reviews' as any)}
+            >
+              <View style={[styles.mgmtIcon, { backgroundColor: '#F59E0B15' }]}>
+                <Ionicons name="star-outline" size={24} color="#F59E0B" />
+              </View>
+              <Text style={[styles.mgmtText, { color: colors.text }]}>Avis Clients</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.mgmtItem, { backgroundColor: colors.card }]} 
+              onPress={() => router.push('/(coiffeur)/salon' as any)}
+            >
+              <View style={[styles.mgmtIcon, { backgroundColor: '#3B82F615' }]}>
+                <Ionicons name="business-outline" size={24} color="#3B82F6" />
+              </View>
+              <Text style={[styles.mgmtText, { color: colors.text }]}>Infos Salon</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Quick Pro Actions (Boost & Manuel) */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Actions Rapides</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.proActionButton, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]} onPress={handleLastMinuteBoost}>
               <Ionicons name="rocket-outline" size={24} color={colors.primary} />
@@ -528,9 +638,9 @@ export default function CoiffeurDashboard() {
             </View>
             
             <View style={[styles.balanceBox, { backgroundColor: '#191919' }]}>
-              <Text style={styles.balanceLabel}>Solde disponible (Net 80%)</Text>
+              <Text style={styles.balanceLabel}>Net ce mois (80%)</Text>
               <Text style={styles.balanceValue}>
-                {((dashboardStats?.totalRevenue || 0) * 0.8).toFixed(2)} €
+                {((revenueStats.monthlyNet || 0) / 100).toFixed(2)} €
               </Text>
               <TouchableOpacity 
                 style={styles.payoutButton}
@@ -560,7 +670,7 @@ export default function CoiffeurDashboard() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Historique des gains</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Statistiques du mois</Text>
               <TouchableOpacity onPress={() => setHistoryModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -569,26 +679,50 @@ export default function CoiffeurDashboard() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.historySummary}>
                 <View style={styles.summaryItem}>
-                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Chiffre d'affaires</Text>
-                  <Text style={[styles.summaryValue, { color: colors.text }]}>{dashboardStats?.totalRevenue?.toFixed(2)}€</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Brut (Mois)</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{((revenueStats.monthly || 0) / 100).toFixed(2)}€</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
-                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Commission (20%)</Text>
-                  <Text style={[styles.summaryValue, { color: colors.error }]}>-{(dashboardStats?.totalRevenue * 0.2)?.toFixed(2)}€</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Net (Mois)</Text>
+                  <Text style={[styles.summaryValue, { color: colors.success }]}>{((revenueStats.monthlyNet || 0) / 100).toFixed(2)}€</Text>
                 </View>
               </View>
 
               <Text style={[styles.sectionTitleModal, { color: colors.text }]}>Dernières transactions</Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 20 }]}>
-                Aucune transaction récente à afficher.
-              </Text>
+              {transactions.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 20 }]}>
+                  Aucune transaction récente à afficher.
+                </Text>
+              ) : (
+                transactions.map((tx) => (
+                  <View key={tx.id} style={[styles.txItem, { borderBottomColor: colors.border }]}>
+                    <View style={styles.txLeft}>
+                      <Text style={[styles.txService, { color: colors.text }]}>{tx.booking?.service?.name || 'Prestation'}</Text>
+                      <Text style={[styles.txDate, { color: colors.textMuted }]}>{new Date(tx.created_at).toLocaleDateString('fr-FR')}</Text>
+                    </View>
+                    <View style={styles.txRight}>
+                      <Text style={[styles.txAmount, { color: colors.success }]}>+{(tx.salon_amount / 100).toFixed(2)}€</Text>
+                      <Text style={styles.txNetLabel}>Net (80%)</Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
       </Modal>
 
       <NotificationModal visible={notificationModalVisible} onClose={() => setNotificationModalVisible(false)} />
+      <FeedbackModal visible={feedbackModalVisible} onClose={() => setFeedbackModalVisible(false)} />
+
+      {/* Floating Feedback Button */}
+      <TouchableOpacity 
+        style={[styles.floatingFeedback, Shadows.lg]} 
+        onPress={() => setFeedbackModalVisible(true)}
+      >
+        <Ionicons name="chatbubble-ellipses" size={24} color="#FFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -629,6 +763,35 @@ const styles = StyleSheet.create({
   switchContent: { flex: 1, marginLeft: 16 },
   switchTitle: { fontSize: 16, fontWeight: '600' },
   switchSubtitle: { fontSize: 13, marginTop: 2 },
+  /* Management Grid Styles */
+  managementGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  mgmtItem: {
+    width: (width - 52) / 2,
+    padding: 16,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
+    ...Shadows.sm,
+  },
+  mgmtIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mgmtText: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   /* Modal Styles */
   modalOverlay: {
     flex: 1,
@@ -745,6 +908,38 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     fontSize: 14,
+  },
+  /* Transaction Styles */
+  txItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  txLeft: {
+    flex: 1,
+  },
+  txService: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  txDate: {
+    fontSize: 12,
+  },
+  txRight: {
+    alignItems: 'flex-end',
+  },
+  txAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  txNetLabel: {
+    fontSize: 10,
+    color: '#808080',
+    fontWeight: '500',
   },
   /* Landing Page Pro Styles */
   heroPro: {
@@ -1269,5 +1464,103 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#808080',
     textAlign: 'center',
+  },
+  /* Ultra-Design Footer Styles */
+  footerSectionUltra: {
+    paddingTop: 50,
+    paddingBottom: 30,
+  },
+  footerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    marginBottom: 40,
+  },
+  footerBrandCol: {
+    flex: 1.5,
+    paddingRight: 20,
+  },
+  footerLogoPremium: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  footerBrandName: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  footerBrandDesc: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  footerLinksCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  footerColTitle: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 16,
+    opacity: 0.4,
+  },
+  footerLinkNew: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  footerDividerNew: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 24,
+  },
+  footerBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  copyrightNew: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  socialGridNew: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialIconNew: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  floatingFeedback: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#191919',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
   },
 });

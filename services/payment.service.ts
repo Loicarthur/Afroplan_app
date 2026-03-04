@@ -68,17 +68,18 @@ export const paymentService = {
   },
 
   /**
-   * Récupérer l'historique des paiements d'un salon
+   * Récupérer l'historique des paiements d'un salon avec filtres
    */
   async getSalonPayments(
     salonId: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    startDate?: string
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const { data, error, count } = await supabase
+    let query = supabase
       .from('payments')
       .select(`
         *,
@@ -88,7 +89,13 @@ export const paymentService = {
           service:services(*)
         )
       `, { count: 'exact' })
-      .eq('salon_id', salonId)
+      .eq('salon_id', salonId);
+
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+
+    const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -103,6 +110,92 @@ export const paymentService = {
       totalPages: Math.ceil((count || 0) / limit),
       hasMore: page < Math.ceil((count || 0) / limit),
     };
+  },
+
+  /**
+   * Calculer les statistiques de revenus détaillées
+   * Le Chiffre d'affaires (brut) vient des bookings (tous modes de paiement)
+   * Le Net (disponible) vient des payments (uniquement Stripe)
+   */
+  async getDetailedRevenueStats(salonId: string) {
+    try {
+      const now = new Date();
+      
+      // Début du mois
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      
+      // Début de semaine (Lundi)
+      const d = new Date(now);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const startOfWeek = new Date(d.setDate(diff));
+      startOfWeek.setHours(0, 0, 0, 0);
+      const startOfWeekISO = startOfWeek.toISOString();
+
+      // Aujourd'hui (minuit)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
+      // 1. Récupérer tous les bookings confirmés/terminés pour le brut
+      const { data: bookings, error: bError } = await supabase
+        .from('bookings')
+        .select('total_price, created_at, status')
+        .eq('salon_id', salonId)
+        .in('status', ['confirmed', 'completed']);
+
+      if (bError) console.error('Error fetching bookings for stats:', bError);
+
+      // 2. Récupérer les paiements Stripe pour le net
+      const { data: payments, error: pError } = await supabase
+        .from('payments')
+        .select('salon_amount, created_at, status')
+        .eq('salon_id', salonId)
+        .eq('status', 'completed');
+
+      if (pError) console.error('Error fetching payments for stats:', pError);
+
+      const stats = {
+        daily: 0,
+        weekly: 0,
+        monthly: 0,
+        total: 0,
+        dailyNet: 0,
+        weeklyNet: 0,
+        monthlyNet: 0,
+        totalNet: 0,
+      };
+
+      // Calcul du Brut (CA) et du Net estimé (80%) via Bookings
+      bookings?.forEach(b => {
+        const amount = Number(b.total_price || 0) * 100; // Conversion en centimes
+        const net = Math.round(amount * 0.8); // 80% pour le coiffeur
+        const date = b.created_at;
+
+        stats.total += amount;
+        stats.totalNet += net;
+
+        if (date >= todayISO) {
+          stats.daily += amount;
+          stats.dailyNet += net;
+        }
+        if (date >= startOfWeekISO) {
+          stats.weekly += amount;
+          stats.weeklyNet += net;
+        }
+        if (date >= startOfMonth) {
+          stats.monthly += amount;
+          stats.monthlyNet += net;
+        }
+      });
+
+      console.log('DEBUG Revenue Stats (Computed 80%):', stats);
+      return stats;
+
+    } catch (error) {
+      console.error('CRITICAL Error in getDetailedRevenueStats:', error);
+      return { daily: 0, weekly: 0, monthly: 0, total: 0, dailyNet: 0, weeklyNet: 0, monthlyNet: 0, totalNet: 0 };
+    }
   },
 
   /**
