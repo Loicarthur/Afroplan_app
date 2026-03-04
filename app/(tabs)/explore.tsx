@@ -173,8 +173,20 @@ export default function SearchScreen() {
           {isLoading ? (
             <ActivityIndicator size="large" color="#191919" style={{ marginTop: 50 }} />
           ) : salons.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={{ marginTop: 50, color: '#888' }}>Aucun salon trouvé</Text>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyStateIconCircle}>
+                <Ionicons name="search-outline" size={40} color="#191919" />
+              </View>
+              <Text style={styles.emptyStateTitle}>Aucun salon trouvé</Text>
+              <Text style={styles.emptyStateText}>
+                Nous n'avons pas encore de partenaires ici. {"\n"}Essayez une autre ville comme <Text style={styles.emptyStateLink} onPress={() => { setSearchQuery('Paris'); }}>Paris</Text> ou <Text style={styles.emptyStateLink} onPress={() => { setSearchQuery('Champigny'); }}>Champigny</Text> !
+              </Text>
+              <TouchableOpacity 
+                style={styles.resetSearchBtn}
+                onPress={() => { setSearchQuery(''); setSelectedCategory('all'); }}
+              >
+                <Text style={styles.resetSearchBtnText}>Réinitialiser la recherche</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             salons.map(s => (
@@ -207,4 +219,52 @@ const styles = StyleSheet.create({
   marker: { backgroundColor: '#FF385C', padding: 6, borderRadius: 20, borderWidth: 2, borderColor: '#FFF' },
   mapCard: { position: 'absolute', bottom: 20, left: 20, right: 20 },
   list: { padding: 16 },
+  // Styles pour l'état vide
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    marginTop: 80,
+  },
+  emptyStateIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#191919',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: '#717171',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 30,
+  },
+  emptyStateLink: {
+    color: '#191919',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  resetSearchBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#191919',
+  },
+  resetSearchBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#191919',
+  },
 });

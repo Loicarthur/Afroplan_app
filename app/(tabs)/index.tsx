@@ -196,7 +196,7 @@ export default function HomeScreen() {
 
         {/* Popular */}
         <View style={styles.section}>
-          <SectionHeader title="Les plus populaires" onSeeAll={() => router.push('/(tabs)/explore')} />
+          <SectionHeader title={t('home.popularSalons')} onSeeAll={() => router.push('/(tabs)/explore')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             {salons.sort((a, b) => (b.reviews_count || 0) - (a.reviews_count || 0)).slice(0, 6).map(s => <SalonCard key={s.id} salon={s} variant="default" isFavorite={favoriteIds.includes(s.id)} onFavoritePress={() => handleToggleFavorite(s.id)} />)}
           </ScrollView>
@@ -212,7 +212,7 @@ export default function HomeScreen() {
 
         {/* Tips */}
         <View style={styles.section}>
-          <SectionHeader title="Conseils & Inspiration" />
+          <SectionHeader title={t('home.tipsAndInspiration')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             {TIPS_AND_INSPIRATION.map((item) => (
               <TouchableOpacity key={item.id} style={styles.tipCard}>

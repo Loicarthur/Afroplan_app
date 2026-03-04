@@ -83,6 +83,24 @@ const translations: Record<Language, Record<string, string>> = {
     'home.joinAfroPlanPro': 'Rejoins AfroPlan Pro et développe ton activité',
     'home.discoverPro': 'Découvrir AfroPlan Pro',
 
+    // Onboarding
+    'onboarding.slide1Title': 'Révélez votre style',
+    'onboarding.slide1Subtitle': 'Découvrez les meilleurs coiffeurs afro de votre région.',
+    'onboarding.slide2Title': 'Réservation simple',
+    'onboarding.slide2Subtitle': 'Prenez rendez-vous en quelques clics, à tout moment.',
+    'onboarding.slide3Title': 'Expertise certifiée',
+    'onboarding.slide3Subtitle': 'Des professionnels passionnés pour prendre soin de vous.',
+    'onboarding.touchToContinue': 'Touchez l\'écran pour continuer',
+
+    // Role Selection
+    'role.tagline': 'La beauté afro à portée de main',
+    'role.chooseSpace': 'Choisissez votre univers',
+    'role.clientSpace': 'Espace Client',
+    'role.clientSubtitle': 'Je souhaite découvrir des salons et réserver une prestation.',
+    'role.coiffeurSpace': 'Espace Coiffeur',
+    'role.coiffeurSubtitle': 'Je souhaite gérer mon salon et recevoir des réservations.',
+    'role.trust': 'Plus de 500 salons nous font confiance',
+
     // Search Flow
     'search.findCoiffeur': 'Trouve facilement ton coiffeur afro',
     'search.quickQuestions': 'Quelques questions rapides pour te proposer les meilleurs salons.',
@@ -421,6 +439,15 @@ const translations: Record<Language, Record<string, string>> = {
     'home.joinAfroPlanPro': 'Join AfroPlan Pro and grow your business',
     'home.discoverPro': 'Discover AfroPlan Pro',
 
+    // Onboarding
+    'onboarding.slide1Title': 'Reveal your style',
+    'onboarding.slide1Subtitle': 'Discover the best afro stylists in your area.',
+    'onboarding.slide2Title': 'Easy booking',
+    'onboarding.slide2Subtitle': 'Book an appointment in a few clicks, anytime.',
+    'onboarding.slide3Title': 'Certified expertise',
+    'onboarding.slide3Subtitle': 'Passionate professionals to take care of you.',
+    'onboarding.touchToContinue': 'Touch the screen to continue',
+
     // Search Flow
     'search.findCoiffeur': 'Find your afro stylist easily',
     'search.quickQuestions': 'A few quick questions to suggest the best salons.',
@@ -749,6 +776,15 @@ const translations: Record<Language, Record<string, string>> = {
     'home.areYouCoiffeur': 'Bist du Friseur?',
     'home.joinAfroPlanPro': 'Wachse mit AfroPlan Pro',
     'home.discoverPro': 'AfroPlan Pro entdecken',
+
+    // Onboarding
+    'onboarding.slide1Title': 'Enthülle deinen Stil',
+    'onboarding.slide1Subtitle': 'Entdecke die besten Afro-Friseure in deiner Nähe.',
+    'onboarding.slide2Title': 'Einfache Reservierung',
+    'onboarding.slide2Subtitle': 'Buche einen Termin mit wenigen Klicks, jederzeit.',
+    'onboarding.slide3Title': 'Zertifizierte Expertise',
+    'onboarding.slide3Subtitle': 'Leidenschaftliche Profis kümmern sich um dich.',
+    'onboarding.touchToContinue': 'Tippe auf den Bildschirm, um fortzufahren',
 
     // Search Flow
     'search.findCoiffeur': 'Afro-Friseur einfach finden',
@@ -1079,6 +1115,15 @@ const translations: Record<Language, Record<string, string>> = {
     'home.joinAfroPlanPro': 'Crece con AfroPlan Pro',
     'home.discoverPro': 'Descubrir AfroPlan Pro',
 
+    // Onboarding
+    'onboarding.slide1Title': 'Revela tu estilo',
+    'onboarding.slide1Subtitle': 'Descubre los mejores peluqueros afro de tu zona.',
+    'onboarding.slide2Title': 'Reserva fácil',
+    'onboarding.slide2Subtitle': 'Reserva una cita en pocos clics, en cualquier momento.',
+    'onboarding.slide3Title': 'Experticia certificada',
+    'onboarding.slide3Subtitle': 'Profesionales apasionados para cuidar de ti.',
+    'onboarding.touchToContinue': 'Toca la pantalla para continuar',
+
     // Search Flow
     'search.findCoiffeur': 'Encuentra tu peluquero afro',
     'search.quickQuestions': 'Preguntas rápidas para mejores salones.',
@@ -1387,7 +1432,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   // Translation function
   const t = (key: string): string => {
-    return translations[language][key] || translations['fr'][key] || key;
+    // 1. Chercher dans la langue actuelle
+    if (translations[language] && translations[language][key]) {
+      return translations[language][key];
+    }
+    // 2. Secours : Chercher en français
+    if (translations['fr'] && translations['fr'][key]) {
+      return translations['fr'][key];
+    }
+    // 3. Dernier recours : Nettoyer la clé pour qu'elle soit lisible
+    // ex: 'onboarding.slide1Title' -> 'Slide1Title'
+    return key.split('.').pop() || key;
   };
 
   return (
