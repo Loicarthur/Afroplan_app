@@ -164,15 +164,6 @@ export default function CoiffeurDashboard() {
   const pendingBookingsCount = todayBookings.filter(b => b.status === 'pending').length;
   const activeTodayCount = todayBookings.filter(b => b.status !== 'cancelled').length;
 
-  const dashboardStats = {
-    todayBookings: activeTodayCount,
-    pendingBookings: pendingBookingsCount,
-    totalRevenue: allTimeStats?.totalRevenue || 0,
-    weeklyRevenue: allTimeStats?.weeklyRevenue || 0,
-    weeklyBookingsCount: allTimeStats?.weeklyBookingsCount || 0,
-    averageRating: allTimeStats?.averageRating || 0,
-  };
-
   // Rendu selon l'état réel des données
   if (!isAuthenticated) {
     return (

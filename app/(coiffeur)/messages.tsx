@@ -29,13 +29,16 @@ import { BookingWithDetails } from '@/types';
 export default function CoiffeurMessagesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<BookingWithDetails[]>([]);
 
   const fetchConversations = React.useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
@@ -52,15 +55,27 @@ export default function CoiffeurMessagesScreen() {
   }, [user]);
 
   React.useEffect(() => {
-    if (isAuthenticated) {
-      fetchConversations();
+    if (!isAuthLoading) {
+      if (isAuthenticated) {
+        fetchConversations();
+      } else {
+        setLoading(false);
+      }
     }
-  }, [isAuthenticated, fetchConversations]);
+  }, [isAuthenticated, isAuthLoading, fetchConversations]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchConversations();
   };
+
+  if (isAuthLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -81,59 +96,6 @@ export default function CoiffeurMessagesScreen() {
       </SafeAreaView>
     );
   }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed': return colors.success;
-      case 'pending': return colors.accent;
-      case 'completed': return colors.textMuted;
-      default: return colors.textMuted;
-    }
-  };
-
-  const renderConversation = ({ item }: { item: BookingWithDetails }) => (
-    <TouchableOpacity
-      style={[styles.conversationCard, { backgroundColor: colors.card }]}
-      onPress={() => router.push({
-        pathname: '/chat/[bookingId]',
-        params: { bookingId: item.id },
-      })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatarWrapper}>
-        <Image 
-          source={{ uri: item.client?.avatar_url || 'https://via.placeholder.com/100' }} 
-          style={styles.avatar} 
-          contentFit="cover" 
-        />
-        <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
-      </View>
-      <View style={styles.conversationContent}>
-        <View style={styles.conversationHeader}>
-          <Text style={[styles.clientName, { color: colors.text }]} numberOfLines={1}>
-            {item.client?.full_name || 'Client'}
-          </Text>
-          <Text style={[styles.timeText, { color: colors.textMuted }]}>
-            {item.start_time.substring(0, 5)}
-          </Text>
-        </View>
-        <Text style={[styles.serviceLabel, { color: colors.primary }]} numberOfLines={1}>
-          {item.service?.name} - {item.booking_date}
-        </Text>
-        <View style={styles.lastMessageRow}>
-          <Text
-            style={[
-              styles.lastMessage,
-              { color: colors.textSecondary },
-            ]}
-            numberOfLines={1}
-          >
-            {item.notes || "Cliquer pour discuter avec le client"}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
 
   if (loading && !refreshing) {
     return (

@@ -31,7 +31,7 @@ import { BookingWithDetails, Booking } from '@/types';
 export default function ClientReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const { t, language } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
@@ -39,7 +39,10 @@ export default function ClientReservationsScreen() {
   const [loading, setLoading] = useState(true);
 
   const fetchBookings = React.useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await bookingService.getClientBookings(user.id);
       setBookings(response.data);
@@ -52,10 +55,14 @@ export default function ClientReservationsScreen() {
   }, [user]);
 
   React.useEffect(() => {
-    if (isAuthenticated) {
-      fetchBookings();
+    if (!isAuthLoading) {
+      if (isAuthenticated) {
+        fetchBookings();
+      } else {
+        setLoading(false);
+      }
     }
-  }, [isAuthenticated, fetchBookings]);
+  }, [isAuthenticated, isAuthLoading, fetchBookings]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -85,6 +92,14 @@ export default function ClientReservationsScreen() {
       Linking.openURL(url);
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

@@ -32,7 +32,7 @@ import { BookingWithDetails } from '@/types';
 export default function CoiffeurReservationsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const { t } = useLanguage();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -49,7 +49,10 @@ export default function CoiffeurReservationsScreen() {
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
 
   const fetchBookings = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     
     try {
       // 1. Récupérer le salon du coiffeur
@@ -71,10 +74,14 @@ export default function CoiffeurReservationsScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchBookings();
+    if (!isAuthLoading) {
+      if (isAuthenticated) {
+        fetchBookings();
+      } else {
+        setLoading(false);
+      }
     }
-  }, [isAuthenticated, fetchBookings]);
+  }, [isAuthenticated, isAuthLoading, fetchBookings]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -156,7 +163,7 @@ export default function CoiffeurReservationsScreen() {
     }
   };
 
-  if (loading && !refreshing) {
+  if (isAuthLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -173,6 +180,14 @@ export default function CoiffeurReservationsScreen() {
           <Button title={t('auth.login')} onPress={() => router.push('/(auth)/login')} style={{ marginTop: 20, width: '100%' }} />
         </View>
       </SafeAreaView>
+    );
+  }
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
