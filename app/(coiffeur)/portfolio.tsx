@@ -21,22 +21,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-// Import sécurisé de expo-av
-let Video: any = null;
-let ResizeMode: any = { COVER: 'cover', CONTAIN: 'contain' };
-try {
-  const ExpoAV = require('expo-av');
-  Video = ExpoAV.Video;
-  ResizeMode = ExpoAV.ResizeMode;
-} catch (e) {
-  console.warn("Module expo-av non chargé sur cet appareil.");
-}
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
 import * as base64js from 'base64-js';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '@/constants/theme';
 import { Button } from '@/components/ui';
 import { HAIRSTYLE_CATEGORIES } from '@/constants/hairstyleCategories';
@@ -53,10 +45,27 @@ interface Realization {
   created_at: string;
 }
 
+function PortfolioVideoItem({ url }: { url: string }) {
+  const player = useVideoPlayer(url, player => {
+    player.loop = false;
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      allowsFullscreen={false}
+      allowsPictureInPicture={false}
+    />
+  );
+}
+
 export default function CoiffeurPortfolioScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [realizations, setRealizations] = useState<Realization[]>([]);
   const [filteredRealizations, setFilteredRealizations] = useState<Realization[]>([]);
@@ -82,11 +91,9 @@ export default function CoiffeurPortfolioScreen() {
       if (salon) {
         const gallery = await salonService.getSalonGallery(salon.id);
         const formatted: Realization[] = (gallery || []).map(img => {
-          // Format attendu de la légende : "category_id: description"
           const separatorIndex = img.caption?.indexOf(': ') ?? -1;
           const catId = separatorIndex !== -1 ? img.caption!.substring(0, separatorIndex) : (img.caption || '');
           const desc = separatorIndex !== -1 ? img.caption!.substring(separatorIndex + 2) : '';
-          
           const categoryObj = HAIRSTYLE_CATEGORIES.find(c => c.id === catId);
           
           return {
@@ -98,8 +105,6 @@ export default function CoiffeurPortfolioScreen() {
           };
         });
         setRealizations(formatted);
-        
-        // Appliquer le filtre actuel immédiatement après le chargement
         if (activeFilter === 'all') {
           setFilteredRealizations(formatted);
         } else {
@@ -141,11 +146,11 @@ export default function CoiffeurPortfolioScreen() {
         'Quelle source souhaitez-vous utiliser ?',
         [
           {
-            text: 'Prendre une photo',
+            text: t('coiffeur.camera'),
             onPress: async () => {
               const { status } = await ImagePicker.requestCameraPermissionsAsync();
               if (status !== 'granted') {
-                Alert.alert('Permission requise', 'Accès caméra refusé');
+                Alert.alert(t('common.error'), t('coiffeur.cameraDenied'));
                 return;
               }
               const result = await ImagePicker.launchCameraAsync({
@@ -160,7 +165,7 @@ export default function CoiffeurPortfolioScreen() {
             onPress: async () => {
               const { status } = await ImagePicker.requestCameraPermissionsAsync();
               if (status !== 'granted') {
-                Alert.alert('Permission requise', 'Accès caméra refusé');
+                Alert.alert(t('common.error'), t('coiffeur.cameraDenied'));
                 return;
               }
               const result = await ImagePicker.launchCameraAsync({
@@ -171,13 +176,13 @@ export default function CoiffeurPortfolioScreen() {
             },
           },
           {
-            text: 'Choisir dans la galerie',
+            text: t('coiffeur.gallery'),
             onPress: async () => {
               const result = await ImagePicker.launchImageLibraryAsync(options);
               if (!result.canceled) setNewImage(result.assets[0].uri);
             },
           },
-          { text: 'Annuler', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
         ]
       );
     } catch (e) {
@@ -187,7 +192,7 @@ export default function CoiffeurPortfolioScreen() {
 
   const handleSave = async () => {
     if (!newImage || !user) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une image.');
+      Alert.alert(t('common.error'), 'Veuillez sélectionner un média.');
       return;
     }
 
@@ -195,15 +200,12 @@ export default function CoiffeurPortfolioScreen() {
     try {
       const salon = await salonService.getSalonByOwnerId(user.id);
       if (salon) {
-        // Upload de l'image vers Supabase Storage
         let finalImageUrl = newImage;
         
         if (!newImage.startsWith('http')) {
           const { supabase } = await import('@/lib/supabase');
           const extension = newImage.split('.').pop()?.toLowerCase() || 'jpg';
           const fileName = `${user.id}/portfolio_${Date.now()}.${extension}`;
-          
-          // Détection du type de contenu
           const isVideo = ['mp4', 'mov', 'avi', 'wmv'].includes(extension);
           const contentType = isVideo ? `video/${extension === 'mov' ? 'quicktime' : extension}` : `image/${extension === 'png' ? 'png' : 'jpeg'}`;
           
@@ -214,26 +216,14 @@ export default function CoiffeurPortfolioScreen() {
               reader.onloadend = async function () {
                 try {
                   const base64 = (reader.result as string).split(',')[1];
-                  // Utilisation explicite de base64js.toByteArray
                   const arrayBuffer = base64js.toByteArray(base64);
-
                   const { data, error } = await supabase.storage
                     .from('salon-photos')
-                    .upload(fileName, arrayBuffer, {
-                      contentType,
-                      upsert: true
-                    });
-
-                  if (error) {
-                    reject(new Error(`Erreur Supabase: ${error.message}`));
-                    return;
-                  }
-                  
+                    .upload(fileName, arrayBuffer, { contentType, upsert: true });
+                  if (error) { reject(new Error(`Erreur Supabase: ${error.message}`)); return; }
                   const { data: urlData } = supabase.storage.from('salon-photos').getPublicUrl(data.path);
                   resolve(urlData.publicUrl);
-                } catch (err) {
-                  reject(err);
-                }
+                } catch (err) { reject(err); }
               };
               reader.readAsDataURL(xhr.response);
             };
@@ -245,8 +235,7 @@ export default function CoiffeurPortfolioScreen() {
         }
 
         await salonService.addGalleryImage(salon.id, finalImageUrl, `${selectedCategory}: ${newCaption}`);
-        
-        Alert.alert('Succès', 'Votre réalisation a été ajoutée au portfolio !');
+        Alert.alert(t('common.success'), 'Votre réalisation a été ajoutée au portfolio !');
         setModalVisible(false);
         setNewImage(null);
         setNewCaption('');
@@ -254,24 +243,24 @@ export default function CoiffeurPortfolioScreen() {
       }
     } catch (error: any) {
       if (__DEV__) console.warn('Portfolio upload error:', error);
-      Alert.alert('Erreur', "Impossible d'ajouter l'image : " + (error.message || "Erreur réseau"));
+      Alert.alert(t('common.error'), "Impossible d'ajouter le média : " + (error.message || "Erreur réseau"));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert('Supprimer', 'Voulez-vous retirer cette réalisation de votre portfolio ?', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('common.delete'), 'Voulez-vous retirer cette réalisation de votre portfolio ?', [
+      { text: t('common.cancel'), style: 'cancel' },
       { 
-        text: 'Supprimer', 
+        text: t('common.delete'), 
         style: 'destructive', 
         onPress: async () => {
           try {
             await salonService.deleteGalleryImage(id);
             await loadRealizations();
           } catch (error) {
-            Alert.alert('Erreur', 'Impossible de supprimer l\'image.');
+            Alert.alert(t('common.error'), 'Impossible de supprimer l\'image.');
           }
         } 
       },
@@ -293,14 +282,13 @@ export default function CoiffeurPortfolioScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Barre de filtres */}
       <View style={styles.filterSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           <TouchableOpacity 
             style={[styles.filterChip, activeFilter === 'all' && { backgroundColor: colors.primary }]}
             onPress={() => setActiveFilter('all')}
           >
-            <Text style={[styles.filterText, activeFilter === 'all' && { color: '#FFF' }]}>Tout</Text>
+            <Text style={[styles.filterText, activeFilter === 'all' && { color: '#FFF' }]}>{t('common.seeAll')}</Text>
           </TouchableOpacity>
           {HAIRSTYLE_CATEGORIES.map(cat => (
             <TouchableOpacity 
@@ -324,7 +312,7 @@ export default function CoiffeurPortfolioScreen() {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Chargement du portfolio...</Text>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('common.loading')}</Text>
           </View>
         ) : filteredRealizations.length === 0 ? (
           <View style={styles.emptyState}>
@@ -339,7 +327,7 @@ export default function CoiffeurPortfolioScreen() {
             </Text>
             {activeFilter === 'all' && (
               <Button 
-                title="Ajouter ma première photo" 
+                title={t('coiffeur.addPhoto')} 
                 onPress={() => setModalVisible(true)}
                 style={{ marginTop: Spacing.lg }}
               />
@@ -359,18 +347,7 @@ export default function CoiffeurPortfolioScreen() {
                 >
                   {item.image_url.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
                     <View style={styles.image}>
-                      {Video ? (
-                        <Video
-                          source={{ uri: item.image_url }}
-                          style={StyleSheet.absoluteFill}
-                          resizeMode={ResizeMode.COVER}
-                          shouldPlay={false}
-                        />
-                      ) : (
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-                          <Ionicons name="videocam" size={32} color="#FFF" />
-                        </View>
-                      )}
+                      <PortfolioVideoItem url={item.image_url} />
                       <View style={styles.videoIndicator}>
                         <Ionicons name="play" size={24} color="#FFFFFF" />
                       </View>
@@ -379,7 +356,6 @@ export default function CoiffeurPortfolioScreen() {
                     <Image source={{ uri: item.image_url }} style={styles.image} contentFit="cover" />
                   )}
                   
-                  {/* Badge de catégorie */}
                   <View style={styles.categoryBadge}>
                     <Text style={styles.categoryBadgeText}>{item.style_category}</Text>
                   </View>
@@ -396,7 +372,6 @@ export default function CoiffeurPortfolioScreen() {
         )}
       </ScrollView>
 
-      {/* Modal Ajout Réalisation */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -406,7 +381,7 @@ export default function CoiffeurPortfolioScreen() {
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Annuler</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle Réalisation</Text>
             <TouchableOpacity onPress={handleSave} disabled={isSaving}>
@@ -421,27 +396,16 @@ export default function CoiffeurPortfolioScreen() {
             >
               {newImage ? (
                 newImage.toLowerCase().match(/\.(mp4|mov|wmv|avi|quicktime)$/) ? (
-                  Video ? (
-                    <Video
-                      source={{ uri: newImage }}
-                      style={styles.previewImage}
-                      useNativeControls
-                      resizeMode={ResizeMode.COVER}
-                      isLooping
-                    />
-                  ) : (
-                    <View style={[styles.previewImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-                      <Ionicons name="videocam" size={48} color="#FFF" />
-                      <Text style={{ color: '#FFF', marginTop: 10 }}>Vidéo sélectionnée</Text>
-                    </View>
-                  )
+                  <View style={styles.previewImage}>
+                    <PortfolioVideoItem url={newImage} />
+                  </View>
                 ) : (
                   <Image source={{ uri: newImage }} style={styles.previewImage} />
                 )
               ) : (
                 <View style={styles.pickerPlaceholder}>
                   <Ionicons name="camera" size={48} color={colors.textMuted} />
-                  <Text style={{ color: colors.textMuted, marginTop: 8 }}>Prendre ou choisir un média</Text>
+                  <Text style={{ color: colors.textMuted, marginTop: 8 }}>{t('coiffeur.addPhoto')}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -487,208 +451,40 @@ export default function CoiffeurPortfolioScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  loadingContainer: {
-    paddingVertical: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  filterSection: {
-    paddingBottom: Spacing.md,
-  },
-  filterScroll: {
-    paddingHorizontal: Spacing.md,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: 40,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  gridItem: {
-    width: COLUMN_WIDTH,
-    height: COLUMN_WIDTH * 1.2,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: '#E5E5E5',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  videoIndicator: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -20,
-    marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(25,25,25,0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  categoryBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  itemOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 8,
-  },
-  itemCaption: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    lineHeight: 20,
-  },
+  loadingContainer: { paddingVertical: 60, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, fontWeight: '500' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.lg },
+  title: { fontSize: 28, fontWeight: '800' },
+  subtitle: { fontSize: 14, marginTop: 2 },
+  filterSection: { paddingBottom: Spacing.md },
+  filterScroll: { paddingHorizontal: Spacing.md, gap: 8 },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
+  filterText: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
+  addButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  scrollContent: { paddingHorizontal: Spacing.md, paddingBottom: 40 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  gridItem: { width: COLUMN_WIDTH, height: COLUMN_WIDTH * 1.2, borderRadius: BorderRadius.lg, overflow: 'hidden', backgroundColor: '#E5E5E5' },
+  image: { width: '100%', height: '100%' },
+  videoIndicator: { position: 'absolute', top: '50%', left: '50%', marginLeft: -20, marginTop: -20, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  categoryBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(25,25,25,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  categoryBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
+  itemOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8 },
+  itemCaption: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyIconCircle: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  emptyText: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  emptySubtext: { fontSize: 14, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   modalContainer: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalContent: {
-    padding: Spacing.md,
-  },
-  imagePicker: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    marginBottom: Spacing.xl,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  pickerPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formSection: {
-    marginBottom: Spacing.xl,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  categoryScroll: {
-    flexDirection: 'row',
-  },
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginRight: 8,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  input: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalContent: { padding: Spacing.md },
+  imagePicker: { width: '100%', aspectRatio: 1, borderRadius: BorderRadius.xl, borderWidth: 2, borderStyle: 'dashed', overflow: 'hidden', marginBottom: Spacing.xl },
+  previewImage: { width: '100%', height: '100%' },
+  pickerPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  formSection: { marginBottom: Spacing.xl },
+  label: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  categoryScroll: { flexDirection: 'row' },
+  categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  categoryText: { fontSize: 14, fontWeight: '600' },
+  input: { borderRadius: BorderRadius.md, borderWidth: 1, padding: 12, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
 });
